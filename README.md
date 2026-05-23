@@ -6,8 +6,8 @@ This repository defines a simple **group of repositories** for managing multiple
 
 Create one GitHub organization (or team namespace) and keep each project in its own repository:
 
-- `ad-west-web` (JavaScript/TypeScript)
-- `ad-west-api` (Python)
+- `ad-west-web` (React)
+- `ad-west-api` (Next.js)
 - `ad-west-services` (Go)
 - `ad-west-data` (SQL + Python)
 - `ad-west-infra` (Terraform/YAML)
