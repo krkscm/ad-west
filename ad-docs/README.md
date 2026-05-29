@@ -5,6 +5,17 @@
 - business-intake/BRS_Zone_Remaining_Requirement.md
 - business-intake-modular/README.md
 
+## Reverse Engineered Application Docs (Current Implementation)
+- application-documentation/README.md
+- application-documentation/01-system-overview.md
+- application-documentation/02-backend-architecture.md
+- application-documentation/03-frontend-architecture.md
+- application-documentation/04-auth-and-google-integration.md
+- application-documentation/05-public-gateway-and-member-services.md
+- application-documentation/06-data-and-migrations.md
+- application-documentation/07-runtime-and-deployment.md
+- application-documentation/diagrams/adwest-architecture.svg
+
 ## Required Documentation Structure
 - business-intake-modular
 - business-intake

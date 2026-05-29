@@ -1,7 +1,8 @@
 -- 034_remove_deprecated_contacts_import_runtime.sql
 -- Decommission deprecated contact import / dedup / merge runtime persistence.
--- NOTE: Base contacts and memberships tables remain for now because other modules
--- still reference contact identity in this phase.
+-- NOTE: The base contacts table has been removed from the bootstrap schema.
+-- This script now only clears out any legacy import/dedup/contact-merge objects
+-- that may still exist in older databases.
 
 DROP FUNCTION IF EXISTS adwest.merge_contacts(
   uuid,

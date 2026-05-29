@@ -25,6 +25,17 @@ import { SreniDocumentsPage } from './SreniDocumentsPage';
 import { SreniReportsPage } from './SreniReportsPage';
 import { AttendanceMetricsPage } from './settings/AttendanceMetricsPage';
 import { ReportConfigSettingsPage } from './settings/ReportConfigSettingsPage';
+import { ResponsibilityChartPage } from './settings/ResponsibilityChartPage';
+import { GoogleIntegrationSettingsPage } from './settings/GoogleIntegrationSettingsPage';
+import { HelpdeskTicketsPage } from './helpdesk/HelpdeskTicketsPage';
+import { JobPostingsPage } from './helpdesk/JobPostingsPage';
+import { JobApplicationsPage } from './helpdesk/JobApplicationsPage';
+import { ReimbursementPage } from './member-services/ReimbursementPage';
+import { SpecialEventsPage } from './member-services/SpecialEventsPage';
+import { NotificationsAdminPage } from './member-services/NotificationsAdminPage';
+import { NotificationCarouselModal } from '../components/common/NotificationCarouselModal';
+import { GmailWorkspacePanel } from '../components/features/GmailWorkspacePanel';
+import { InsightsPage } from './InsightsPage';
 import {
   ApprovalWorkflowDefinitionApi,
   backendApi,
@@ -44,13 +55,6 @@ const toUiError = (error: unknown, fallback: string): string => {
 
   return error.message || fallback;
 };
-
-interface UiAuditLog {
-  id: string;
-  actorName: string;
-  action: string;
-  timestamp: string;
-}
 
 interface UiProgram {
   id: string;
@@ -75,7 +79,17 @@ type ActiveTab =
   | 'settings-permissions'
   | 'settings-approval-workflows'
   | 'settings-attendance-metrics'
+  | 'settings-responsibility-chart'
   | 'settings-report-config'
+  | 'settings-google-integration'
+  | 'insights'
+  | 'helpdesk-tickets'
+  | 'job-postings'
+  | 'job-applications'
+  | 'member-services-reimbursements'
+  | 'member-services-events'
+  | 'member-services-notifications'
+  | 'member-services-gmail'
   | `sreni-calendar-${string}`
   | `sreni-contacts-${string}`
   | `sreni-attendance-${string}`
@@ -90,13 +104,18 @@ const ALL_TABS: ActiveTab[] = [
   'settings-admins', 'settings-admins-form', 'settings-users-form', 'settings-roles-definition', 'settings-location-definition',
   'settings-sreni-definition', 'settings-permissions', 'settings-permission-sets', 'settings-enum-values',
   'settings-users', 'settings-approval-workflows', 'settings-approval-workflows-form', 'settings-attendance-metrics',
-  'settings-report-config',
+  'settings-responsibility-chart', 'settings-report-config',
+  'settings-google-integration',
+  'insights',
+  'helpdesk-tickets', 'job-postings', 'job-applications',
+  'member-services-reimbursements', 'member-services-events', 'member-services-notifications', 'member-services-gmail',
 ];
 
 const LEGACY_TAB_REDIRECTS: Record<string, ActiveTab> = {
   'permission-sets': 'settings-permission-sets',
   'users': 'settings-users',
   'approval-workflows': 'settings-approval-workflows',
+  'responsibility-chart': 'settings-responsibility-chart',
 };
 
 const resolveTabFromHash = (hash: string): ActiveTab | null => {
@@ -133,7 +152,17 @@ const TAB_METADATA: { [key: string]: { label: string; parent?: 'settings' } } = 
   'settings-permissions': { label: 'Permissions', parent: 'settings' },
   'settings-approval-workflows': { label: 'Approval Workflows', parent: 'settings' },
   'settings-attendance-metrics': { label: 'Attendance Metrics', parent: 'settings' },
+  'settings-responsibility-chart': { label: 'Responsibility Chart', parent: 'settings' },
   'settings-report-config': { label: 'Report Config', parent: 'settings' },
+  'settings-google-integration': { label: 'Google Integration', parent: 'settings' },
+  'insights': { label: 'Insights' },
+  'helpdesk-tickets': { label: 'Helpdesk Tickets' },
+  'job-postings': { label: 'Job Postings' },
+  'job-applications': { label: 'Job Applications' },
+  'member-services-reimbursements': { label: 'Reimbursements' },
+  'member-services-events': { label: 'Special Events' },
+  'member-services-notifications': { label: 'Notifications' },
+  'member-services-gmail': { label: 'Gmail Workspace' },
 };
 
 const SETTINGS_TABS: ActiveTab[] = Object.entries(TAB_METADATA)
@@ -193,8 +222,12 @@ const buildBreadcrumbItems = (
 export const AdminDashboardPage: React.FC = () => {
   const [activeTab, setActiveTabState] = useState<ActiveTab>(getInitialTab);
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
+  const [isGatewayOpen, setIsGatewayOpen] = useState(true);
+  const [isMemberServicesOpen, setIsMemberServicesOpen] = useState(true);
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isVerySmallDevice, setIsVerySmallDevice] = useState(() => window.innerWidth <= 480);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [adminFormEditId, setAdminFormEditId] = useState<string | null>(null);
   const [usersFormEdit, setUsersFormEdit] = useState<UserApi | null>(null);
   const [approvalWorkflowFormEdit, setApprovalWorkflowFormEdit] = useState<ApprovalWorkflowDefinitionApi | null>(null);
@@ -206,7 +239,29 @@ export const AdminDashboardPage: React.FC = () => {
   const setActiveTab = useCallback((tab: ActiveTab) => {
     window.location.hash = tab;
     setActiveTabState(tab);
+    if (isVerySmallDevice) {
+      setIsMobileNavOpen(false);
+    }
+  }, [isVerySmallDevice]);
+
+  useEffect(() => {
+    const onResize = () => {
+      const verySmall = window.innerWidth <= 480;
+      setIsVerySmallDevice(verySmall);
+      if (!verySmall) {
+        setIsMobileNavOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  useEffect(() => {
+    if (isVerySmallDevice && isSidebarCollapsed) {
+      setIsSidebarCollapsed(false);
+    }
+  }, [isVerySmallDevice, isSidebarCollapsed]);
 
   const openAdminForm = useCallback((editId: string | null) => {
     setAdminFormEditId(editId);
@@ -274,8 +329,12 @@ export const AdminDashboardPage: React.FC = () => {
 
   // Metrics state
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
-  const [recentLogs, setRecentLogs] = useState<UiAuditLog[]>([]);
   const [programs, setPrograms] = useState<UiProgram[]>([]);
+  const [openTicketsCount, setOpenTicketsCount] = useState(0);
+  const [newApplicationsCount, setNewApplicationsCount] = useState(0);
+  const [underReviewApplicationsCount, setUnderReviewApplicationsCount] = useState(0);
+  const [activeJobPostingsCount, setActiveJobPostingsCount] = useState(0);
+  const [expiringJobPostingsCount, setExpiringJobPostingsCount] = useState(0);
   const [srenyId, setSrenyId] = useState('');
   const [docFolderName, setDocFolderName] = useState('Weekly Reports');
   const [docFileName, setDocFileName] = useState('sreny-weekly-summary.pdf');
@@ -291,33 +350,75 @@ export const AdminDashboardPage: React.FC = () => {
   useEffect(() => {
     const loadDashboard = async () => {
       try {
-        const [logs, pendingApprovals, srenies] = await Promise.all([
-          backendApi.listAuditLogs(),
+        const [pendingApprovalsResult, sreniesResult, ticketsResult, jobPostingsResult, jobApplicationsResult] = await Promise.allSettled([
           backendApi.listMyApprovalActions('pending'),
           backendApi.listSrenies(),
+          backendApi.listHelpdeskTickets(),
+          backendApi.listJobPostings(),
+          backendApi.listAllJobApplications(),
         ]);
 
-        setPendingApprovalsCount(pendingApprovals.length);
-        setSrenyId((prev) => prev || srenies[0]?.id || '');
-        setRecentLogs(
-          logs.slice(0, 5).map((log) => ({
-            id: log.id,
-            actorName: log.actorId,
-            action: log.action,
-            timestamp: log.timestamp,
-          })),
-        );
-        setPrograms(
-          srenies.map((sreni) => ({
-            id: sreni.id,
-            title: sreni.name,
-            subtitle: sreni.zoneId,
-          })),
-        );
+        if (pendingApprovalsResult.status === 'fulfilled') {
+          setPendingApprovalsCount(pendingApprovalsResult.value.length);
+        } else {
+          setPendingApprovalsCount(0);
+        }
+
+        if (sreniesResult.status === 'fulfilled') {
+          setSrenyId((prev) => prev || sreniesResult.value[0]?.id || '');
+          setPrograms(
+            sreniesResult.value.map((sreni) => ({
+              id: sreni.id,
+              title: sreni.name,
+              subtitle: sreni.zoneId,
+            })),
+          );
+        } else {
+          setPrograms([]);
+        }
+
+        if (ticketsResult.status === 'fulfilled') {
+          const tickets = ticketsResult.value.items;
+          setOpenTicketsCount(tickets.filter((ticket) => ticket.status === 'open' || ticket.status === 'in_progress').length);
+        } else {
+          setOpenTicketsCount(0);
+        }
+
+        if (jobPostingsResult.status === 'fulfilled') {
+          const jobPostings = jobPostingsResult.value.items;
+          const activeJobPostings = jobPostings.filter((job) => job.isActive);
+          setActiveJobPostingsCount(activeJobPostings.length);
+
+          const now = Date.now();
+          const next14Days = now + 14 * 24 * 60 * 60 * 1000;
+          setExpiringJobPostingsCount(
+            activeJobPostings.filter((job) => {
+              if (!job.expiresAt) return false;
+              const expiresAt = Date.parse(job.expiresAt);
+              return Number.isFinite(expiresAt) && expiresAt >= now && expiresAt <= next14Days;
+            }).length,
+          );
+        } else {
+          setActiveJobPostingsCount(0);
+          setExpiringJobPostingsCount(0);
+        }
+
+        if (jobApplicationsResult.status === 'fulfilled') {
+          const applications = jobApplicationsResult.value.items;
+          setNewApplicationsCount(applications.filter((application) => application.status === 'new').length);
+          setUnderReviewApplicationsCount(applications.filter((application) => application.status === 'under_review').length);
+        } else {
+          setNewApplicationsCount(0);
+          setUnderReviewApplicationsCount(0);
+        }
       } catch {
         setPendingApprovalsCount(0);
-        setRecentLogs([]);
         setPrograms([]);
+        setOpenTicketsCount(0);
+        setNewApplicationsCount(0);
+        setUnderReviewApplicationsCount(0);
+        setActiveJobPostingsCount(0);
+        setExpiringJobPostingsCount(0);
       }
     };
 
@@ -326,11 +427,14 @@ export const AdminDashboardPage: React.FC = () => {
 
   if (!adminUser) return null;
 
-  // Determine user permissions based on first role
-  const userRole = adminUser.roles[0]?.role;
+  // Normalize role values so both UI labels and API enum values are supported.
+  const normalizedRoles = adminUser.roles.map((assignment) =>
+    String(assignment.role).trim().toUpperCase().replace(/\s+/g, '_'),
+  );
 
-  const isSuperAdmin = userRole === 'Super Admin';
-  const isZoneAdmin = userRole === 'Zone Admin';
+  const isSuperAdmin = normalizedRoles.includes('SUPER_ADMIN');
+  const isZoneAdmin = normalizedRoles.includes('ZONE_ADMIN');
+  const userRole = adminUser.roles[0]?.role ?? (isSuperAdmin ? 'Super Admin' : isZoneAdmin ? 'Zone Admin' : 'Sreny Admin');
   const showOpsTab = isSuperAdmin || isZoneAdmin;
 
   // Allowed tabs:
@@ -340,6 +444,21 @@ export const AdminDashboardPage: React.FC = () => {
   const showAdminsTab = isSuperAdmin;
   const showLogsTab = isSuperAdmin || isZoneAdmin;
   const isSettingsTabActive = SETTINGS_TABS.includes(activeTab) || activeTab === 'settings-admins-form' || activeTab === 'settings-users-form' || activeTab === 'settings-approval-workflows-form';
+  const hasGatewayMenu = (key: string) => sidebarMenuItems.some((item) => item.active && item.key === key);
+  const showGatewaySection = isSuperAdmin || hasGatewayMenu('helpdesk') || hasGatewayMenu('helpdesk-tickets') || hasGatewayMenu('job-postings') || hasGatewayMenu('job-applications');
+  const showHelpdeskTicketsTab = isSuperAdmin || hasGatewayMenu('helpdesk-tickets');
+  const showJobPostingsTab = isSuperAdmin || hasGatewayMenu('job-postings');
+  const showJobApplicationsTab = isSuperAdmin || hasGatewayMenu('job-applications');
+  const isGatewayTabActive = activeTab === 'helpdesk-tickets' || activeTab === 'job-postings' || activeTab === 'job-applications';
+  const isGatewaySectionOpen = isGatewayOpen || isGatewayTabActive;
+
+  const showMemberServicesSection = isSuperAdmin || hasGatewayMenu('member-services') || hasGatewayMenu('member-services-reimbursements') || hasGatewayMenu('member-services-events') || hasGatewayMenu('member-services-notifications') || hasGatewayMenu('member-services-gmail');
+  const showReimbursementsTab = isSuperAdmin || hasGatewayMenu('member-services-reimbursements');
+  const showEventsTab = isSuperAdmin || hasGatewayMenu('member-services-events');
+  const showNotificationsTab = isSuperAdmin || hasGatewayMenu('member-services-notifications');
+  const showGmailTab = isSuperAdmin || hasGatewayMenu('member-services-gmail');
+  const isMemberServicesTabActive = activeTab === 'member-services-reimbursements' || activeTab === 'member-services-events' || activeTab === 'member-services-notifications' || activeTab === 'member-services-gmail';
+  const isMemberServicesSectionOpen = isMemberServicesOpen || isMemberServicesTabActive;
 
   // Sreni sidebar menu structure — only items whose keys start with 'sreni-'
   const sreniParentMenus = sidebarMenuItems.filter(m => m.active && m.key.startsWith('sreni-') && !m.parentKey);
@@ -373,6 +492,139 @@ export const AdminDashboardPage: React.FC = () => {
   });
   const sidebarWidth = isSidebarCollapsed ? '84px' : '260px';
   const currentYear = new Date().getFullYear();
+  const uniqueZoneCount = new Set(programs.map((program) => program.subtitle).filter(Boolean)).size;
+  const mappedSreniesCount = programs.filter((program) => Boolean(program.subtitle)).length;
+  const unmappedSreniesCount = programs.length - mappedSreniesCount;
+  const coverageRate = programs.length > 0 ? Math.round((mappedSreniesCount / programs.length) * 100) : 0;
+  const intakeBacklogCount = openTicketsCount + newApplicationsCount + underReviewApplicationsCount;
+  const hiringPipelineCount = newApplicationsCount + underReviewApplicationsCount;
+  const reviewLoadRate = hiringPipelineCount > 0 ? Math.round((underReviewApplicationsCount / hiringPipelineCount) * 100) : 0;
+  const backlogPerSreni = programs.length > 0 ? Number((intakeBacklogCount / programs.length).toFixed(1)) : 0;
+  const isSreniAdmin = !isSuperAdmin && !isZoneAdmin;
+  const thresholdProfile = isSuperAdmin
+    ? { approvalsWatch: 5, approvalsCritical: 15, intakeWatch: 10, intakeCritical: 25, coverageWatch: 80, coverageHealthy: 92, expiringWatch: 2, expiringCritical: 6, unmappedWatch: 1, unmappedCritical: 4, reviewLoadWatch: 55, reviewLoadCritical: 75, backlogDensityWatch: 2, backlogDensityCritical: 4 }
+    : isZoneAdmin
+    ? { approvalsWatch: 3, approvalsCritical: 10, intakeWatch: 7, intakeCritical: 16, coverageWatch: 75, coverageHealthy: 90, expiringWatch: 1, expiringCritical: 4, unmappedWatch: 1, unmappedCritical: 3, reviewLoadWatch: 50, reviewLoadCritical: 70, backlogDensityWatch: 1.5, backlogDensityCritical: 3 }
+    : { approvalsWatch: 2, approvalsCritical: 6, intakeWatch: 5, intakeCritical: 12, coverageWatch: 70, coverageHealthy: 85, expiringWatch: 1, expiringCritical: 3, unmappedWatch: 1, unmappedCritical: 2, reviewLoadWatch: 45, reviewLoadCritical: 65, backlogDensityWatch: 1, backlogDensityCritical: 2 };
+
+  const toSignal = (value: number, watchAt: number, criticalAt: number): 'healthy' | 'watch' | 'critical' => {
+    if (value >= criticalAt) return 'critical';
+    if (value >= watchAt) return 'watch';
+    return 'healthy';
+  };
+
+  const signalStyles: Record<'healthy' | 'watch' | 'critical' | 'neutral', { accent: string; badgeClass: string; label: string }> = {
+    healthy: { accent: 'var(--success)', badgeClass: 'badge-success', label: 'Healthy' },
+    watch: { accent: 'var(--warning)', badgeClass: 'badge-warning', label: 'Watch' },
+    critical: { accent: 'var(--error)', badgeClass: 'badge-error', label: 'Critical' },
+    neutral: { accent: 'var(--info)', badgeClass: 'badge-info', label: 'Baseline' },
+  };
+
+  const approvalsSignal = toSignal(pendingApprovalsCount, thresholdProfile.approvalsWatch, thresholdProfile.approvalsCritical);
+  const intakeSignal = toSignal(intakeBacklogCount, thresholdProfile.intakeWatch, thresholdProfile.intakeCritical);
+  const unmappedSignal: 'healthy' | 'watch' | 'critical' | 'neutral' = programs.length === 0
+    ? 'neutral'
+    : toSignal(unmappedSreniesCount, thresholdProfile.unmappedWatch, thresholdProfile.unmappedCritical);
+  const expiringSignal = toSignal(expiringJobPostingsCount, thresholdProfile.expiringWatch, thresholdProfile.expiringCritical);
+  const reviewLoadSignal = toSignal(reviewLoadRate, thresholdProfile.reviewLoadWatch, thresholdProfile.reviewLoadCritical);
+  const backlogDensitySignal: 'healthy' | 'watch' | 'critical' | 'neutral' = programs.length === 0
+    ? 'neutral'
+    : toSignal(backlogPerSreni, thresholdProfile.backlogDensityWatch, thresholdProfile.backlogDensityCritical);
+  const coverageSignal: 'healthy' | 'watch' | 'critical' | 'neutral' = programs.length === 0
+    ? 'neutral'
+    : coverageRate >= thresholdProfile.coverageHealthy
+    ? 'healthy'
+    : coverageRate >= thresholdProfile.coverageWatch
+    ? 'watch'
+    : 'critical';
+
+  const dashboardHeading = isSuperAdmin
+    ? 'Executive Dashboard'
+    : isZoneAdmin
+    ? 'Zone Operations Dashboard'
+    : 'Sreni Operations Dashboard';
+  const dashboardSubtitle = isSuperAdmin
+    ? 'Cross-platform governance, intake, and approval posture across the organization.'
+    : isZoneAdmin
+    ? 'Zone-level workload, sreni coverage quality, and execution readiness.'
+    : 'Day-to-day sreni execution health, service requests, and pending approvals.';
+
+  const dashboardMetrics = isSuperAdmin
+    ? [
+        { label: 'Approval Queue', value: pendingApprovalsCount, signal: approvalsSignal, icon: '📝', hint: 'Awaiting decision' },
+        { label: 'Intake Backlog', value: intakeBacklogCount, signal: intakeSignal, icon: '📥', hint: 'Tickets + applications' },
+        { label: 'Mapping Coverage', value: `${coverageRate}%`, signal: coverageSignal, icon: '🧭', hint: `${mappedSreniesCount}/${programs.length} mapped across ${uniqueZoneCount} zones` },
+        { label: 'Backlog Density', value: backlogPerSreni, signal: backlogDensitySignal, icon: '⚖️', hint: 'Avg backlog per sreni' },
+        { label: 'Review Load', value: `${reviewLoadRate}%`, signal: reviewLoadSignal, icon: '🔎', hint: 'Share in under-review' },
+        { label: 'Expiring Posts (14d)', value: expiringJobPostingsCount, signal: expiringSignal, icon: '⏳', hint: `${activeJobPostingsCount} active job posts` },
+      ]
+    : isZoneAdmin
+    ? [
+        { label: 'Zone Approval Queue', value: pendingApprovalsCount, signal: approvalsSignal, icon: '📝', hint: 'Awaiting decision' },
+        { label: 'Zone Intake Backlog', value: intakeBacklogCount, signal: intakeSignal, icon: '📥', hint: 'Tickets + applications' },
+        { label: 'Coverage Rate', value: `${coverageRate}%`, signal: coverageSignal, icon: '🧭', hint: `${mappedSreniesCount}/${programs.length} mapped across ${uniqueZoneCount} zones` },
+        { label: 'Mapping Gaps', value: unmappedSreniesCount, signal: unmappedSignal, icon: '⚠️', hint: 'Srenies without zones' },
+        { label: 'Review Load', value: `${reviewLoadRate}%`, signal: reviewLoadSignal, icon: '🔎', hint: 'Under-review pressure' },
+        { label: 'Expiring Posts (14d)', value: expiringJobPostingsCount, signal: expiringSignal, icon: '⏳', hint: `${activeJobPostingsCount} active job posts` },
+      ]
+    : [
+        { label: 'My Pending Approvals', value: pendingApprovalsCount, signal: approvalsSignal, icon: '📝', hint: 'Awaiting your action' },
+        { label: 'Open Service Tickets', value: openTicketsCount, signal: intakeSignal, icon: '🎫', hint: 'Needs response' },
+        { label: 'Candidate Intake', value: newApplicationsCount, signal: intakeSignal, icon: '📄', hint: 'New applicants' },
+        { label: 'Review Queue', value: underReviewApplicationsCount, signal: reviewLoadSignal, icon: '🔎', hint: 'In progress reviews' },
+        { label: 'Active Job Posts', value: activeJobPostingsCount, signal: expiringSignal, icon: '📌', hint: 'Currently open opportunities' },
+        { label: 'Expiry Risk (14d)', value: expiringJobPostingsCount, signal: expiringSignal, icon: '⏳', hint: `${activeJobPostingsCount} active job posts` },
+      ];
+
+  const dashboardPipelineRows = isSuperAdmin
+    ? [
+        { label: 'Service Intake Backlog', value: intakeBacklogCount, signal: intakeSignal },
+        { label: 'Pending Approvals', value: pendingApprovalsCount, signal: approvalsSignal },
+        { label: 'Unmapped Srenies', value: unmappedSreniesCount, signal: unmappedSignal },
+        { label: 'Expiring Job Posts (14d)', value: expiringJobPostingsCount, signal: expiringSignal },
+      ]
+    : isZoneAdmin
+    ? [
+        { label: 'Zone Intake Backlog', value: intakeBacklogCount, signal: intakeSignal },
+        { label: 'Zone Approval Queue', value: pendingApprovalsCount, signal: approvalsSignal },
+        { label: 'Sreni Mapping Gaps', value: unmappedSreniesCount, signal: unmappedSignal },
+        { label: 'Applications Under Review', value: underReviewApplicationsCount, signal: intakeSignal },
+      ]
+    : [
+        { label: 'My Pending Approvals', value: pendingApprovalsCount, signal: approvalsSignal },
+        { label: 'Open Tickets Requiring Action', value: openTicketsCount, signal: intakeSignal },
+        { label: 'New Candidate Applications', value: newApplicationsCount, signal: intakeSignal },
+        { label: 'Applications in Review', value: underReviewApplicationsCount, signal: intakeSignal },
+      ];
+
+  const dashboardPriorities = [
+    {
+      id: 'pending-approvals',
+      title: isSreniAdmin ? 'My pending approvals' : 'Pending approvals',
+      value: pendingApprovalsCount,
+      note: pendingApprovalsCount > 0 ? 'Prioritize approvals to avoid downstream workflow delay.' : 'Approval queue is clear.',
+      targetTab: 'my-approvals' as ActiveTab,
+      tone: signalStyles[approvalsSignal].accent,
+    },
+    {
+      id: 'intake-backlog',
+      title: 'Service intake backlog',
+      value: intakeBacklogCount,
+      note: intakeBacklogCount > 0 ? 'Open support and hiring requests are waiting for action.' : 'No intake backlog at the moment.',
+      targetTab: showHelpdeskTicketsTab ? 'helpdesk-tickets' as ActiveTab : showJobApplicationsTab ? 'job-applications' as ActiveTab : 'dashboard' as ActiveTab,
+      tone: signalStyles[intakeSignal].accent,
+    },
+    ...((isSuperAdmin || isZoneAdmin)
+      ? [{
+          id: 'mapping-gaps',
+          title: 'Sreni mapping gaps',
+          value: unmappedSreniesCount,
+          note: unmappedSreniesCount > 0 ? 'Some srenies are missing zone mapping and should be normalized.' : 'All srenies are mapped to zones.',
+          targetTab: 'settings-sreni-definition' as ActiveTab,
+          tone: signalStyles[unmappedSignal].accent,
+        }]
+      : []),
+  ];
 
   const runDocumentFlow = async () => {
     if (!srenyId) {
@@ -503,11 +755,28 @@ export const AdminDashboardPage: React.FC = () => {
 
   return (
     <div className="admin-theme" style={{ display: 'flex', minHeight: '100vh', width: '100vw' }}>
+      <NotificationCarouselModal userType="admin" />
+      {isVerySmallDevice && isMobileNavOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation drawer"
+          onClick={() => setIsMobileNavOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1190,
+            background: 'rgba(2, 6, 23, 0.54)',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+          }}
+        />
+      )}
       
       {/* Sidebar navigation */}
       <aside
         style={{
-          width: sidebarWidth,
+          width: isVerySmallDevice ? 'min(86vw, 320px)' : sidebarWidth,
           height: '100vh',
           flexShrink: 0,
           borderRight: '1px solid var(--border-dark)',
@@ -516,22 +785,27 @@ export const AdminDashboardPage: React.FC = () => {
           display: 'flex',
           flexDirection: 'column',
           padding: '24px 0',
-          transition: 'width 0.2s ease',
+          transition: isVerySmallDevice ? 'transform 0.22s ease' : 'width 0.2s ease',
           overflowY: 'auto',
           overflowX: 'hidden',
-          position: 'sticky',
+          position: isVerySmallDevice ? 'fixed' : 'sticky',
           top: 0,
+          left: isVerySmallDevice ? 0 : undefined,
+          zIndex: isVerySmallDevice ? 1200 : undefined,
+          transform: isVerySmallDevice ? (isMobileNavOpen ? 'translateX(0)' : 'translateX(-104%)') : undefined,
+          pointerEvents: isVerySmallDevice && !isMobileNavOpen ? 'none' : 'auto',
+          boxShadow: isVerySmallDevice && isMobileNavOpen ? '0 24px 56px -20px rgba(2, 6, 23, 0.6)' : undefined,
         }}
       >
         {/* Brand */}
         <div style={{ padding: isSidebarCollapsed ? '0 12px' : '0 24px', marginBottom: '40px', display: 'flex', alignItems: 'center', gap: '12px', justifyContent: isSidebarCollapsed ? 'center' : 'flex-start' }}>
           <img
             src="/favicon.png"
-            alt="Abu Dhabi West"
+            alt="IFCA Abu Dhabi"
             style={{ width: '38px', height: '38px', borderRadius: '8px', objectFit: 'contain', flexShrink: 0 }}
           />
           {!isSidebarCollapsed && (
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary-dark)', lineHeight: 1 }}>Abu Dhabi West</h3>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary-dark)', lineHeight: 1 }}>IFCA Abu Dhabi</h3>
           )}
         </div>
 
@@ -551,6 +825,72 @@ export const AdminDashboardPage: React.FC = () => {
             title="Dashboard"
           >
             <span>📊</span>{!isSidebarCollapsed && <span style={{ marginLeft: '8px' }}>Dashboard</span>}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('insights')}
+            className={`btn ${activeTab === 'insights' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{
+              justifyContent: isSidebarCollapsed ? 'center' : 'flex-start',
+              padding: '10px 16px', fontSize: '0.9rem',
+              background: activeTab === 'insights' ? '' : 'transparent', border: 'none',
+              color: activeTab === 'insights' ? '#fff' : 'var(--text-secondary-dark)',
+            }}
+            title="Insights"
+          >
+            <span>📈</span>{!isSidebarCollapsed && <span style={{ marginLeft: '8px' }}>Insights</span>}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('my-approvals')}
+            className={`btn ${activeTab === 'my-approvals' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{
+              justifyContent: isSidebarCollapsed ? 'center' : 'flex-start',
+              padding: '10px 16px',
+              fontSize: '0.9rem',
+              background: activeTab === 'my-approvals' ? '' : 'transparent',
+              border: 'none',
+              color: activeTab === 'my-approvals' ? '#fff' : 'var(--text-secondary-dark)',
+              position: 'relative',
+            }}
+            title="My Approvals"
+          >
+            <span>📝</span>
+            {!isSidebarCollapsed && <span style={{ marginLeft: '8px' }}>My Approvals</span>}
+            {pendingApprovalsCount > 0 && (
+              <span
+                style={{
+                  marginLeft: isSidebarCollapsed ? '0' : '8px',
+                  background: 'var(--warning)',
+                  color: '#fff',
+                  borderRadius: '10px',
+                  padding: '1px 7px',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  position: isSidebarCollapsed ? 'absolute' : 'static',
+                  top: isSidebarCollapsed ? '6px' : undefined,
+                  right: isSidebarCollapsed ? '6px' : undefined,
+                }}
+              >
+                {pendingApprovalsCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('settings-responsibility-chart')}
+            className={`btn ${activeTab === 'settings-responsibility-chart' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{
+              justifyContent: isSidebarCollapsed ? 'center' : 'flex-start',
+              padding: '10px 16px',
+              fontSize: '0.9rem',
+              background: activeTab === 'settings-responsibility-chart' ? '' : 'transparent',
+              border: 'none',
+              color: activeTab === 'settings-responsibility-chart' ? '#fff' : 'var(--text-secondary-dark)',
+            }}
+            title="Responsibility Chart"
+          >
+            <span>🧭</span>{!isSidebarCollapsed && <span style={{ marginLeft: '8px' }}>Responsibility Chart</span>}
           </button>
 
           {/* Dynamic Sreni sections — each Sreni created in Settings appears here */}
@@ -630,41 +970,172 @@ export const AdminDashboardPage: React.FC = () => {
             );
           })}
 
-          <button
-            onClick={() => setActiveTab('my-approvals')}
-            className={`btn ${activeTab === 'my-approvals' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{
-              justifyContent: isSidebarCollapsed ? 'center' : 'flex-start',
-              padding: '10px 16px',
-              fontSize: '0.9rem',
-              background: activeTab === 'my-approvals' ? '' : 'transparent',
-              border: 'none',
-              color: activeTab === 'my-approvals' ? '#fff' : 'var(--text-secondary-dark)',
-              position: 'relative',
-            }}
-            title="My Approvals"
-          >
-            <span>📝</span>
-            {!isSidebarCollapsed && <span style={{ marginLeft: '8px' }}>My Approvals</span>}
-            {pendingApprovalsCount > 0 && (
-              <span
+          {showGatewaySection && (
+            <div>
+              <button
+                className={`btn ${isGatewayTabActive ? 'btn-primary' : 'btn-secondary'}`}
                 style={{
-                  marginLeft: isSidebarCollapsed ? '0' : '8px',
-                  background: 'var(--warning)',
-                  color: '#fff',
-                  borderRadius: '10px',
-                  padding: '1px 7px',
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  position: isSidebarCollapsed ? 'absolute' : 'static',
-                  top: isSidebarCollapsed ? '6px' : undefined,
-                  right: isSidebarCollapsed ? '6px' : undefined,
+                  justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
+                  padding: '10px 16px',
+                  fontSize: '0.9rem',
+                  background: isGatewayTabActive ? '' : 'transparent',
+                  border: 'none',
+                  color: isGatewayTabActive ? '#fff' : 'var(--text-secondary-dark)',
+                  width: '100%',
+                }}
+                title="Helpdesk"
+                onClick={() => {
+                  if (isSidebarCollapsed) {
+                    if (showHelpdeskTicketsTab) {
+                      setActiveTab('helpdesk-tickets');
+                      return;
+                    }
+                    if (showJobPostingsTab) {
+                      setActiveTab('job-postings');
+                      return;
+                    }
+                    if (showJobApplicationsTab) {
+                      setActiveTab('job-applications');
+                    }
+                    return;
+                  }
+                  setIsGatewayOpen((prev) => !prev);
                 }}
               >
-                {pendingApprovalsCount}
-              </span>
-            )}
-          </button>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <span>🛠️</span>
+                  {!isSidebarCollapsed && <span>Helpdesk</span>}
+                </span>
+                {!isSidebarCollapsed && <span style={{ fontSize: '0.8rem' }}>{isGatewaySectionOpen ? '▾' : '▸'}</span>}
+              </button>
+
+              {isGatewaySectionOpen && !isSidebarCollapsed && (
+                <div style={{ display: 'grid', gap: '4px', paddingLeft: '14px' }}>
+                  {showHelpdeskTicketsTab && (
+                    <button
+                      onClick={() => setActiveTab('helpdesk-tickets')}
+                      className={`btn ${activeTab === 'helpdesk-tickets' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{
+                        justifyContent: 'flex-start',
+                        padding: '8px 14px',
+                        fontSize: '0.84rem',
+                        background: activeTab === 'helpdesk-tickets' ? '' : 'transparent',
+                        border: 'none',
+                        color: activeTab === 'helpdesk-tickets' ? '#fff' : 'var(--text-secondary-dark)'
+                      }}
+                    >
+                      🎫 Helpdesk Tickets
+                    </button>
+                  )}
+
+                  {showJobPostingsTab && (
+                    <button
+                      onClick={() => setActiveTab('job-postings')}
+                      className={`btn ${activeTab === 'job-postings' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{
+                        justifyContent: 'flex-start',
+                        padding: '8px 14px',
+                        fontSize: '0.84rem',
+                        background: activeTab === 'job-postings' ? '' : 'transparent',
+                        border: 'none',
+                        color: activeTab === 'job-postings' ? '#fff' : 'var(--text-secondary-dark)'
+                      }}
+                    >
+                      📋 Job Postings
+                    </button>
+                  )}
+
+                  {showJobApplicationsTab && (
+                    <button
+                      onClick={() => setActiveTab('job-applications')}
+                      className={`btn ${activeTab === 'job-applications' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{
+                        justifyContent: 'flex-start',
+                        padding: '8px 14px',
+                        fontSize: '0.84rem',
+                        background: activeTab === 'job-applications' ? '' : 'transparent',
+                        border: 'none',
+                        color: activeTab === 'job-applications' ? '#fff' : 'var(--text-secondary-dark)'
+                      }}
+                    >
+                      📄 Job Applications
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {showMemberServicesSection && (
+            <div>
+              <button
+                className={`btn ${isMemberServicesTabActive ? 'btn-primary' : 'btn-secondary'}`}
+                style={{
+                  justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
+                  padding: '10px 16px', fontSize: '0.9rem',
+                  background: isMemberServicesTabActive ? '' : 'transparent', border: 'none',
+                  color: isMemberServicesTabActive ? '#fff' : 'var(--text-secondary-dark)', width: '100%',
+                }}
+                title="Member Services"
+                onClick={() => {
+                  if (isSidebarCollapsed) {
+                    if (showReimbursementsTab) { setActiveTab('member-services-reimbursements'); return }
+                    if (showEventsTab) { setActiveTab('member-services-events'); return }
+                    if (showNotificationsTab) { setActiveTab('member-services-notifications'); return }
+                    return
+                  }
+                  setIsMemberServicesOpen((prev) => !prev)
+                }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <span>🛎️</span>
+                  {!isSidebarCollapsed && <span>Member Services</span>}
+                </span>
+                {!isSidebarCollapsed && <span style={{ fontSize: '0.8rem' }}>{isMemberServicesSectionOpen ? '▾' : '▸'}</span>}
+              </button>
+
+              {isMemberServicesSectionOpen && !isSidebarCollapsed && (
+                <div style={{ display: 'grid', gap: '4px', paddingLeft: '14px' }}>
+                  {showReimbursementsTab && (
+                    <button
+                      onClick={() => setActiveTab('member-services-reimbursements')}
+                      className={`btn ${activeTab === 'member-services-reimbursements' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'member-services-reimbursements' ? '' : 'transparent', border: 'none', color: activeTab === 'member-services-reimbursements' ? '#fff' : 'var(--text-secondary-dark)' }}
+                    >
+                      💰 Reimbursements
+                    </button>
+                  )}
+                  {showEventsTab && (
+                    <button
+                      onClick={() => setActiveTab('member-services-events')}
+                      className={`btn ${activeTab === 'member-services-events' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'member-services-events' ? '' : 'transparent', border: 'none', color: activeTab === 'member-services-events' ? '#fff' : 'var(--text-secondary-dark)' }}
+                    >
+                      🗓️ Special Events
+                    </button>
+                  )}
+                  {showNotificationsTab && (
+                    <button
+                      onClick={() => setActiveTab('member-services-notifications')}
+                      className={`btn ${activeTab === 'member-services-notifications' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'member-services-notifications' ? '' : 'transparent', border: 'none', color: activeTab === 'member-services-notifications' ? '#fff' : 'var(--text-secondary-dark)' }}
+                    >
+                      🔔 Notifications
+                    </button>
+                  )}
+                  {showGmailTab && (
+                    <button
+                      onClick={() => setActiveTab('member-services-gmail')}
+                      className={`btn ${activeTab === 'member-services-gmail' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'member-services-gmail' ? '' : 'transparent', border: 'none', color: activeTab === 'member-services-gmail' ? '#fff' : 'var(--text-secondary-dark)' }}
+                    >
+                      ✉️ Gmail Workspace
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           <button
             onClick={() => setIsSettingsOpen((prev) => !prev)}
@@ -854,6 +1325,23 @@ export const AdminDashboardPage: React.FC = () => {
                 📊 Report Config
               </button>
 
+              {showAdminsTab && (
+                <button
+                  onClick={() => setActiveTab('settings-google-integration')}
+                  className={`btn ${activeTab === 'settings-google-integration' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{
+                    justifyContent: 'flex-start',
+                    padding: '8px 14px',
+                    fontSize: '0.84rem',
+                    background: activeTab === 'settings-google-integration' ? '' : 'transparent',
+                    border: 'none',
+                    color: activeTab === 'settings-google-integration' ? '#fff' : 'var(--text-secondary-dark)'
+                  }}
+                >
+                  🔐 Google Integration
+                </button>
+              )}
+
             </div>
           )}
         </nav>
@@ -879,7 +1367,7 @@ export const AdminDashboardPage: React.FC = () => {
       </aside>
 
       {/* Main Content Pane */}
-      <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+      <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: isVerySmallDevice ? 'auto' : '100vh', overflow: isVerySmallDevice ? 'visible' : 'hidden' }}>
         
         {/* Top Header bar */}
         <header 
@@ -910,9 +1398,15 @@ export const AdminDashboardPage: React.FC = () => {
           >
             <button
               type="button"
-              onClick={() => setIsSidebarCollapsed((prev) => !prev)}
-              aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              onClick={() => {
+                if (isVerySmallDevice) {
+                  setIsMobileNavOpen((prev) => !prev);
+                  return;
+                }
+                setIsSidebarCollapsed((prev) => !prev);
+              }}
+              aria-label={isVerySmallDevice ? (isMobileNavOpen ? 'Close navigation' : 'Open navigation') : isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={isVerySmallDevice ? (isMobileNavOpen ? 'Close navigation' : 'Open navigation') : isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               style={{
                 width: '34px',
                 height: '34px',
@@ -1010,6 +1504,29 @@ export const AdminDashboardPage: React.FC = () => {
             </button>
             <div style={{ width: '1px', height: '24px', background: 'var(--border-dark)', margin: '0 4px' }} />
             <ThemeToggle iconOnly placement="header" />
+            {adminUser.picture ? (
+              <img
+                src={adminUser.picture}
+                alt={adminUser.name}
+                style={{ width: '36px', height: '36px', borderRadius: '999px', border: '1px solid var(--border-dark)' }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '999px',
+                  border: '1px solid var(--border-dark)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'rgba(59,130,246,0.18)',
+                  fontSize: '0.9rem',
+                }}
+              >
+                👤
+              </div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
               <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, lineHeight: 1.2 }}>{adminUser.name}</h4>
               <span style={{ marginTop: '2px', fontSize: '0.75rem', lineHeight: 1.2, color: 'var(--text-secondary-dark)' }}>{adminUser.email}</span>
@@ -1030,126 +1547,126 @@ export const AdminDashboardPage: React.FC = () => {
           
           {/* TAB 1: DASHBOARD VIEW */}
           {activeTab === 'dashboard' && (
-            <div className="animate-slide-up">
-              <div style={{ marginBottom: '28px' }}>
-                <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Platform Overview</h2>
-                <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginTop: '4px' }}>
-                  Monitoring community directory health, pending validations, and administrative logs.
+            <div className="animate-slide-up" style={{ display: 'grid', gap: '18px' }}>
+              <div>
+                <h2 style={{ fontSize: '1.72rem', fontWeight: 800, margin: 0 }}>{dashboardHeading}</h2>
+                <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.9rem', margin: '6px 0 0' }}>
+                  {dashboardSubtitle}
                 </p>
               </div>
 
-              {/* Grid Widgets */}
-              <div className="dashboard-grid" style={{ marginBottom: '32px' }}>
-                
-                {/* Widget 1: Pending approvals */}
-                <div 
-                  className="widget-card glass-panel"
-                  style={{ borderLeft: '4px solid var(--warning)' }}
-                >
-                  <div className="widget-icon" style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: 'var(--warning)' }}>📝</div>
-                  <div className="widget-value">{pendingApprovalsCount}</div>
-                  <div className="widget-label" style={{ color: 'var(--text-secondary-dark)' }}>Pending Approvals</div>
-                </div>
-
-                {/* Widget 2: Active sreni */}
-                <div 
-                  className="widget-card glass-panel"
-                  style={{ borderLeft: '4px solid var(--info)' }}
-                >
-                  <div className="widget-icon" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: 'var(--info)' }}>🏘️</div>
-                  <div className="widget-value">{programs.length}</div>
-                  <div className="widget-label" style={{ color: 'var(--text-secondary-dark)' }}>Active Srenies</div>
-                </div>
-
-                {/* Widget 3: Duplicate alerts */}
-                <div 
-                  className="widget-card glass-panel"
-                  style={{ borderLeft: '4px solid var(--error)' }}
-                >
-                  <div className="widget-icon" style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', color: 'var(--error)' }}>⚠️</div>
-                  <div className="widget-value">{programs.length}</div>
-                  <div className="widget-label" style={{ color: 'var(--text-secondary-dark)' }}>Active Programs</div>
-                </div>
-
-                {/* Widget 4: Total members */}
-                <div 
-                  className="widget-card glass-panel"
-                  style={{ borderLeft: '4px solid var(--success)' }}
-                >
-                  <div className="widget-icon" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: 'var(--success)' }}>👥</div>
-                  <div className="widget-value">{recentLogs.length}</div>
-                  <div className="widget-label" style={{ color: 'var(--text-secondary-dark)' }}>Recent Security Logs</div>
-                </div>
-
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                {dashboardMetrics.map((metric) => (
+                  <div key={metric.label} className="glass-panel" style={{ padding: '16px', borderLeft: `3px solid ${signalStyles[metric.signal].accent}` }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)', fontWeight: 600 }}>{metric.label}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '1rem' }}>{metric.icon}</span>
+                        <span className={`badge ${signalStyles[metric.signal].badgeClass}`} style={{ fontSize: '0.68rem', padding: '2px 7px' }}>
+                          {signalStyles[metric.signal].label}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '8px', lineHeight: 1.1, color: signalStyles[metric.signal].accent }}>{metric.value}</div>
+                    {metric.hint && (
+                      <div style={{ marginTop: '4px', fontSize: '0.72rem', color: 'var(--text-secondary-dark)' }}>{metric.hint}</div>
+                    )}
+                  </div>
+                ))}
               </div>
 
-              {/* Layout split: recent activity and calendar */}
-              <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '32px' }}>
-                
-                {/* Recent audit activity list */}
-                <div className="glass-panel" style={{ padding: '24px' }}>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>🗂️</span> Recent Security Audits
-                  </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {recentLogs.map(log => {
-                      const date = new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                      
-                      let bColor = 'var(--info)';
-                      if (log.action.includes('FAILURE')) bColor = 'var(--error)';
-                      if (log.action.includes('SUCCESS') || log.action.includes('APPROVE') || log.action.includes('ENROLLED')) bColor = 'var(--success)';
+              <div className="glass-panel" style={{ padding: '14px 16px', display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>
+                  {isSreniAdmin ? 'Service intake backlog' : 'Sreni zone mapping coverage'}: <strong style={{ color: 'var(--text-primary-dark)' }}>{isSreniAdmin ? intakeBacklogCount : `${coverageRate}%`}</strong>
+                </span>
+                <span className={`badge ${signalStyles[unmappedSignal].badgeClass}`}>
+                  {unmappedSreniesCount} unmapped srenies
+                </span>
+                <span className={`badge ${signalStyles[expiringSignal].badgeClass}`}>
+                  {expiringJobPostingsCount} job posts expiring in 14 days
+                </span>
+              </div>
 
-                      return (
-                        <div 
-                          key={log.id}
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '12px 16px',
-                            backgroundColor: 'var(--panel-soft-bg)',
-                            borderRadius: '8px',
-                            border: '1px solid var(--border-dark)'
-                          }}
-                        >
-                          <div>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary-dark)' }}>{date} &bull; {log.actorName}</span>
-                            <h4 style={{ fontSize: '0.875rem', fontWeight: 600, marginTop: '2px' }}>{log.action.replace(/_/g, ' ')}</h4>
-                          </div>
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: bColor }} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '16px' }}>
+                <div className="glass-panel" style={{ padding: '18px' }}>
+                  <h3 style={{ fontSize: '1.02rem', fontWeight: 700, marginBottom: '12px' }}>Priority Queue</h3>
+                  <div style={{ display: 'grid', gap: '10px' }}>
+                    {dashboardPriorities.map((priority) => (
+                      <div key={priority.id} style={{ border: '1px solid var(--border-dark)', borderRadius: '10px', padding: '12px', background: 'var(--panel-soft-bg)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                          <div style={{ fontWeight: 700 }}>{priority.title}</div>
+                          <span style={{ color: priority.tone, fontWeight: 800 }}>{priority.value}</span>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Upcoming programs list */}
-                <div className="glass-panel" style={{ padding: '24px' }}>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>📅</span> Active Sreni List
-                  </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {programs.map(prog => (
-                      <div 
-                        key={prog.id}
-                        style={{
-                          padding: '12px 16px',
-                          backgroundColor: 'var(--panel-soft-bg)',
-                          borderRadius: '8px',
-                          border: '1px solid var(--border-dark)'
-                        }}
-                      >
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary-dark)', fontWeight: 600 }}>Sreni</span>
-                        <h4 style={{ fontSize: '0.875rem', fontWeight: 700, marginTop: '2px' }}>{prog.title}</h4>
-                        <p style={{ fontSize: '0.8rem', color: '#60a5fa', marginTop: '4px', fontWeight: 600 }}>Zone ID: {prog.subtitle}</p>
+                        <p style={{ margin: '6px 0 10px', fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>{priority.note}</p>
+                        <button className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 12px' }} onClick={() => setActiveTab(priority.targetTab)}>
+                          Open
+                        </button>
                       </div>
                     ))}
                   </div>
                 </div>
 
+                <div className="glass-panel" style={{ padding: '18px' }}>
+                  <h3 style={{ fontSize: '1.02rem', fontWeight: 700, marginBottom: '12px' }}>Operational Focus</h3>
+                  <div style={{ display: 'grid', gap: '8px' }}>
+                    {dashboardPipelineRows.map((row) => (
+                      <div key={row.label} style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-dark)', background: 'var(--panel-soft-bg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{row.label}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span className={`badge ${signalStyles[row.signal].badgeClass}`} style={{ fontSize: '0.66rem', padding: '2px 7px' }}>
+                            {signalStyles[row.signal].label}
+                          </span>
+                          <span style={{ color: signalStyles[row.signal].accent, fontWeight: 800 }}>{row.value}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="glass-panel" style={{ padding: '18px' }}>
+                  <h3 style={{ fontSize: '1.02rem', fontWeight: 700, marginBottom: '12px' }}>Sreni Directory Snapshot</h3>
+                  <div style={{ display: 'grid', gap: '8px', maxHeight: '240px', overflowY: 'auto' }}>
+                    {programs.length === 0 && (
+                      <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border-dark)', color: 'var(--text-secondary-dark)', fontSize: '0.84rem' }}>
+                        No active sreni definitions found.
+                      </div>
+                    )}
+                    {programs.map((program) => (
+                      <div key={program.id} style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-dark)', background: 'var(--panel-soft-bg)' }}>
+                        <div style={{ fontSize: '0.86rem', fontWeight: 700 }}>{program.title}</div>
+                        <div style={{ marginTop: '2px', fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>Zone ID: {program.subtitle || 'Not mapped'}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="glass-panel" style={{ padding: '18px' }}>
+                  <h3 style={{ fontSize: '1.02rem', fontWeight: 700, marginBottom: '12px' }}>Quick Navigation</h3>
+                  <div style={{ display: 'grid', gap: '8px' }}>
+                    <button className="btn btn-secondary" style={{ justifyContent: 'space-between' }} onClick={() => setActiveTab('my-approvals')}>
+                      <span>My Approvals</span>
+                      <span className="badge badge-warning" style={{ marginLeft: '8px' }}>{pendingApprovalsCount}</span>
+                    </button>
+                    <button className="btn btn-secondary" style={{ justifyContent: 'space-between' }} onClick={() => setActiveTab('settings-responsibility-chart')}>
+                      <span>Responsibility Chart</span>
+                      <span>↗</span>
+                    </button>
+                    {showGatewaySection && (
+                      <button className="btn btn-secondary" style={{ justifyContent: 'space-between' }} onClick={() => setActiveTab(showHelpdeskTicketsTab ? 'helpdesk-tickets' : showJobPostingsTab ? 'job-postings' : 'job-applications')}>
+                        <span>Helpdesk Workspace</span>
+                        <span>↗</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
             </div>
           )}
+
+          {activeTab === 'insights' && <InsightsPage />}
 
           {/* TAB 2: ADMINS LIST (now under Settings) */}
           {activeTab === 'settings-admins' && showAdminsTab && (
@@ -1241,6 +1758,20 @@ export const AdminDashboardPage: React.FC = () => {
 
           {activeTab === 'my-approvals' && <ApprovalActionsPanel />}
 
+          {activeTab === 'helpdesk-tickets' && showHelpdeskTicketsTab && <HelpdeskTicketsPage />}
+
+          {activeTab === 'job-postings' && showJobPostingsTab && <JobPostingsPage />}
+
+          {activeTab === 'job-applications' && showJobApplicationsTab && <JobApplicationsPage />}
+
+          {activeTab === 'member-services-reimbursements' && showReimbursementsTab && <ReimbursementPage />}
+
+          {activeTab === 'member-services-events' && showEventsTab && <SpecialEventsPage />}
+
+          {activeTab === 'member-services-notifications' && showNotificationsTab && <NotificationsAdminPage />}
+
+          {activeTab === 'member-services-gmail' && showGmailTab && <GmailWorkspacePanel />}
+
           {activeTab === 'settings-approval-workflows' && (
             <ApprovalWorkflowPage
               onAdd={() => openApprovalWorkflowForm(null)}
@@ -1296,6 +1827,10 @@ export const AdminDashboardPage: React.FC = () => {
 
           {activeTab === 'settings-report-config' && <ReportConfigSettingsPage />}
 
+          {activeTab === 'settings-google-integration' && showAdminsTab && <GoogleIntegrationSettingsPage />}
+
+          {activeTab === 'settings-responsibility-chart' && <ResponsibilityChartPage />}
+
         </div>
 
         <footer
@@ -1314,7 +1849,7 @@ export const AdminDashboardPage: React.FC = () => {
           }}
         >
           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>
-            © {currentYear} Abu Dhabi West
+            © {currentYear} IFCA Abu Dhabi
           </span>
           <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>
             Powered by <a style={{ color: 'var(--text-secondary-dark)', textDecoration: 'underline' }}>VGK Technologies</a>

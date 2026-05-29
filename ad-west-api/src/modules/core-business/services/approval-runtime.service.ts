@@ -3,7 +3,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { AuthPrincipal } from '@modules/user-management/interfaces/auth-principal.interface';
-import { ReviewApprovalItemDto, SubmitApprovalItemDto, ResubmitApprovalItemDto } from '../dto/core-business.dto';
+import {
+  CreateApprovalWorkflowDto,
+  ReviewApprovalItemDto,
+  SubmitApprovalItemDto,
+  ResubmitApprovalItemDto,
+} from '../dto/core-business.dto';
 import type {
   ApprovalWorkflowRecord,
   ApprovalItemRecord,
@@ -25,6 +30,43 @@ export interface ApprovalRuntimeContext {
 
 export class ApprovalRuntimeService {
   constructor(private readonly ctx: ApprovalRuntimeContext) {}
+
+  listApprovalWorkflows(): ApprovalWorkflowRecord[] {
+    return Array.from(this.ctx.approvalWorkflows.values());
+  }
+
+  createApprovalWorkflow(dto: CreateApprovalWorkflowDto): ApprovalWorkflowRecord {
+    const steps = Array.from(new Set(dto.steps.map((item) => item.trim()).filter((item) => item.length > 0)));
+    if (!steps.length) {
+      throw new BadRequestException('Approval workflow must have at least one step');
+    }
+
+    const mode = dto.mode ?? 'sequential';
+    if (mode === 'single' && steps.length > 1) {
+      throw new BadRequestException('Single approval mode supports exactly one step');
+    }
+
+    if (dto.escalationHours !== undefined && (dto.escalationHours < 1 || dto.escalationHours > 240)) {
+      throw new BadRequestException('escalationHours must be between 1 and 240');
+    }
+
+    const now = new Date().toISOString();
+    const workflow: ApprovalWorkflowRecord = {
+      id: this.ctx.newId('apw'),
+      name: dto.name.trim(),
+      targetType: dto.targetType,
+      mode,
+      steps,
+      escalationHours: dto.escalationHours,
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    this.ctx.approvalWorkflows.set(workflow.id, workflow);
+    this.ctx.scheduleApprovalWorkflowStatePersistence(workflow.id);
+    return workflow;
+  }
 
   submitApprovalItem(dto: SubmitApprovalItemDto, principal: AuthPrincipal): ApprovalItemRecord {
     const workflow = this.ctx.findApprovalWorkflow(dto.workflowId);

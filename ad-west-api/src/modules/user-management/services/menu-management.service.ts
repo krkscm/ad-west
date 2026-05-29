@@ -14,6 +14,7 @@ import { UserStore } from '../interfaces/user-store.interface';
 
 const DEFAULT_MENUS: Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>[] = [
   { key: 'dashboard',                    label: 'Dashboard',           parentKey: null,       icon: '📊', sortOrder: 10, active: true },
+  { key: 'insights',                     label: 'Insights',            parentKey: null,       icon: '📈', sortOrder: 15, active: true },
   { key: 'settings',                     label: 'Settings',            parentKey: null,       icon: '⚙️', sortOrder: 20, active: true },
   { key: 'settings-roles-definition',    label: 'Roles Definition',    parentKey: 'settings', icon: null, sortOrder: 10, active: true },
   { key: 'settings-location-definition', label: 'Location Definition', parentKey: 'settings', icon: null, sortOrder: 20, active: true },
@@ -24,6 +25,17 @@ const DEFAULT_MENUS: Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>[] = [
   { key: 'settings-admins',              label: 'Admin Management',    parentKey: 'settings', icon: null, sortOrder: 60, active: true },
   { key: 'settings-approval-workflows',  label: 'Approval Workflows',  parentKey: 'settings', icon: null, sortOrder: 70, active: true },
   { key: 'settings-users',               label: 'Users',               parentKey: 'settings', icon: null, sortOrder: 80, active: true },
+  { key: 'settings-responsibility-chart', label: 'Responsibility Chart', parentKey: 'settings', icon: null, sortOrder: 90, active: true },
+  { key: 'settings-google-integration',  label: 'Google Integration',  parentKey: 'settings', icon: null, sortOrder: 95, active: true },
+  { key: 'helpdesk',                         label: 'Helpdesk',              parentKey: null,                icon: '🛠️', sortOrder: 25, active: true },
+  { key: 'helpdesk-tickets',                 label: 'Helpdesk Tickets',      parentKey: 'helpdesk',          icon: null, sortOrder: 10, active: true },
+  { key: 'job-postings',                     label: 'Job Postings',          parentKey: 'helpdesk',          icon: null, sortOrder: 20, active: true },
+  { key: 'job-applications',                 label: 'Job Applications',      parentKey: 'helpdesk',          icon: null, sortOrder: 30, active: true },
+  { key: 'member-services',                  label: 'Member Services',       parentKey: null,                icon: '🛎️', sortOrder: 27, active: true },
+  { key: 'member-services-reimbursements',   label: 'Reimbursements',        parentKey: 'member-services',   icon: null, sortOrder: 10, active: true },
+  { key: 'member-services-events',           label: 'Special Events',        parentKey: 'member-services',   icon: null, sortOrder: 20, active: true },
+  { key: 'member-services-notifications',    label: 'Notifications',         parentKey: 'member-services',   icon: null, sortOrder: 30, active: true },
+  { key: 'member-services-gmail',            label: 'Gmail Workspace',        parentKey: 'member-services',   icon: null, sortOrder: 40, active: true },
 ];
 
 @Injectable()
@@ -60,6 +72,10 @@ export class MenuManagementService {
 
   async listMenuItems(activeOnly = false): Promise<MenuItem[]> {
     if (this.useDb()) {
+      await this.ensureSettingsResponsibilityChartMenu();
+      await this.ensureSettingsGoogleIntegrationMenu();
+      await this.ensurePublicGatewayMenus();
+      await this.ensureMemberServicesMenus();
       await this.ensureSreniAttendanceChildMenus();
       const rows = activeOnly
         ? await this.menuRepo!.find({ where: { active: true } })
@@ -278,6 +294,154 @@ export class MenuManagementService {
       entity.updatedAt = now;
       missing.push(entity);
       existingKeys.add(attendanceKey);
+    }
+
+    if (missing.length > 0) {
+      await this.menuRepo!.insert(missing);
+    }
+  }
+
+  private async ensureSettingsResponsibilityChartMenu(): Promise<void> {
+    if (!this.useDb()) {
+      return;
+    }
+
+    const existing = await this.menuRepo!.findOne({ where: { key: 'settings-responsibility-chart' } });
+    if (existing) {
+      return;
+    }
+
+    const settingsMenu = await this.menuRepo!.findOne({ where: { key: 'settings' } });
+    if (!settingsMenu) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const entity = new MenuItemEntity();
+    entity.id = this.cryptoService.randomId('menu');
+    entity.key = 'settings-responsibility-chart';
+    entity.label = 'Responsibility Chart';
+    entity.parentKey = 'settings';
+    entity.icon = '🧭';
+    entity.sortOrder = 90;
+    entity.active = settingsMenu.active;
+    entity.createdAt = now;
+    entity.updatedAt = now;
+    await this.menuRepo!.insert(entity);
+  }
+
+  private async ensureSettingsGoogleIntegrationMenu(): Promise<void> {
+    if (!this.useDb()) {
+      return;
+    }
+
+    const existing = await this.menuRepo!.findOne({ where: { key: 'settings-google-integration' } });
+    if (existing) {
+      return;
+    }
+
+    const settingsMenu = await this.menuRepo!.findOne({ where: { key: 'settings' } });
+    if (!settingsMenu) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const entity = new MenuItemEntity();
+    entity.id = this.cryptoService.randomId('menu');
+    entity.key = 'settings-google-integration';
+    entity.label = 'Google Integration';
+    entity.parentKey = 'settings';
+    entity.icon = '🔐';
+    entity.sortOrder = 95;
+    entity.active = settingsMenu.active;
+    entity.createdAt = now;
+    entity.updatedAt = now;
+    await this.menuRepo!.insert(entity);
+  }
+
+  private async ensurePublicGatewayMenus(): Promise<void> {
+    if (!this.useDb()) {
+      return;
+    }
+
+    const allMenus = await this.menuRepo!.find();
+    const existingKeys = new Set(allMenus.map((item) => item.key));
+    const now = new Date().toISOString();
+    const missing: MenuItemEntity[] = [];
+
+    const definitions: Array<{
+      key: string;
+      label: string;
+      parentKey: string | null;
+      icon: string | null;
+      sortOrder: number;
+    }> = [
+      { key: 'helpdesk', label: 'Helpdesk', parentKey: null, icon: '🛠️', sortOrder: 25 },
+      { key: 'helpdesk-tickets', label: 'Helpdesk Tickets', parentKey: 'helpdesk', icon: null, sortOrder: 10 },
+      { key: 'job-postings', label: 'Job Postings', parentKey: 'helpdesk', icon: null, sortOrder: 20 },
+      { key: 'job-applications', label: 'Job Applications', parentKey: 'helpdesk', icon: null, sortOrder: 30 },
+    ];
+
+    for (const definition of definitions) {
+      if (existingKeys.has(definition.key)) {
+        continue;
+      }
+
+      if (definition.parentKey && !existingKeys.has(definition.parentKey)) {
+        continue;
+      }
+
+      const entity = new MenuItemEntity();
+      entity.id = this.cryptoService.randomId('menu');
+      entity.key = definition.key;
+      entity.label = definition.label;
+      entity.parentKey = definition.parentKey;
+      entity.icon = definition.icon;
+      entity.sortOrder = definition.sortOrder;
+      entity.active = true;
+      entity.createdAt = now;
+      entity.updatedAt = now;
+      missing.push(entity);
+      existingKeys.add(definition.key);
+    }
+
+    if (missing.length > 0) {
+      await this.menuRepo!.insert(missing);
+    }
+  }
+
+  private async ensureMemberServicesMenus(): Promise<void> {
+    if (!this.useDb()) return;
+
+    const allMenus = await this.menuRepo!.find();
+    const existingKeys = new Set(allMenus.map((item) => item.key));
+    const now = new Date().toISOString();
+    const missing: MenuItemEntity[] = [];
+
+    const definitions = [
+      { key: 'member-services',                label: 'Member Services',  parentKey: null as string | null,  icon: '🛎️', sortOrder: 27 },
+      { key: 'member-services-reimbursements',  label: 'Reimbursements',   parentKey: 'member-services',      icon: null as string | null, sortOrder: 10 },
+      { key: 'member-services-events',          label: 'Special Events',   parentKey: 'member-services',      icon: null as string | null, sortOrder: 20 },
+      { key: 'member-services-notifications',   label: 'Notifications',    parentKey: 'member-services',      icon: null as string | null, sortOrder: 30 },
+      { key: 'member-services-gmail',           label: 'Gmail Workspace',  parentKey: 'member-services',      icon: null as string | null, sortOrder: 40 },
+    ];
+
+    for (const def of definitions) {
+      if (existingKeys.has(def.key)) continue;
+      if (def.parentKey && !existingKeys.has(def.parentKey)) continue;
+
+      const entity = new MenuItemEntity();
+      entity.id = this.cryptoService.randomId('menu');
+      entity.key = def.key;
+      entity.label = def.label;
+      entity.parentKey = def.parentKey;
+      entity.icon = def.icon;
+      entity.sortOrder = def.sortOrder;
+      entity.active = true;
+      entity.createdAt = now;
+      entity.updatedAt = now;
+      missing.push(entity);
+      existingKeys.add(def.key);
     }
 
     if (missing.length > 0) {

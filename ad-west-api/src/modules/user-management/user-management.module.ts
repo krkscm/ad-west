@@ -4,6 +4,8 @@ import { ROLE_DEFINITION_STORE, USER_STORE } from './constants';
 import { AuthController } from './controllers/auth.controller';
 import { AdminUsersController } from './controllers/admin-users.controller';
 import { AuditController } from './controllers/audit.controller';
+import { GmailController } from './controllers/gmail.controller';
+import { GoogleIntegrationConfigController } from './controllers/google-integration-config.controller';
 import { MenuManagementController } from './controllers/menu-management.controller';
 import { RoleDefinitionsController } from './controllers/role-definitions.controller';
 import { AdminMenuGrantEntity } from './entities/admin-menu-grant.entity';
@@ -22,6 +24,7 @@ import { AuthService } from './services/auth.service';
 import { CryptoService } from './services/crypto.service';
 import { InMemoryRoleDefinitionStoreService } from './services/in-memory-role-definition-store.service';
 import { InMemoryStoreService } from './services/in-memory-store.service';
+import { GoogleIntegrationConfigService } from './services/google-integration-config.service';
 import { MenuManagementService } from './services/menu-management.service';
 import { PostgresRoleDefinitionStoreService } from './services/postgres-role-definition-store.service';
 import { PostgresStoreService } from './services/postgres-store.service';
@@ -79,6 +82,7 @@ export class UserManagementModule {
           : [InMemoryRoleDefinitionStoreService],
       },
       AuditService,
+      GoogleIntegrationConfigService,
       AuthService,
       AdminUsersService,
       RoleDefinitionsService,
@@ -91,7 +95,7 @@ export class UserManagementModule {
     return {
       module: UserManagementModule,
       imports,
-      controllers: [AuthController, AdminUsersController, AuditController, RoleDefinitionsController, MenuManagementController],
+      controllers: [AuthController, AdminUsersController, AuditController, GmailController, GoogleIntegrationConfigController, RoleDefinitionsController, MenuManagementController],
       providers,
       exports: [USER_STORE, ROLE_DEFINITION_STORE, AuthService, AuthGuard, MemberAuthGuard, RolesGuard],
     };

@@ -13,14 +13,7 @@ const TYPE_LABELS: Record<string, string> = {
   admin_role: 'Admin Role',
   scope_type: 'Scope Type',
   role_level: 'Role Level',
-  location_level: 'Location Level',
   approval_mode: 'Approval Mode',
-  approval_target_type: 'Approval Target Type',
-  approval_item_status: 'Approval Item Status',
-  document_access_level: 'Document Access Level',
-  report_field_type: 'Report Field Type',
-  report_submission_status: 'Report Submission Status',
-  audit_actor_type: 'Audit Actor Type',
 }
 
 const formatTypeName = (t: string) =>

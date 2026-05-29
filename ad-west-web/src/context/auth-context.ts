@@ -6,6 +6,8 @@ export interface AdminSessionUser {
   code: string
   name: string
   email: string
+  picture?: string
+  authProvider?: 'password' | 'google'
   roles: Array<{
     role: 'Super Admin' | 'Zone Admin' | 'Sreny Admin'
     scopeType: 'global' | 'zone' | 'sreny'
@@ -20,6 +22,7 @@ export interface AuthContextType {
   mustResetPassword: boolean
   getCaptchaChallenge: () => Promise<{ success: boolean; captchaToken?: string; captchaImage?: string; expiresInSeconds?: number; error?: string }>
   login: (identifier: string, password: string, captchaToken: string, captchaAnswer: string) => Promise<{ success: boolean; error?: string }>
+  loginWithGoogle: () => Promise<{ success: boolean; error?: string }>
   logout: () => void
   refreshAdminSession: () => Promise<void>
   changeOwnPassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>

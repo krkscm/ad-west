@@ -140,6 +140,10 @@ export class InMemoryStoreService implements UserStore {
     return Array.from(this.members.values());
   }
 
+  async getMemberById(id: string): Promise<MemberUser | undefined> {
+    return this.members.get(id);
+  }
+
   async findMemberByIdentity(
     phone?: string,
     email?: string,

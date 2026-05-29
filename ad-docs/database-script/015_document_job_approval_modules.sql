@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS adwest.report_template_fields (
 CREATE TABLE IF NOT EXISTS adwest.report_submissions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   template_id uuid NOT NULL REFERENCES adwest.report_templates(id) ON DELETE CASCADE,
-  submitted_by uuid REFERENCES adwest.contacts(id) ON DELETE SET NULL,
+  submitted_by uuid REFERENCES adwest.users(id) ON DELETE SET NULL,
   answers jsonb NOT NULL DEFAULT '{}'::jsonb,
   status text NOT NULL DEFAULT 'pending',
   reviewed_by uuid REFERENCES adwest.admin_users(id) ON DELETE SET NULL,
@@ -89,14 +89,14 @@ CREATE TABLE IF NOT EXISTS adwest.job_listings (
 CREATE TABLE IF NOT EXISTS adwest.job_interests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id uuid NOT NULL REFERENCES adwest.job_listings(id) ON DELETE CASCADE,
-  contact_id uuid NOT NULL REFERENCES adwest.contacts(id) ON DELETE CASCADE,
+  contact_id uuid NOT NULL REFERENCES adwest.users(id) ON DELETE CASCADE,
   note text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS adwest.resumes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  contact_id uuid NOT NULL REFERENCES adwest.contacts(id) ON DELETE CASCADE,
+  contact_id uuid NOT NULL REFERENCES adwest.users(id) ON DELETE CASCADE,
   file_name text NOT NULL,
   file_type text NOT NULL,
   summary text,

@@ -24,6 +24,7 @@ export const MemberPortalPage: React.FC<MemberPortalPageProps> = ({ onBack }) =>
   return (
     <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <header
+        className="member-portal-header"
         style={{
           height: '72px',
           backgroundColor: '#ffffff',
@@ -57,7 +58,7 @@ export const MemberPortalPage: React.FC<MemberPortalPageProps> = ({ onBack }) =>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+        <div className="member-portal-actions" style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           <ThemeToggle iconOnly placement="header" />
           <button className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '0.85rem' }} onClick={onBack}>
             Back
@@ -69,6 +70,7 @@ export const MemberPortalPage: React.FC<MemberPortalPageProps> = ({ onBack }) =>
       </header>
 
       <div
+        className="member-portal-layout"
         style={{
           flex: 1,
           display: 'grid',
@@ -80,7 +82,7 @@ export const MemberPortalPage: React.FC<MemberPortalPageProps> = ({ onBack }) =>
           gap: '24px',
         }}
       >
-        <aside style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <aside className="member-portal-sidebar" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <button
             onClick={() => setActiveSection('profile')}
             className="btn"
@@ -110,7 +112,7 @@ export const MemberPortalPage: React.FC<MemberPortalPageProps> = ({ onBack }) =>
           </button>
         </aside>
 
-        <div style={{ backgroundColor: '#ffffff', border: '1px solid var(--border-light)', borderRadius: '16px', padding: '32px', boxShadow: 'var(--shadow-md)' }}>
+        <div className="member-portal-content" style={{ backgroundColor: '#ffffff', border: '1px solid var(--border-light)', borderRadius: '16px', padding: '32px', boxShadow: 'var(--shadow-md)' }}>
           {activeSection === 'profile' && (
             <div className="animate-slide-up">
               <div style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '18px', marginBottom: '24px' }}>

@@ -7,6 +7,8 @@ import { CoreBusinessModule } from '@modules/core-business/core-business.module'
 import { UserManagementModule } from '@modules/user-management/user-management.module';
 import { ApprovalWorkflowDefinitionsModule } from '@modules/approval-workflow-definitions/approval-workflow-definitions.module';
 import { EnumValuesModule } from '@modules/enum-values/enum-values.module';
+import { PublicGatewayModule } from '@modules/public-gateway/public-gateway.module';
+import { MemberServicesModule } from '@modules/member-services/member-services.module';
 import { AppControllerModule } from './app.controller.module';
 
 loadEnv({ path: '.env.local' });
@@ -51,6 +53,8 @@ function createTypeOrmModule() {
     UserManagementModule.register(useDbPersistence),
     ApprovalWorkflowDefinitionsModule.register(useDbPersistence),
     EnumValuesModule.register(useDbPersistence),
+    PublicGatewayModule.register(useDbPersistence),
+    MemberServicesModule.register(useDbPersistence),
   ],
 })
 export class AppModule {}

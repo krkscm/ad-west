@@ -16,6 +16,8 @@ A modern React application built with Vite, TypeScript, and best practices for m
 - Custom hooks for reusable logic
 - Context API for state management
 - Utility functions for API calls
+- Public utility entry points at `/helpdesk`, `/jobs`, and `/jobs/apply?job=<jobId>`, plus internal admin management pages for helpdesk tickets, job postings, and job applications
+- Public job applications now support optional resume uploads with client/server validation for PDF, DOC, and DOCX files up to 1 MB, and authenticated admin resume viewing
 
 **Quick Start:**
 ```bash
@@ -60,6 +62,7 @@ A robust REST API built with NestJS, TypeScript, and best practices for API deve
 - Environment configuration management
 - Custom middleware and filters
 - Comprehensive logging
+- Public gateway endpoints for helpdesk submission and public job application flows, with authenticated admin management routes
 
 **Quick Start:**
 ```bash

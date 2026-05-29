@@ -29,6 +29,22 @@ CREATE TABLE IF NOT EXISTS adwest.admin_users (
   last_login_at timestamptz
 );
 
+CREATE TABLE IF NOT EXISTS adwest.users (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  code text NOT NULL,
+  name text NOT NULL,
+  phone text,
+  email text,
+  role_id text,
+  sthan_id text,
+  active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_by text,
+  updated_by text,
+  CONSTRAINT uq_users_code UNIQUE (code)
+);
+
 CREATE TABLE IF NOT EXISTS adwest.srenies (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   zone_id uuid NOT NULL REFERENCES adwest.zones(id) ON DELETE RESTRICT,
@@ -49,60 +65,6 @@ CREATE TABLE IF NOT EXISTS adwest.gov_body_structures (
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT chk_gov_body_year CHECK (year BETWEEN 2000 AND 2100),
   UNIQUE (sreny_id, year)
-);
-
-CREATE TABLE IF NOT EXISTS adwest.contacts (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  zone_id uuid NOT NULL REFERENCES adwest.zones(id) ON DELETE RESTRICT,
-  first_name text NOT NULL,
-  last_name text NOT NULL,
-  phone_primary text,
-  phone_secondary text,
-  email_primary citext,
-  email_secondary citext,
-  whatsapp text,
-  dob date,
-  gender text,
-  address text,
-  photo_url text,
-  status text NOT NULL DEFAULT 'active',
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT chk_contacts_status CHECK (status IN ('active', 'inactive', 'deleted'))
-);
-
-CREATE TABLE IF NOT EXISTS adwest.sreny_memberships (
-  contact_id uuid NOT NULL REFERENCES adwest.contacts(id) ON DELETE CASCADE,
-  sreny_id uuid NOT NULL REFERENCES adwest.srenies(id) ON DELETE CASCADE,
-  joined_date date NOT NULL DEFAULT CURRENT_DATE,
-  status text NOT NULL DEFAULT 'active',
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (contact_id, sreny_id),
-  CONSTRAINT chk_membership_status CHECK (status IN ('active', 'inactive'))
-);
-
-CREATE TABLE IF NOT EXISTS adwest.import_batches (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  zone_id uuid NOT NULL REFERENCES adwest.zones(id) ON DELETE RESTRICT,
-  filename text NOT NULL,
-  status text NOT NULL DEFAULT 'processing',
-  summary jsonb NOT NULL DEFAULT '{}'::jsonb,
-  created_by uuid REFERENCES adwest.admin_users(id) ON DELETE SET NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT chk_import_status CHECK (status IN ('processing', 'ready_for_review', 'finalized', 'failed'))
-);
-
-CREATE TABLE IF NOT EXISTS adwest.dedup_candidates (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  batch_id uuid NOT NULL REFERENCES adwest.import_batches(id) ON DELETE CASCADE,
-  incoming jsonb NOT NULL,
-  matched_contact_id uuid REFERENCES adwest.contacts(id) ON DELETE SET NULL,
-  resolution text NOT NULL DEFAULT 'pending',
-  reviewed_by uuid REFERENCES adwest.admin_users(id) ON DELETE SET NULL,
-  reviewed_at timestamptz,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT chk_dedup_resolution CHECK (resolution IN ('pending', 'merged', 'skipped', 'new'))
 );
 
 CREATE TABLE IF NOT EXISTS adwest.programs (
@@ -138,7 +100,7 @@ CREATE TABLE IF NOT EXISTS adwest.program_sessions (
 CREATE TABLE IF NOT EXISTS adwest.registrations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   program_id uuid NOT NULL REFERENCES adwest.programs(id) ON DELETE CASCADE,
-  contact_id uuid NOT NULL REFERENCES adwest.contacts(id) ON DELETE RESTRICT,
+  contact_id uuid NOT NULL REFERENCES adwest.users(id) ON DELETE RESTRICT,
   status text NOT NULL DEFAULT 'registered',
   registered_at timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -150,7 +112,7 @@ CREATE TABLE IF NOT EXISTS adwest.registrations (
 CREATE TABLE IF NOT EXISTS adwest.attendance (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id uuid NOT NULL REFERENCES adwest.program_sessions(id) ON DELETE CASCADE,
-  contact_id uuid NOT NULL REFERENCES adwest.contacts(id) ON DELETE RESTRICT,
+  contact_id uuid NOT NULL REFERENCES adwest.users(id) ON DELETE RESTRICT,
   status text NOT NULL,
   method text,
   marked_by uuid REFERENCES adwest.admin_users(id) ON DELETE SET NULL,
@@ -159,46 +121,6 @@ CREATE TABLE IF NOT EXISTS adwest.attendance (
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT chk_attendance_status CHECK (status IN ('present', 'absent', 'late', 'excused')),
   UNIQUE (session_id, contact_id)
-);
-
-CREATE TABLE IF NOT EXISTS adwest.helpdesk_tickets (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  contact_id uuid NOT NULL REFERENCES adwest.contacts(id) ON DELETE RESTRICT,
-  zone_id uuid NOT NULL REFERENCES adwest.zones(id) ON DELETE RESTRICT,
-  category text NOT NULL,
-  subject text NOT NULL,
-  description text NOT NULL,
-  priority text NOT NULL DEFAULT 'medium',
-  status text NOT NULL DEFAULT 'new',
-  assigned_to uuid REFERENCES adwest.admin_users(id) ON DELETE SET NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  closed_at timestamptz,
-  CONSTRAINT chk_ticket_priority CHECK (priority IN ('low', 'medium', 'high', 'critical')),
-  CONSTRAINT chk_ticket_status CHECK (status IN ('new', 'assigned', 'in_progress', 'resolved', 'closed'))
-);
-
-CREATE TABLE IF NOT EXISTS adwest.ticket_comments (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  ticket_id uuid NOT NULL REFERENCES adwest.helpdesk_tickets(id) ON DELETE CASCADE,
-  author_id uuid,
-  author_type text NOT NULL,
-  body text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT chk_comment_author_type CHECK (author_type IN ('admin', 'member', 'system'))
-);
-
-CREATE TABLE IF NOT EXISTS adwest.edit_requests (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  contact_id uuid NOT NULL REFERENCES adwest.contacts(id) ON DELETE RESTRICT,
-  requested_fields jsonb NOT NULL,
-  status text NOT NULL DEFAULT 'pending',
-  reviewed_by uuid REFERENCES adwest.admin_users(id) ON DELETE SET NULL,
-  reviewed_at timestamptz,
-  review_note text,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT chk_edit_request_status CHECK (status IN ('pending', 'approved', 'rejected'))
 );
 
 CREATE TABLE IF NOT EXISTS adwest.role_assignments (

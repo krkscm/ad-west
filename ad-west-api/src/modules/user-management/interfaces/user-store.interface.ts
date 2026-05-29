@@ -13,6 +13,7 @@ export interface UserStore {
   deleteAdmin(id: string): Promise<void>;
 
   getMembers(): Promise<MemberUser[]>;
+  getMemberById(id: string): Promise<MemberUser | undefined>;
   findMemberByIdentity(
     phone?: string,
     email?: string,

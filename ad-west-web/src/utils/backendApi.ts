@@ -216,6 +216,29 @@ export interface UserApi {
   reportingToRoleIds?: string[]
 }
 
+export interface ResponsibilityChartNodeApi {
+  userId: string
+  name: string
+  roleId?: string
+  reportingToRoleIds: string[]
+  active: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ResponsibilityChartEdgeApi {
+  fromUserId: string
+  toUserId: string
+  viaRoleId: string
+}
+
+export interface ResponsibilityChartApi {
+  year: number
+  availableYears: number[]
+  nodes: ResponsibilityChartNodeApi[]
+  edges: ResponsibilityChartEdgeApi[]
+}
+
 export interface ReportMetricDefinitionApi {
   id: string
   name: string
@@ -224,6 +247,7 @@ export interface ReportMetricDefinitionApi {
   inputType: 'number' | 'text'
   isRequired: boolean
   sortOrder: number
+  target?: number
   active: boolean
   createdAt: string
   updatedAt: string
@@ -461,6 +485,30 @@ export interface AdminLoginResponse {
   accessToken: string
 }
 
+export interface GoogleProfileApi {
+  name: string
+  email: string
+  picture?: string
+}
+
+export interface GmailInboxEmailApi {
+  id: string
+  subject: string
+  from: string
+  date: string
+  snippet: string
+}
+
+export interface GoogleIntegrationConfigApi {
+  clientId: string
+  redirectUri: string
+  oauthScopes: string
+  webAppOrigin: string
+  enabled: boolean
+  hasClientSecret: boolean
+  updatedAt?: string
+}
+
 export interface CaptchaChallengeResponse {
   captchaToken: string
   captchaImage: string
@@ -478,13 +526,147 @@ export interface EnumValueApi {
   updatedAt: string
 }
 
+// ─── Public Gateway types ─────────────────────────────────────────────────────
+
+export type TicketCategory = 'general' | 'technical' | 'financial' | 'membership' | 'other'
+export type TicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed'
+export type JobType = 'full_time' | 'part_time' | 'volunteer' | 'contract'
+export type ApplicationStatus = 'new' | 'under_review' | 'shortlisted' | 'rejected' | 'accepted'
+
+export type ReimbursementCategory = 'travel' | 'food' | 'accommodation' | 'event_supplies' | 'printing' | 'other'
+export type ReimbursementStatus = 'draft' | 'submitted' | 'pending_review' | 'approved' | 'rejected'
+export type FormFieldType = 'text' | 'number' | 'email' | 'phone' | 'date' | 'select' | 'checkbox' | 'textarea'
+export type NotificationTarget = 'all' | 'admin' | 'member'
+
+export interface ReimbursementApi {
+  id: string
+  submittedBy: string
+  category: ReimbursementCategory
+  description: string
+  amount: number
+  currency: string
+  receiptUrl?: string
+  receiptOriginalName?: string
+  status: ReimbursementStatus
+  reviewerNotes?: string
+  reviewedBy?: string
+  reviewedAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface EventFormFieldApi {
+  id: string
+  eventId: string
+  fieldType: FormFieldType
+  label: string
+  placeholder?: string
+  options?: string[]
+  isRequired: boolean
+  sortOrder: number
+}
+
+export interface SpecialEventApi {
+  id: string
+  title: string
+  description?: string
+  dateTime: string
+  endDateTime?: string
+  venue?: string
+  isPublic: boolean
+  registrationEnabled: boolean
+  sreniIds: string[]
+  formFields: EventFormFieldApi[]
+  createdBy?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface EventRegistrationApi {
+  id: string
+  eventId: string
+  formData: Record<string, unknown>
+  submittedAt: string
+}
+
+export interface AppNotificationApi {
+  id: string
+  title: string
+  message: string
+  validFrom: string
+  validTo: string
+  target: NotificationTarget
+  isActive: boolean
+  createdBy?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface HelpdeskTicketApi {
+  id: string
+  name: string
+  phone: string
+  email?: string
+  category: TicketCategory
+  subject: string
+  description: string
+  status: TicketStatus
+  assignedTo?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface JobPostingApi {
+  id: string
+  title: string
+  description: string
+  requirements?: string
+  location?: string
+  type: JobType
+  isActive: boolean
+  expiresAt?: string
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface JobApplicationApi {
+  id: string
+  jobId: string
+  jobTitle: string
+  name: string
+  phone: string
+  email?: string
+  resumeUrl?: string
+  resumeFileName?: string
+  resumeMimeType?: string
+  resumeSizeBytes?: number
+  coverLetter?: string
+  status: ApplicationStatus
+  notes?: string
+  reviewedBy?: string
+  reviewedAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
 export const backendApi = {
   captchaChallenge: () => api.get<CaptchaChallengeResponse>('/auth/captcha'),
 
   login: (identifier: string, password: string, captchaToken: string, captchaAnswer: string) =>
     api.post<AdminLoginResponse>('/auth/login', { identifier, password, captchaToken, captchaAnswer }),
 
+  buildGoogleStartUrl: (returnOrigin: string) =>
+    `${import.meta.env.VITE_API_URL || '/api/v1'}/auth/google/start?returnOrigin=${encodeURIComponent(returnOrigin)}`,
+
   adminLogout: () => api.post<{ success: boolean }>('/auth/admin/logout', {}),
+
+  gmailInbox: (maxResults = 10) =>
+    api.get<{ emails: GmailInboxEmailApi[] }>(`/gmail/inbox?maxResults=${maxResults}`),
+
+  gmailSend: (payload: { to: string; subject: string; body: string }) =>
+    api.post<{ success: boolean; messageId: string }>('/gmail/send', payload),
 
   listAdminUsers: () => api.get<AdminUserApi[]>('/admin-users'),
 
@@ -647,6 +829,8 @@ export const backendApi = {
     const q = qs.toString();
     return api.get<PaginatedUsersApi>(`/org/users${q ? `?${q}` : ''}`);
   },
+  getResponsibilityChart: (year?: number) =>
+    api.get<ResponsibilityChartApi>(`/org/responsibility-chart${year ? `?year=${encodeURIComponent(String(year))}` : ''}`),
   createUser: (payload: { name: string; password: string; phone?: string; email?: string; roleId?: string; sthanId?: string; permissionSetId?: string; adminManagement?: string; isSuperAdmin?: boolean; reportingToRoleIds?: string[] }) =>
     api.post<UserApi>('/org/users', payload),
   updateUser: (id: string, payload: { name?: string; password?: string; phone?: string; email?: string; roleId?: string; sthanId?: string; permissionSetId?: string; adminManagement?: string; isSuperAdmin?: boolean; active?: boolean; reportingToRoleIds?: string[] }) =>
@@ -923,6 +1107,21 @@ export const backendApi = {
   deleteEnumValue: (id: string) =>
     api.delete<{ success: boolean }>(`/settings/enum-values/${id}`),
 
+  // Google Integration Settings
+  getGoogleIntegrationConfig: () =>
+    api.get<GoogleIntegrationConfigApi>('/settings/google-integration-config'),
+
+  updateGoogleIntegrationConfig: (payload: {
+    clientId?: string
+    clientSecret?: string
+    redirectUri?: string
+    oauthScopes?: string
+    webAppOrigin?: string
+    enabled?: boolean
+    clearClientSecret?: boolean
+  }) =>
+    api.patch<GoogleIntegrationConfigApi>('/settings/google-integration-config', payload),
+
   // Sreni Contact List
   listSreniContacts: (sreniId: string, page = 1, pageSize = 50) =>
     api.get<PaginatedResponse<SreniContactRowApi>>(
@@ -1033,9 +1232,9 @@ export const backendApi = {
   // Report Metric Definitions
   listReportMetricDefinitions: () =>
     api.get<ReportMetricDefinitionApi[]>('/settings/report-metrics'),
-  createReportMetricDefinition: (payload: { name: string; inputType: 'number' | 'text'; description?: string; unit?: string; isRequired?: boolean; sortOrder?: number }) =>
+  createReportMetricDefinition: (payload: { name: string; inputType: 'number' | 'text'; description?: string; unit?: string; isRequired?: boolean; sortOrder?: number; target?: number }) =>
     api.post<ReportMetricDefinitionApi>('/settings/report-metrics', payload),
-  updateReportMetricDefinition: (id: string, payload: { name?: string; inputType?: 'number' | 'text'; description?: string; unit?: string; isRequired?: boolean; sortOrder?: number; active?: boolean }) =>
+  updateReportMetricDefinition: (id: string, payload: { name?: string; inputType?: 'number' | 'text'; description?: string; unit?: string; isRequired?: boolean; sortOrder?: number; target?: number; active?: boolean }) =>
     api.patch<ReportMetricDefinitionApi>(`/settings/report-metrics/${id}`, payload),
   deleteReportMetricDefinition: (id: string) =>
     api.delete<void>(`/settings/report-metrics/${id}`),
@@ -1063,6 +1262,98 @@ export const backendApi = {
     api.get<SreniReportApi[]>(`/org/sreni-definitions/${encodeURIComponent(sreniId)}/reports-v2${submissionType ? `?submissionType=${submissionType}` : ''}`),
   upsertSreniReport: (sreniId: string, payload: { submissionType: 'monthly' | 'half_yearly' | 'yearly'; periodYear: number; periodValue: number; entries: Record<string, string>; notes?: string }) =>
     api.post<SreniReportApi>(`/org/sreni-definitions/${encodeURIComponent(sreniId)}/reports-v2`, payload),
+
+  // ─── Public Gateway — Helpdesk (admin) ───────────────────────────────────
+  listHelpdeskTickets: (status?: string) => {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : ''
+    return api.get<{ items: HelpdeskTicketApi[] }>(`/gateway/helpdesk/tickets${qs}`)
+  },
+  getHelpdeskTicket: (id: string) =>
+    api.get<HelpdeskTicketApi>(`/gateway/helpdesk/tickets/${id}`),
+  updateHelpdeskTicket: (id: string, payload: { status?: TicketStatus; assignedTo?: string; notes?: string }) =>
+    api.patch<HelpdeskTicketApi>(`/gateway/helpdesk/tickets/${id}`, payload),
+
+  // ─── Public Gateway — Jobs (admin) ───────────────────────────────────────
+  listJobPostings: () =>
+    api.get<{ items: JobPostingApi[] }>('/gateway/jobs'),
+  createJobPosting: (payload: { title: string; description: string; requirements?: string; location?: string; type?: JobType; expiresAt?: string }) =>
+    api.post<JobPostingApi>('/gateway/jobs', payload),
+  updateJobPosting: (id: string, payload: { title?: string; description?: string; requirements?: string; location?: string; type?: JobType; isActive?: boolean; expiresAt?: string }) =>
+    api.patch<JobPostingApi>(`/gateway/jobs/${id}`, payload),
+  deleteJobPosting: (id: string) =>
+    api.delete<{ success: boolean }>(`/gateway/jobs/${id}`),
+  listAllJobApplications: () =>
+    api.get<{ items: JobApplicationApi[] }>('/gateway/jobs/applications'),
+  listJobApplicationsForPosting: (jobId: string) =>
+    api.get<{ items: JobApplicationApi[] }>(`/gateway/jobs/${jobId}/applications`),
+  downloadJobApplicationResume: (id: string) =>
+    api.getBlob(`/gateway/jobs/applications/${id}/resume`),
+  updateJobApplication: (id: string, payload: { status?: ApplicationStatus; notes?: string }) =>
+    api.patch<JobApplicationApi>(`/gateway/jobs/applications/${id}`, payload),
+
+  // ─── Public Gateway — Public endpoints (no auth) ─────────────────────────
+  publicListActiveJobs: () =>
+    api.get<{ items: JobPostingApi[] }>('/public/jobs'),
+  publicSubmitHelpdeskTicket: (payload: { name: string; phone: string; email?: string; category?: TicketCategory; subject: string; description: string }) =>
+    api.post<HelpdeskTicketApi>('/public/helpdesk/tickets', payload),
+  publicSubmitJobPosting: (payload: { contactName: string; contactPhone: string; contactEmail?: string; title: string; description: string; requirements?: string; location?: string; type?: JobType }) =>
+    api.post<JobPostingApi>('/public/jobs', payload),
+
+  // ─── Member Services — Reimbursements ────────────────────────────────────
+  listReimbursements: (params?: { submittedBy?: string; status?: string }) => {
+    const qs = params ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined)) as Record<string, string>).toString() : ''
+    return api.get<{ items: ReimbursementApi[] }>(`/member-services/reimbursements${qs}`)
+  },
+  listMyReimbursements: () => api.get<{ items: ReimbursementApi[] }>('/member-services/reimbursements/my'),
+  createReimbursement: (payload: { category: ReimbursementCategory; description: string; amount: number; currency?: string; asDraft?: boolean; receiptFile?: File }) => {
+    const form = new FormData()
+    form.append('category', payload.category)
+    form.append('description', payload.description)
+    form.append('amount', String(payload.amount))
+    if (payload.currency) form.append('currency', payload.currency)
+    if (payload.asDraft) form.append('asDraft', 'true')
+    if (payload.receiptFile) form.append('receipt', payload.receiptFile)
+    return api.postForm<ReimbursementApi>('/member-services/reimbursements', form)
+  },
+  submitReimbursement: (id: string) => api.patch<ReimbursementApi>(`/member-services/reimbursements/${id}/submit`, {}),
+  reviewReimbursement: (id: string, payload: { status: ReimbursementStatus; reviewerNotes?: string }) =>
+    api.patch<ReimbursementApi>(`/member-services/reimbursements/${id}/review`, payload),
+  deleteReimbursement: (id: string) => api.delete<{ success: boolean }>(`/member-services/reimbursements/${id}`),
+
+  // ─── Member Services — Special Events ────────────────────────────────────
+  listSpecialEvents: () => api.get<{ items: SpecialEventApi[] }>('/member-services/events'),
+  getSpecialEvent: (id: string) => api.get<SpecialEventApi>(`/member-services/events/${id}`),
+  createSpecialEvent: (payload: Omit<SpecialEventApi, 'id' | 'createdBy' | 'createdAt' | 'updatedAt'>) =>
+    api.post<SpecialEventApi>('/member-services/events', payload),
+  updateSpecialEvent: (id: string, payload: Partial<Omit<SpecialEventApi, 'id' | 'createdBy' | 'createdAt' | 'updatedAt'>>) =>
+    api.patch<SpecialEventApi>(`/member-services/events/${id}`, payload),
+  deleteSpecialEvent: (id: string) => api.delete<{ success: boolean }>(`/member-services/events/${id}`),
+  listEventRegistrations: (eventId: string) =>
+    api.get<{ items: EventRegistrationApi[] }>(`/member-services/events/${eventId}/registrations`),
+  publicGetEventRegistrationInfo: (eventId: string) =>
+    api.get<SpecialEventApi>(`/public/events/${eventId}/registration-info`),
+  publicRegisterForEvent: (eventId: string, payload: { formData: Record<string, unknown> }) =>
+    api.post<EventRegistrationApi>(`/public/events/${eventId}/register`, payload),
+  publicGetEventsForSreni: (sreniId: string) =>
+    api.get<{ items: SpecialEventApi[] }>(`/public/events/sreni/${sreniId}`),
+
+  // ─── Member Services — Notifications ─────────────────────────────────────
+  listNotifications: (activeOnly?: boolean) =>
+    api.get<{ items: AppNotificationApi[] }>(`/member-services/notifications${activeOnly ? '?activeOnly=true' : ''}`),
+  createNotification: (payload: { title: string; message: string; validFrom?: string; validTo: string; target?: NotificationTarget }) =>
+    api.post<AppNotificationApi>('/member-services/notifications', payload),
+  updateNotification: (id: string, payload: Partial<{ title: string; message: string; validFrom: string; validTo: string; target: NotificationTarget; isActive: boolean }>) =>
+    api.patch<AppNotificationApi>(`/member-services/notifications/${id}`, payload),
+  deleteNotification: (id: string) => api.delete<{ success: boolean }>(`/member-services/notifications/${id}`),
+  publicApplyForJob: (jobId: string, payload: { name: string; phone: string; email?: string; coverLetter?: string; resumeFile?: File }) => {
+    const form = new FormData()
+    form.append('name', payload.name)
+    form.append('phone', payload.phone)
+    if (payload.email) form.append('email', payload.email)
+    if (payload.coverLetter) form.append('coverLetter', payload.coverLetter)
+    if (payload.resumeFile) form.append('resume', payload.resumeFile)
+    return api.postForm<JobApplicationApi>(`/public/jobs/${jobId}/apply`, form)
+  },
 }
 
 export function toUiRole(role: AdminRoleAssignment['role']): 'Super Admin' | 'Zone Admin' | 'Sreny Admin' {

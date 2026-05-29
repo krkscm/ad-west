@@ -6,13 +6,27 @@ import { AdminSessionUser, AuthContext } from './auth-context'
 interface SessionPayload {
   sub: string
   type: 'admin' | 'member'
+  authProvider?: 'password' | 'google'
   code?: string
   name?: string
   email?: string
+  picture?: string
   origin?: 'admin' | 'user'
   sid: string
   exp: number
   mustResetPassword?: boolean
+}
+
+interface GoogleAuthMessage {
+  type: 'adwest-google-auth'
+  success: boolean
+  accessToken?: string
+  profile?: {
+    name: string
+    email: string
+    picture?: string
+  }
+  error?: string
 }
 
 function decodeToken(token: string): SessionPayload | null {
@@ -49,6 +63,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const payload = decodeToken(adminToken)
     if (!payload || payload.type !== 'admin') {
       setAdminUser(null)
+      setToken(null)
+      localStorage.removeItem('adwest_token')
       return
     }
 
@@ -60,6 +76,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       code: payload.code ?? payload.sub,
       name: payload.name ?? payload.code ?? payload.email ?? payload.sub,
       email: payload.email ?? `${payload.code ?? payload.sub}@adwest.local`,
+      picture: payload.picture,
+      authProvider: payload.authProvider ?? 'password',
       roles: [{ role: 'Super Admin', scopeType: 'global', scopeId: 'global' }],
     }
 
@@ -76,8 +94,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setAdminUser({
             sub: current.id,
             code: current.code,
-            name: current.name,
-            email: current.email,
+            name: payload.name ?? current.name,
+            email: payload.email ?? current.email,
+            picture: payload.picture,
+            authProvider: payload.authProvider ?? 'password',
             roles: current.roles.map((role) => ({
               role: toUiRole(role.role),
               scopeType: role.scopeType,
@@ -101,6 +121,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const payload = decodeToken(tokenValue)
     if (!payload || payload.type !== 'member') {
       setMemberUser(null)
+      setMemberToken(null)
+      localStorage.removeItem('adwest_member_token')
       return
     }
 
@@ -170,6 +192,66 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
+  const loginWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
+    return new Promise((resolve) => {
+      const popup = window.open(
+        backendApi.buildGoogleStartUrl(window.location.origin),
+        'adwest-google-auth',
+        'width=520,height=700,left=200,top=100',
+      )
+
+      if (!popup) {
+        resolve({ success: false, error: 'Popup blocked. Allow popups and try again.' })
+        return
+      }
+
+      const timeoutId = window.setTimeout(() => {
+        cleanup()
+        resolve({ success: false, error: 'Google sign-in timed out. Please try again.' })
+      }, 120000)
+
+      const closeWatcher = window.setInterval(() => {
+        if (popup.closed) {
+          window.clearInterval(closeWatcher)
+          cleanup(false)
+          resolve({ success: false, error: 'Google sign-in was cancelled.' })
+        }
+      }, 400)
+
+      const onMessage = (event: MessageEvent<GoogleAuthMessage>) => {
+        if (event.origin !== window.location.origin) {
+          return
+        }
+
+        const message = event.data
+        if (!message || message.type !== 'adwest-google-auth') {
+          return
+        }
+
+        window.clearInterval(closeWatcher)
+        cleanup()
+
+        if (!message.success || !message.accessToken) {
+          resolve({ success: false, error: message.error || 'Google sign-in failed.' })
+          return
+        }
+
+        void loadAdminSession(message.accessToken)
+          .then(() => resolve({ success: true }))
+          .catch(() => resolve({ success: false, error: 'Unable to initialize session after Google sign-in.' }))
+      }
+
+      function cleanup(removeListener = true) {
+        window.clearTimeout(timeoutId)
+        if (removeListener) {
+          window.removeEventListener('message', onMessage)
+        }
+      }
+
+      window.addEventListener('message', onMessage)
+    })
+  }
+
   const logout = () => {
     if (token) {
       void backendApi.adminLogout().catch(() => undefined)
@@ -213,6 +295,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         mustResetPassword,
         getCaptchaChallenge,
         login,
+        loginWithGoogle,
         logout,
         refreshAdminSession,
         changeOwnPassword,

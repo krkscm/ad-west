@@ -305,6 +305,26 @@ export class CoreBusinessController {
     });
   }
 
+  @Get('org/responsibility-chart')
+  @UseGuards(CoreAdminAuthGuard)
+  async getResponsibilityChart(@Query('year') year?: string) {
+    const normalizedYear = typeof year === 'string' ? year.trim() : undefined;
+    let parsedYear: number | undefined;
+
+    if (normalizedYear) {
+      if (!/^\d{4}$/.test(normalizedYear)) {
+        throw new BadRequestException('year must be a valid 4-digit year');
+      }
+      parsedYear = parseInt(normalizedYear, 10);
+    }
+
+    if (parsedYear !== undefined && (parsedYear < 1900 || parsedYear > 9999)) {
+      throw new BadRequestException('year must be a valid 4-digit year');
+    }
+
+    return this.service.getResponsibilityChart(parsedYear);
+  }
+
   @Post('org/users')
   @UseGuards(CoreAdminAuthGuard)
   async createUser(@Body() dto: CreateUserDto, @CurrentUser() actor?: AuthPrincipal) {

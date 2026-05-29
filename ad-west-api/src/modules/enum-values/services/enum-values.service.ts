@@ -28,52 +28,16 @@ const SEED_VALUES: Omit<EnumValue, 'id' | 'createdAt' | 'updatedAt'>[] = [
   // Role levels
   { enumType: 'role_level', value: 'ZONE',  label: 'Zone',  sortOrder: 10, active: true },
   { enumType: 'role_level', value: 'STHAN', label: 'Sthan', sortOrder: 20, active: true },
-  // Location levels
-  { enumType: 'location_level', value: 'zone',  label: 'Zone',  sortOrder: 10, active: true },
-  { enumType: 'location_level', value: 'sthan', label: 'Sthan', sortOrder: 20, active: true },
   // Approval modes
   { enumType: 'approval_mode', value: 'sequential', label: 'Sequential', sortOrder: 10, active: true },
   { enumType: 'approval_mode', value: 'parallel',   label: 'Parallel',   sortOrder: 20, active: true },
-  // Approval target types
-  { enumType: 'approval_target_type', value: 'document_submission',  label: 'Document Submission',  sortOrder: 10, active: true },
-  { enumType: 'approval_target_type', value: 'report_submission',    label: 'Report Submission',    sortOrder: 20, active: true },
-  // Approval item statuses
-  { enumType: 'approval_item_status', value: 'submitted',  label: 'Submitted',  sortOrder: 10, active: true },
-  { enumType: 'approval_item_status', value: 'in_review',  label: 'In Review',  sortOrder: 20, active: true },
-  { enumType: 'approval_item_status', value: 'approved',   label: 'Approved',   sortOrder: 30, active: true },
-  { enumType: 'approval_item_status', value: 'rejected',   label: 'Rejected',   sortOrder: 40, active: true },
-  // Document access levels
-  { enumType: 'document_access_level', value: 'sreny',   label: 'Sreny',   sortOrder: 10, active: true },
-  { enumType: 'document_access_level', value: 'zone',    label: 'Zone',    sortOrder: 20, active: true },
-  { enumType: 'document_access_level', value: 'private', label: 'Private', sortOrder: 30, active: true },
-  // Report field types
-  { enumType: 'report_field_type', value: 'text',     label: 'Text',     sortOrder: 10, active: true },
-  { enumType: 'report_field_type', value: 'number',   label: 'Number',   sortOrder: 20, active: true },
-  { enumType: 'report_field_type', value: 'date',     label: 'Date',     sortOrder: 30, active: true },
-  { enumType: 'report_field_type', value: 'file',     label: 'File',     sortOrder: 40, active: true },
-  { enumType: 'report_field_type', value: 'dropdown', label: 'Dropdown', sortOrder: 50, active: true },
-  // Report submission statuses
-  { enumType: 'report_submission_status', value: 'submitted', label: 'Submitted', sortOrder: 10, active: true },
-  { enumType: 'report_submission_status', value: 'approved',  label: 'Approved',  sortOrder: 20, active: true },
-  { enumType: 'report_submission_status', value: 'rejected',  label: 'Rejected',  sortOrder: 30, active: true },
-  // Audit actor types
-  { enumType: 'audit_actor_type', value: 'admin',  label: 'Admin',  sortOrder: 10, active: true },
-  { enumType: 'audit_actor_type', value: 'member', label: 'Member', sortOrder: 20, active: true },
-  { enumType: 'audit_actor_type', value: 'system', label: 'System', sortOrder: 30, active: true },
 ];
 
 const SUPPORTED_ENUM_TYPES = new Set<string>([
   'admin_role',
   'scope_type',
   'role_level',
-  'location_level',
   'approval_mode',
-  'approval_target_type',
-  'approval_item_status',
-  'document_access_level',
-  'report_field_type',
-  'report_submission_status',
-  'audit_actor_type',
 ]);
 
 @Injectable()

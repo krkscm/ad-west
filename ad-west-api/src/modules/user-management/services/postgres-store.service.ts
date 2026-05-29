@@ -63,6 +63,11 @@ export class PostgresStoreService implements UserStore {
     return this.memberRepo.find();
   }
 
+  async getMemberById(id: string): Promise<MemberUser | undefined> {
+    const found = await this.memberRepo.findOne({ where: { id } });
+    return found ?? undefined;
+  }
+
   async findMemberByIdentity(
     phone?: string,
     email?: string,
@@ -70,15 +75,25 @@ export class PostgresStoreService implements UserStore {
     const normalizedPhone = phone?.trim();
     const normalizedEmail = email?.trim().toLowerCase();
 
-    const members = await this.memberRepo.find();
+    if (normalizedPhone) {
+      const byPhone = await this.memberRepo.findOne({
+        where: { phone: normalizedPhone },
+      });
+      if (byPhone) {
+        return byPhone;
+      }
+    }
 
-    return members.find((member) => {
-      const phoneMatch = normalizedPhone ? member.phone === normalizedPhone : false;
-      const emailMatch = normalizedEmail
-        ? member.email?.toLowerCase() === normalizedEmail
-        : false;
-      return phoneMatch || emailMatch;
-    });
+    if (normalizedEmail) {
+      const byEmail = await this.memberRepo
+        .createQueryBuilder('member')
+        .where('lower(member.email) = :email', { email: normalizedEmail })
+        .getOne();
+
+      return byEmail ?? undefined;
+    }
+
+    return undefined;
   }
 
   async saveMember(member: MemberUser): Promise<void> {

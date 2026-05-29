@@ -6,6 +6,7 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
@@ -212,109 +213,6 @@ export class UpdateGovernanceAssignmentDto {
   @IsBoolean()
   archived?: boolean;
 }
-
-export class CreateContactDto {
-  @IsString()
-  @IsNotEmpty()
-  firstName!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  lastName!: string;
-
-  @IsOptional()
-  @IsEmail()
-  email?: string;
-
-  @IsOptional()
-  @IsString()
-  phone?: string;
-
-  @IsString()
-  @IsNotEmpty()
-  zoneId!: string;
-
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  srenyIds?: string[];
-
-  @IsOptional()
-  @IsString()
-  address?: string;
-
-  @IsOptional()
-  @IsObject()
-  customMetadataBySreny?: Record<string, Record<string, string>>;
-}
-
-export class UpdateContactDto {
-  @IsOptional()
-  @IsString()
-  firstName?: string;
-
-  @IsOptional()
-  @IsString()
-  lastName?: string;
-
-  @IsOptional()
-  @IsEmail()
-  email?: string;
-
-  @IsOptional()
-  @IsString()
-  phone?: string;
-
-  @IsOptional()
-  @IsString()
-  address?: string;
-
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  srenyIds?: string[];
-
-  @IsOptional()
-  @IsObject()
-  customMetadataBySreny?: Record<string, Record<string, string>>;
-}
-
-export class UpsertContactSrenyMetadataDto {
-  @IsObject()
-  metadata!: Record<string, string>;
-}
-
-export class AddMembershipDto {
-  @IsString()
-  @IsNotEmpty()
-  srenyId!: string;
-}
-
-export class StartImportDto {
-  @IsString()
-  @IsNotEmpty()
-  fileName!: string;
-
-  @IsString()
-  @IsIn(['csv', 'xlsx'])
-  fileType!: 'csv' | 'xlsx';
-
-  @IsOptional()
-  @IsString()
-  mappingProfileId?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  hasHeader?: boolean;
-}
-
-export class MarkImportFailedDto {
-  @IsString()
-  @IsNotEmpty()
-  reason!: string;
-}
-
-// ── Sreni Contact List ──────────────────────────────────────────────────────
 
 export class ClearSreniContactsDto {
   // Empty body — confirmation is done client-side
@@ -555,42 +453,6 @@ export class BulkAttendanceUploadDto {
   @IsOptional()
   @IsString()
   sourceFileName?: string;
-}
-
-export class CreateTicketDto {
-  @IsString()
-  @IsNotEmpty()
-  subject!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  description!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  category!: string;
-
-  @IsString()
-  @IsIn(['low', 'medium', 'high', 'critical'])
-  priority!: 'low' | 'medium' | 'high' | 'critical';
-}
-
-export class UpdateTicketStatusDto {
-  @IsString()
-  @IsIn(['new', 'in_progress', 'resolved', 'closed'])
-  status!: 'new' | 'in_progress' | 'resolved' | 'closed';
-}
-
-export class UpdateTicketAssigneeDto {
-  @IsString()
-  @IsNotEmpty()
-  assigneeId!: string;
-}
-
-export class CreateTicketCommentDto {
-  @IsString()
-  @IsNotEmpty()
-  body!: string;
 }
 
 export class CreateDocumentFolderDto {
@@ -954,6 +816,10 @@ export class CreateReportMetricDefinitionDto {
   @IsOptional()
   @IsInt()
   sortOrder?: number;
+
+  @IsOptional()
+  @IsNumber()
+  target?: number;
 }
 
 export class UpdateReportMetricDefinitionDto {
@@ -981,6 +847,10 @@ export class UpdateReportMetricDefinitionDto {
   @IsOptional()
   @IsInt()
   sortOrder?: number;
+
+  @IsOptional()
+  @IsNumber()
+  target?: number;
 
   @IsOptional()
   @IsBoolean()

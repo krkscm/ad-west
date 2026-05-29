@@ -26,6 +26,7 @@ export interface DocumentReportRuntimeContext {
   findDocument(documentId: string): DocumentRecord;
   findReportTemplate(templateId: string): ReportTemplateRecord;
   findReportSubmission(submissionId: string): ReportSubmissionRecord;
+  canViewCreatorData(principal: AuthPrincipal, creatorUserId: string): boolean;
   scheduleDocumentStatePersistence(entityId: string): void;
   scheduleReportTemplateStatePersistence(templateId: string): void;
   scheduleReportSubmissionStatePersistence(submissionId: string): void;
@@ -225,7 +226,9 @@ export class DocumentReportRuntimeService {
   }
 
   listMyReportSubmissions(principal: AuthPrincipal): ReportSubmissionRecord[] {
-    return Array.from(this.ctx.reportSubmissions.values()).filter((item) => item.submittedBy === principal.userId);
+    return Array.from(this.ctx.reportSubmissions.values())
+      .filter((item) => this.ctx.canViewCreatorData(principal, item.submittedBy))
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
   reviewReportSubmission(

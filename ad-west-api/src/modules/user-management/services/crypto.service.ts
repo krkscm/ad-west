@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 import { AdminRole } from '../enums/admin-role.enum';
 
@@ -6,6 +6,7 @@ interface TokenPayload {
   sub: string;
   type: 'admin' | 'member';
   origin?: 'admin' | 'user';
+  authProvider?: 'password' | 'google';
   code?: string;
   roles: string[];
   roleAssignments?: Array<{
@@ -19,6 +20,7 @@ interface TokenPayload {
   exp: number;
   email?: string;
   name?: string;
+  picture?: string;
   memberId?: string;
   mustResetPassword?: boolean;
 }
@@ -30,6 +32,8 @@ interface CaptchaPayload {
 
 @Injectable()
 export class CryptoService {
+  private readonly logger = new Logger(CryptoService.name);
+
   hashPassword(password: string): string {
     const salt = randomBytes(16).toString('hex');
     const hash = scryptSync(password, salt, 64).toString('hex');
@@ -61,7 +65,7 @@ export class CryptoService {
     }
 
     const expected = this.signValue(encoded);
-    if (signature !== expected) {
+    if (!this.isValidSignature(signature, expected)) {
       return null;
     }
 
@@ -88,32 +92,50 @@ export class CryptoService {
     captchaImage: string;
     expiresInSeconds: number;
   } {
-    const charset = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-    let answer = '';
-    for (let i = 0; i < 5; i++) {
-      answer += charset[Math.floor(Math.random() * charset.length)];
+    const startedAt = Date.now();
+    try {
+      const charset = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+      let answer = '';
+      for (let i = 0; i < 5; i++) {
+        answer += charset[Math.floor(Math.random() * charset.length)];
+      }
+
+      const exp = Math.floor(Date.now() / 1000) + 600;
+      const payload: CaptchaPayload = { answer, exp };
+      const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
+      const signature = this.signValue(encoded);
+      const captchaImage = this.renderCaptchaSvg(answer);
+      const elapsedMs = Date.now() - startedAt;
+
+      if (elapsedMs >= 500) {
+        this.logger.warn(`createCaptchaChallenge took ${elapsedMs}ms`);
+      }
+
+      return {
+        captchaToken: `${encoded}.${signature}`,
+        captchaImage,
+        expiresInSeconds: 600,
+      };
+    } catch (error) {
+      const elapsedMs = Date.now() - startedAt;
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `createCaptchaChallenge failed after ${elapsedMs}ms: ${message}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
     }
-
-    const exp = Math.floor(Date.now() / 1000) + 180;
-    const payload: CaptchaPayload = { answer, exp };
-    const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
-    const signature = this.signValue(encoded);
-
-    return {
-      captchaToken: `${encoded}.${signature}`,
-      captchaImage: this.renderCaptchaSvg(answer),
-      expiresInSeconds: 180,
-    };
   }
 
   verifyCaptcha(captchaToken: string, captchaAnswer: string): boolean {
+    const startedAt = Date.now();
     const [encoded, signature] = captchaToken.split('.');
     if (!encoded || !signature) {
       return false;
     }
 
     const expected = this.signValue(encoded);
-    if (signature !== expected) {
+    if (!this.isValidSignature(signature, expected)) {
       return false;
     }
 
@@ -126,7 +148,12 @@ export class CryptoService {
         return false;
       }
 
-      return payload.answer === captchaAnswer.trim().toUpperCase();
+      const isValid = payload.answer === captchaAnswer.trim().toUpperCase();
+      const elapsedMs = Date.now() - startedAt;
+      if (elapsedMs >= 250) {
+        this.logger.warn(`verifyCaptcha took ${elapsedMs}ms`);
+      }
+      return isValid;
     } catch {
       return false;
     }
@@ -164,5 +191,14 @@ export class CryptoService {
   private signValue(value: string): string {
     const secret = process.env.JWT_SECRET || 'adwest-local-secret';
     return createHmac('sha256', secret).update(value).digest('base64url');
+  }
+
+  private isValidSignature(signature: string, expected: string): boolean {
+    const sigBuffer = Buffer.from(signature);
+    const expectedBuffer = Buffer.from(expected);
+    if (sigBuffer.length !== expectedBuffer.length) {
+      return false;
+    }
+    return timingSafeEqual(sigBuffer, expectedBuffer);
   }
 }

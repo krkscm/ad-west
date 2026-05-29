@@ -7,8 +7,34 @@ import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { MemberPortalPage } from './pages/MemberPortalPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { ForcePasswordChangePage } from './pages/ForcePasswordChangePage';
+import { PublicHelpdeskPage } from './pages/public/PublicHelpdeskPage';
+import { PublicJobsPage } from './pages/public/PublicJobsPage';
+import { PublicEventRegistrationPage } from './pages/public/PublicEventRegistrationPage';
+
+function PublicRouteContent() {
+  const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
+
+  if (pathname === '/helpdesk') {
+    return <PublicHelpdeskPage />;
+  }
+
+  if (/^\/events\/[^/]+\/register$/.test(pathname)) {
+    return <PublicEventRegistrationPage />;
+  }
+
+  if (pathname === '/jobs' || pathname === '/jobs/apply' || pathname === '/jobs/post') {
+    return <PublicJobsPage />;
+  }
+
+  return null;
+}
 
 function AppContent() {
+  const publicContent = PublicRouteContent();
+  if (publicContent) {
+    return publicContent;
+  }
+
   const { adminUser, memberUser, mustResetPassword } = useAuth();
 
   if (adminUser && mustResetPassword) {

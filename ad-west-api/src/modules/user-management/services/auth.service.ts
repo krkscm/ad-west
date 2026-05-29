@@ -12,18 +12,49 @@ import { MemberLoginDto } from '../dto/member-login.dto';
 import { UserStore } from '../interfaces/user-store.interface';
 import { AuditService } from './audit.service';
 import { CryptoService } from './crypto.service';
+import { GoogleIntegrationConfigService } from './google-integration-config.service';
 import { RoleAssignment } from '../interfaces/admin-user.interface';
 import { DataSource } from 'typeorm';
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
 
+interface GoogleOAuthState {
+  returnOrigin: string;
+  expiresAt: number;
+}
+
+interface GoogleProfile {
+  name: string;
+  email: string;
+  picture?: string;
+}
+
+interface GoogleSessionToken {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt: number;
+  profile: GoogleProfile;
+}
+
+interface GmailInboxItem {
+  id: string;
+  subject: string;
+  from: string;
+  date: string;
+  snippet: string;
+}
+
 @Injectable()
 export class AuthService {
+  private readonly googleOauthStates = new Map<string, GoogleOAuthState>();
+  private readonly googleSessionTokens = new Map<string, GoogleSessionToken>();
+
   constructor(
     @Inject(USER_STORE) private readonly store: UserStore,
     private readonly cryptoService: CryptoService,
     private readonly auditService: AuditService,
+    private readonly googleIntegrationConfigService: GoogleIntegrationConfigService,
     @Optional() @Inject(DataSource) private readonly dataSource?: DataSource,
   ) {}
 
@@ -435,16 +466,40 @@ export class AuthService {
 
     const normalizedIdentifier = identifier.trim();
 
-    const rows = await this.dataSource.query(
-      `SELECT id, code, name, email, phone, password_hash, active, is_super_admin, must_reset_password
-       FROM adwest.users
-       WHERE lower(email) = lower($1)
-          OR phone = $1
-          OR code = $1
-       ORDER BY created_at ASC
-       LIMIT 1`,
-      [normalizedIdentifier],
-    ) as Array<{ id: string; code: string; name: string; email: string | null; phone: string | null; password_hash: string | null; active: boolean; is_super_admin: boolean; must_reset_password: boolean }>;
+    const selectClause =
+      'SELECT id, code, name, email, phone, password_hash, active, is_super_admin, must_reset_password FROM adwest.users';
+
+    const isEmail = normalizedIdentifier.includes('@');
+    const isPhone = /^\+?[0-9]{7,20}$/.test(normalizedIdentifier);
+
+    let rows: Array<{
+      id: string;
+      code: string;
+      name: string;
+      email: string | null;
+      phone: string | null;
+      password_hash: string | null;
+      active: boolean;
+      is_super_admin: boolean;
+      must_reset_password: boolean;
+    }> = [];
+
+    if (isEmail) {
+      rows = await this.dataSource.query(
+        `${selectClause} WHERE lower(email) = lower($1) LIMIT 1`,
+        [normalizedIdentifier],
+      ) as typeof rows;
+    } else if (isPhone) {
+      rows = await this.dataSource.query(
+        `${selectClause} WHERE phone = $1 LIMIT 1`,
+        [normalizedIdentifier],
+      ) as typeof rows;
+    } else {
+      rows = await this.dataSource.query(
+        `${selectClause} WHERE code = $1 LIMIT 1`,
+        [normalizedIdentifier],
+      ) as typeof rows;
+    }
 
     const user = rows[0];
     if (!user || !user.active || !user.password_hash) {
@@ -506,9 +561,8 @@ export class AuthService {
       return null;
     }
 
-    const members = await this.store.getMembers();
-    const member = members.find((item) => item.id === payload.sub && item.active);
-    if (!member) {
+    const member = await this.store.getMemberById(payload.sub);
+    if (!member || !member.active) {
       return null;
     }
 
@@ -523,6 +577,7 @@ export class AuthService {
   }
 
   async adminLogout(principal: AuthPrincipal): Promise<void> {
+    this.googleSessionTokens.delete(principal.sessionId);
     await this.store.revokeSession(principal.sessionId);
     await this.auditService.log({
       actorId: principal.userId,
@@ -539,6 +594,403 @@ export class AuthService {
       password: 'SuperAdmin@123',
       roles: [AdminRole.SUPER_ADMIN],
     };
+  }
+
+  async buildGoogleAuthUrl(returnOrigin?: string): Promise<string> {
+    const config = await this.googleIntegrationConfigService.getResolvedConfig();
+    const clientId = config.clientId;
+    const redirectUri = config.redirectUri;
+    if (!clientId || !redirectUri) {
+      throw new UnauthorizedException('Google OAuth is not configured.');
+    }
+    if (!config.enabled) {
+      throw new UnauthorizedException('Google OAuth is currently disabled in settings.');
+    }
+
+    const state = this.cryptoService.randomId('gstate');
+    const safeOrigin = this.resolveReturnOrigin(returnOrigin, config.webAppOrigin);
+    this.googleOauthStates.set(state, {
+      returnOrigin: safeOrigin,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+    });
+
+    const scope = config.oauthScopes
+      || 'openid email profile https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly';
+
+    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    authUrl.searchParams.set('client_id', clientId);
+    authUrl.searchParams.set('redirect_uri', redirectUri);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('scope', scope);
+    authUrl.searchParams.set('access_type', 'offline');
+    authUrl.searchParams.set('prompt', 'consent');
+    authUrl.searchParams.set('state', state);
+
+    return authUrl.toString();
+  }
+
+  async completeGoogleAuth(code: string, state: string): Promise<{ accessToken: string; profile: GoogleProfile; returnOrigin: string }> {
+    const stateEntry = this.googleOauthStates.get(state);
+    this.googleOauthStates.delete(state);
+    if (!stateEntry || stateEntry.expiresAt < Date.now()) {
+      throw new UnauthorizedException('Google login state is invalid or expired.');
+    }
+
+    const tokenPayload = await this.exchangeGoogleCodeForTokens(code);
+    const profile = await this.fetchGoogleProfile(tokenPayload.access_token);
+
+    const result = await this.issueGoogleAdminSession(profile, tokenPayload.access_token, tokenPayload.refresh_token, tokenPayload.expires_in);
+
+    await this.auditService.log({
+      actorId: result.userId,
+      actorType: 'admin',
+      action: 'admin_google_login_success',
+      targetType: 'admin_user',
+      targetId: result.userId,
+      details: { email: profile.email },
+    });
+
+    return {
+      accessToken: result.accessToken,
+      profile,
+      returnOrigin: stateEntry.returnOrigin,
+    };
+  }
+
+  async sendGmailMessage(principal: AuthPrincipal, to: string, subject: string, body: string): Promise<{ success: boolean; messageId: string }> {
+    const accessToken = await this.ensureGoogleAccessToken(principal.sessionId);
+
+    const rawMessage = [
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset=UTF-8',
+      '',
+      body,
+    ].join('\r\n');
+
+    const encodedMessage = Buffer.from(rawMessage)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+
+    const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ raw: encodedMessage }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new UnauthorizedException(`Failed to send Gmail message. ${errorBody}`);
+    }
+
+    const payload = await response.json() as { id?: string };
+    return { success: true, messageId: payload.id ?? '' };
+  }
+
+  async listInboxEmails(principal: AuthPrincipal, maxResults = 10): Promise<GmailInboxItem[]> {
+    const accessToken = await this.ensureGoogleAccessToken(principal.sessionId);
+    const listUrl = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
+    listUrl.searchParams.set('maxResults', String(maxResults));
+    listUrl.searchParams.set('labelIds', 'INBOX');
+
+    const listResponse = await fetch(listUrl, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!listResponse.ok) {
+      const errorBody = await listResponse.text();
+      throw new UnauthorizedException(`Failed to fetch inbox list. ${errorBody}`);
+    }
+
+    const listPayload = await listResponse.json() as { messages?: Array<{ id: string }> };
+    const messages = listPayload.messages ?? [];
+    if (messages.length === 0) {
+      return [];
+    }
+
+    const emailRows = await Promise.all(
+      messages.map(async (message) => {
+        const detailsUrl = new URL(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`);
+        detailsUrl.searchParams.set('format', 'metadata');
+        detailsUrl.searchParams.set('metadataHeaders', 'Subject');
+        detailsUrl.searchParams.set('metadataHeaders', 'From');
+        detailsUrl.searchParams.set('metadataHeaders', 'Date');
+
+        const detailsResponse = await fetch(detailsUrl, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        if (!detailsResponse.ok) {
+          return {
+            id: message.id,
+            subject: '(Unable to load subject)',
+            from: '(Unknown sender)',
+            date: '',
+            snippet: '',
+          };
+        }
+
+        const details = await detailsResponse.json() as {
+          id?: string;
+          snippet?: string;
+          payload?: { headers?: Array<{ name: string; value: string }> };
+        };
+
+        const headers = details.payload?.headers ?? [];
+        const readHeader = (name: string) => headers.find((header) => header.name.toLowerCase() === name.toLowerCase())?.value ?? '';
+
+        return {
+          id: details.id ?? message.id,
+          subject: readHeader('Subject') || '(No Subject)',
+          from: readHeader('From') || '(Unknown sender)',
+          date: readHeader('Date'),
+          snippet: details.snippet ?? '',
+        };
+      }),
+    );
+
+    return emailRows;
+  }
+
+  private resolveReturnOrigin(returnOrigin: string | undefined, fallbackOrigin: string): string {
+    if (!returnOrigin) {
+      return fallbackOrigin;
+    }
+
+    try {
+      const parsed = new URL(returnOrigin);
+      return `${parsed.protocol}//${parsed.host}`;
+    } catch {
+      return fallbackOrigin;
+    }
+  }
+
+  private async exchangeGoogleCodeForTokens(code: string): Promise<{ access_token: string; refresh_token?: string; expires_in: number }> {
+    const config = await this.googleIntegrationConfigService.getResolvedConfig();
+    const clientId = config.clientId;
+    const clientSecret = config.clientSecret;
+    const redirectUri = config.redirectUri;
+
+    if (!clientId || !clientSecret || !redirectUri) {
+      throw new UnauthorizedException('Google OAuth settings are missing required values.');
+    }
+
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const errorBody = await tokenResponse.text();
+      throw new UnauthorizedException(`Google token exchange failed. ${errorBody}`);
+    }
+
+    const payload = await tokenResponse.json() as { access_token?: string; refresh_token?: string; expires_in?: number };
+    if (!payload.access_token || !payload.expires_in) {
+      throw new UnauthorizedException('Google token exchange returned incomplete data.');
+    }
+
+    return {
+      access_token: payload.access_token,
+      refresh_token: payload.refresh_token,
+      expires_in: payload.expires_in,
+    };
+  }
+
+  private async fetchGoogleProfile(accessToken: string): Promise<GoogleProfile> {
+    const profileResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!profileResponse.ok) {
+      const errorBody = await profileResponse.text();
+      throw new UnauthorizedException(`Failed to fetch Google profile. ${errorBody}`);
+    }
+
+    const profilePayload = await profileResponse.json() as { name?: string; email?: string; picture?: string };
+    if (!profilePayload.email) {
+      throw new UnauthorizedException('Google profile does not include email.');
+    }
+
+    return {
+      name: profilePayload.name || profilePayload.email,
+      email: profilePayload.email.toLowerCase(),
+      picture: profilePayload.picture,
+    };
+  }
+
+  private async issueGoogleAdminSession(
+    profile: GoogleProfile,
+    googleAccessToken: string,
+    googleRefreshToken: string | undefined,
+    googleExpiresIn: number,
+  ): Promise<{ userId: string; accessToken: string; sessionId: string }> {
+    const adminUser = await this.store.getAdminByEmail(profile.email);
+    if (adminUser && adminUser.active) {
+      const activeRoleAssignments = this.getActiveRoleAssignments(adminUser.roles);
+      const activeRoles = [...new Set(activeRoleAssignments.map((assignment) => assignment.role))];
+      if (activeRoles.length === 0) {
+        throw new UnauthorizedException('No active role assignment for this account');
+      }
+
+      const sessionId = this.cryptoService.randomId('sess');
+      const appToken = this.cryptoService.signToken(
+        {
+          sub: adminUser.id,
+          type: 'admin',
+          code: adminUser.code,
+          name: profile.name,
+          email: profile.email,
+          picture: profile.picture,
+          authProvider: 'google',
+          roles: activeRoles,
+          roleAssignments: activeRoleAssignments,
+          sid: sessionId,
+        },
+        60 * 60,
+      );
+
+      await this.store.saveSession({
+        tokenId: sessionId,
+        userId: adminUser.id,
+        type: 'admin',
+        expiresAt: Date.now() + 60 * 60 * 1000,
+      });
+
+      this.googleSessionTokens.set(sessionId, {
+        accessToken: googleAccessToken,
+        refreshToken: googleRefreshToken,
+        expiresAt: Date.now() + googleExpiresIn * 1000,
+        profile,
+      });
+
+      return {
+        userId: adminUser.id,
+        accessToken: appToken,
+        sessionId,
+      };
+    }
+
+    if (!this.dataSource) {
+      throw new UnauthorizedException('Google account is not mapped to an admin user.');
+    }
+
+    const rows = await this.dataSource.query(
+      'SELECT id, code, name, email, active, is_super_admin FROM adwest.users WHERE lower(email) = lower($1) LIMIT 1',
+      [profile.email],
+    ) as Array<{ id: string; code: string; name: string; email: string | null; active: boolean; is_super_admin: boolean }>;
+    const user = rows[0];
+    if (!user || !user.active || !user.is_super_admin) {
+      throw new UnauthorizedException('Google account is not authorized for admin access.');
+    }
+
+    const sessionId = this.cryptoService.randomId('sess');
+    const appToken = this.cryptoService.signToken(
+      {
+        sub: user.id,
+        type: 'admin',
+        origin: 'user',
+        code: user.code,
+        name: profile.name || user.name,
+        email: profile.email || user.email || undefined,
+        picture: profile.picture,
+        authProvider: 'google',
+        roles: ['SUPER_ADMIN'],
+        roleAssignments: [{ role: AdminRole.SUPER_ADMIN, scopeType: 'global' }],
+        sid: sessionId,
+      },
+      60 * 60,
+    );
+
+    await this.store.saveSession({
+      tokenId: sessionId,
+      userId: user.id,
+      type: 'admin',
+      expiresAt: Date.now() + 60 * 60 * 1000,
+    });
+
+    this.googleSessionTokens.set(sessionId, {
+      accessToken: googleAccessToken,
+      refreshToken: googleRefreshToken,
+      expiresAt: Date.now() + googleExpiresIn * 1000,
+      profile,
+    });
+
+    return {
+      userId: user.id,
+      accessToken: appToken,
+      sessionId,
+    };
+  }
+
+  private async ensureGoogleAccessToken(sessionId: string): Promise<string> {
+    const record = this.googleSessionTokens.get(sessionId);
+    if (!record) {
+      throw new UnauthorizedException('Google account is not connected for this session.');
+    }
+
+    if (record.expiresAt > Date.now() + 45_000) {
+      return record.accessToken;
+    }
+
+    if (!record.refreshToken) {
+      throw new UnauthorizedException('Google access token expired. Please sign in with Google again.');
+    }
+
+    const config = await this.googleIntegrationConfigService.getResolvedConfig();
+    const clientId = config.clientId;
+    const clientSecret = config.clientSecret;
+    if (!clientId || !clientSecret) {
+      throw new UnauthorizedException('Google OAuth settings are missing required values.');
+    }
+
+    const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: record.refreshToken,
+        grant_type: 'refresh_token',
+      }),
+    });
+
+    if (!refreshResponse.ok) {
+      const errorBody = await refreshResponse.text();
+      throw new UnauthorizedException(`Google token refresh failed. ${errorBody}`);
+    }
+
+    const refreshed = await refreshResponse.json() as { access_token?: string; expires_in?: number };
+    if (!refreshed.access_token || !refreshed.expires_in) {
+      throw new UnauthorizedException('Google token refresh response is incomplete.');
+    }
+
+    const updated: GoogleSessionToken = {
+      ...record,
+      accessToken: refreshed.access_token,
+      expiresAt: Date.now() + refreshed.expires_in * 1000,
+    };
+    this.googleSessionTokens.set(sessionId, updated);
+    return updated.accessToken;
   }
 
   private getActiveRoleAssignments(roleAssignments: RoleAssignment[]): RoleAssignment[] {

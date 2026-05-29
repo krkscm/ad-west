@@ -40,6 +40,12 @@ This folder contains executable PostgreSQL scripts for ADWest.
 30. 035_remove_deprecated_program_session_registration_legacy_attendance.sql (Decommissions deprecated program/session/registration and legacy attendance persistence)
 31. 036_remove_deprecated_helpdesk_profile_edit_request_runtime.sql (Decommissions deprecated helpdesk/tickets and profile/edit-request persistence)
 32. 037_remove_deprecated_jobs_resumes_and_enum_values.sql (Decommissions deprecated jobs/resumes persistence and removes deprecated enum values)
+33. 038_auth_login_performance_indexes.sql (Adds targeted login indexes for users code/phone/lower(email) lookups)
+34. 039_public_gateway.sql (Prepares future DB persistence for public helpdesk tickets, public job postings, and public job applications)
+35. 040_member_services.sql (Adds reimbursements, special events, and notifications persistence)
+36. 041_google_integration_config.sql (Adds DB-backed Google OAuth/Gmail configuration and settings menu key)
+37. 042_drop_audit_fks.sql (Drops selected member-services audit FK constraints for mixed persistence/runtime compatibility)
+38. 043_report_metric_target.sql (Adds target column for report metric definitions)
 
 ## Enum Visibility Note
 - API now serves only supported active enum domains to the UI, even if legacy rows still exist in `adwest.enum_values`.
@@ -95,5 +101,11 @@ psql "$env:DATABASE_URL" -f "ad-docs/database-script/034_remove_deprecated_conta
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/035_remove_deprecated_program_session_registration_legacy_attendance.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/036_remove_deprecated_helpdesk_profile_edit_request_runtime.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/037_remove_deprecated_jobs_resumes_and_enum_values.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/038_auth_login_performance_indexes.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/039_public_gateway.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/040_member_services.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/041_google_integration_config.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/042_drop_audit_fks.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/043_report_metric_target.sql"
 ```
 

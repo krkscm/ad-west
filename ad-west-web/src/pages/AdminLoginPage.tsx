@@ -12,7 +12,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = () => {
   const [captchaImage, setCaptchaImage] = useState('')
   const [captchaAnswer, setCaptchaAnswer] = useState('')
 
-  const { login, getCaptchaChallenge } = useAuth()
+  const { login, loginWithGoogle, getCaptchaChallenge } = useAuth()
   const { addToast } = useToast()
 
   const loadCaptcha = React.useCallback(async () => {
@@ -50,6 +50,16 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = () => {
     }
 
     addToast('Welcome back. Logged in successfully.', 'success')
+  }
+
+  const handleGoogleLogin = async () => {
+    const result = await loginWithGoogle()
+    if (!result.success) {
+      addToast(result.error || 'Google sign-in failed.', 'error')
+      return
+    }
+
+    addToast('Signed in with Google successfully.', 'success')
   }
 
   return (
@@ -111,6 +121,22 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = () => {
 
           <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '16px', minHeight: '54px' }}>
             Continue
+          </button>
+
+          <div style={{ margin: '12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ height: '1px', flex: 1, background: 'rgba(148,163,184,0.35)' }} />
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>OR</span>
+            <div style={{ height: '1px', flex: 1, background: 'rgba(148,163,184,0.35)' }} />
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ width: '100%', minHeight: '50px', justifyContent: 'center', gap: '10px' }}
+            onClick={() => void handleGoogleLogin()}
+          >
+            <span style={{ fontSize: '1rem' }}>🔐</span>
+            <span>Sign in with Google</span>
           </button>
         </form>
       </div>

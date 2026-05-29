@@ -16,10 +16,11 @@ interface FormState {
   inputType: 'number' | 'text';
   isRequired: boolean;
   sortOrder: string;
+  target: string;
 }
 
 const emptyForm = (): FormState => ({
-  name: '', description: '', unit: '', inputType: 'number', isRequired: false, sortOrder: '0',
+  name: '', description: '', unit: '', inputType: 'number', isRequired: false, sortOrder: '0', target: '',
 });
 
 export const ReportMetricsPage: React.FC = () => {
@@ -48,7 +49,7 @@ export const ReportMetricsPage: React.FC = () => {
 
   const openAdd = () => { setForm(emptyForm()); setEditingId(null); setIsAdding(true); };
   const openEdit = (m: ReportMetricDefinitionApi) => {
-    setForm({ name: m.name, description: m.description ?? '', unit: m.unit ?? '', inputType: m.inputType, isRequired: m.isRequired, sortOrder: String(m.sortOrder) });
+    setForm({ name: m.name, description: m.description ?? '', unit: m.unit ?? '', inputType: m.inputType, isRequired: m.isRequired, sortOrder: String(m.sortOrder), target: m.target != null ? String(m.target) : '' });
     setEditingId(m.id);
     setIsAdding(false);
   };
@@ -66,6 +67,7 @@ export const ReportMetricsPage: React.FC = () => {
         inputType: form.inputType,
         isRequired: form.isRequired,
         sortOrder: parseInt(form.sortOrder) || 0,
+        target: form.inputType === 'number' && form.target.trim() !== '' ? parseFloat(form.target) : undefined,
       };
       if (editingId) {
         await backendApi.updateReportMetricDefinition(editingId, payload);
@@ -131,14 +133,31 @@ export const ReportMetricsPage: React.FC = () => {
             {editingId ? 'Edit Metric' : 'Add New Metric'}
           </h4>
           <form onSubmit={(e) => void handleSave(e)}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
               <div>
                 <label className="form-label">Metric Name <span style={{ color: 'var(--error)' }}>*</span></label>
                 <input className="form-input" placeholder="e.g. Members Present" value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} required />
               </div>
               <div>
                 <label className="form-label">Unit <span style={{ color: 'var(--text-secondary-dark)', fontWeight: 400 }}>(optional)</span></label>
-                <input className="form-input" placeholder="e.g. count, %, hrs" value={form.unit} onChange={(e) => setForm(f => ({ ...f, unit: e.target.value }))} />
+                <input className="form-input" placeholder="e.g. count, %, AED" value={form.unit} onChange={(e) => setForm(f => ({ ...f, unit: e.target.value }))} />
+              </div>
+              <div>
+                <label className="form-label">
+                  Monthly Target
+                  {form.inputType !== 'number' && <span style={{ color: 'var(--text-secondary-dark)', fontWeight: 400 }}> (number metrics only)</span>}
+                </label>
+                <input
+                  className="form-input"
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder={form.inputType === 'number' ? 'e.g. 50' : '—'}
+                  value={form.target}
+                  onChange={(e) => setForm(f => ({ ...f, target: e.target.value }))}
+                  disabled={form.inputType !== 'number'}
+                  style={{ opacity: form.inputType !== 'number' ? 0.4 : 1 }}
+                />
               </div>
             </div>
             <div style={{ marginBottom: '16px' }}>
@@ -202,6 +221,7 @@ export const ReportMetricsPage: React.FC = () => {
                 <th>Metric Name</th>
                 <th>Type</th>
                 <th>Unit</th>
+                <th>Target</th>
                 <th>Required</th>
                 <th>Status</th>
                 <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
@@ -221,6 +241,11 @@ export const ReportMetricsPage: React.FC = () => {
                     </span>
                   </td>
                   <td style={{ color: 'var(--text-secondary-dark)', fontSize: '0.85rem' }}>{m.unit || '—'}</td>
+                  <td>
+                    {m.target != null && m.inputType === 'number'
+                      ? <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.88rem' }}>{m.target.toLocaleString()}{m.unit ? ` ${m.unit}` : ''}</span>
+                      : <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>—</span>}
+                  </td>
                   <td>
                     {m.isRequired
                       ? <span className="badge badge-error" style={{ padding: '3px 10px', fontSize: '0.78rem' }}>Required</span>

@@ -1,0 +1,607 @@
+import React, { useEffect, useState } from 'react'
+import { backendApi, JobPostingApi } from '../../utils/backendApi'
+import { FileUploadZone } from '../../components/common/FileUploadZone'
+
+type View = 'listings' | 'apply' | 'post'
+
+const JOB_TYPE_LABELS: Record<string, string> = {
+  full_time: 'Full Time',
+  part_time: 'Part Time',
+  volunteer: 'Volunteer',
+  contract: 'Contract',
+}
+
+const MAX_RESUME_SIZE_BYTES = 1024 * 1024
+
+function stripContactBlock(description: string): string {
+  return description.replace(/^\[Submitted by:[^\]]*\]\n\n?/, '')
+}
+const ALLOWED_RESUME_EXTENSIONS = ['.pdf', '.doc', '.docx']
+const ALLOWED_RESUME_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+])
+
+function JobCard({ job, onApply }: { job: JobPostingApi; onApply: (job: JobPostingApi) => void }) {
+  const [expanded, setExpanded] = useState(false)
+  const description = stripContactBlock(job.description)
+  return (
+    <div style={{ background: 'var(--surface-dark)', border: '1px solid var(--border-dark)', borderRadius: '12px', padding: '24px', boxShadow: 'var(--shadow-sm)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+        <div>
+          <h3 style={{ margin: '0 0 4px', color: 'var(--text-primary-dark)', fontSize: '1.05rem', fontWeight: 700 }}>{job.title}</h3>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '20px', padding: '2px 10px', fontSize: '0.78rem', fontWeight: 600 }}>
+              {JOB_TYPE_LABELS[job.type] ?? job.type}
+            </span>
+            {job.location && (
+              <span style={{ color: 'var(--text-secondary-dark)', fontSize: '0.82rem' }}>📍 {job.location}</span>
+            )}
+          </div>
+        </div>
+        <button className="btn btn-primary" style={{ flexShrink: 0 }} onClick={() => onApply(job)}>
+          Apply Now
+        </button>
+      </div>
+
+      <div style={{ marginTop: '12px', color: 'var(--text-secondary-dark)', fontSize: '0.88rem', lineHeight: 1.6 }}>
+        {expanded ? (
+          <>
+            <p style={{ margin: '0 0 12px', whiteSpace: 'pre-wrap' }}>{description}</p>
+            {job.requirements && (
+              <>
+                <p style={{ margin: '0 0 4px', fontWeight: 600, color: 'var(--text-primary-dark)', fontSize: '0.85rem' }}>Requirements:</p>
+                <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{job.requirements}</p>
+              </>
+            )}
+          </>
+        ) : (
+          <p style={{ margin: 0 }}>{description.slice(0, 200)}{description.length > 200 ? '…' : ''}</p>
+        )}
+        <button
+          onClick={() => setExpanded(!expanded)}
+          style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '4px 0', marginTop: '4px', fontSize: '0.82rem', fontWeight: 600 }}
+        >
+          {expanded ? 'Show less ▲' : 'Read more ▼'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function PublicJobsPage() {
+  const [view, setView] = useState<View>('listings')
+  const [selectedJob, setSelectedJob] = useState<JobPostingApi | null>(null)
+
+  const [jobs, setJobs] = useState<JobPostingApi[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+
+  // Post a Job form state
+  const [postContactName, setPostContactName] = useState('')
+  const [postContactPhone, setPostContactPhone] = useState('')
+  const [postContactEmail, setPostContactEmail] = useState('')
+  const [postTitle, setPostTitle] = useState('')
+  const [postJobType, setPostJobType] = useState('')
+  const [postLocation, setPostLocation] = useState('')
+  const [postDescription, setPostDescription] = useState('')
+  const [postRequirements, setPostRequirements] = useState('')
+  const [postSubmitting, setPostSubmitting] = useState(false)
+  const [postSubmitted, setPostSubmitted] = useState(false)
+  const [postError, setPostError] = useState('')
+
+  const resetPostForm = () => {
+    setPostContactName('')
+    setPostContactPhone('')
+    setPostContactEmail('')
+    setPostTitle('')
+    setPostJobType('')
+    setPostLocation('')
+    setPostDescription('')
+    setPostRequirements('')
+  }
+
+  // Apply form state
+  const [appName, setAppName] = useState('')
+  const [appPhone, setAppPhone] = useState('')
+  const [appEmail, setAppEmail] = useState('')
+  const [appResumeFile, setAppResumeFile] = useState<File | null>(null)
+  const [appCoverLetter, setAppCoverLetter] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+
+  const resetApplicationForm = () => {
+    setAppName('')
+    setAppPhone('')
+    setAppEmail('')
+    setAppResumeFile(null)
+    setAppCoverLetter('')
+  }
+
+  const validateResumeFile = (file: File): string | null => {
+    const normalizedName = file.name.toLowerCase()
+    const matchedExtension = ALLOWED_RESUME_EXTENSIONS.find((extension) => normalizedName.endsWith(extension))
+
+    if (!matchedExtension) {
+      return 'Resume must be a PDF, DOC, or DOCX file.'
+    }
+
+    if (file.size > MAX_RESUME_SIZE_BYTES) {
+      return 'Resume file must not exceed 1 MB.'
+    }
+
+    if (file.type && !ALLOWED_RESUME_MIME_TYPES.has(file.type)) {
+      return 'Selected file does not look like a supported document. Please choose a PDF, DOC, or DOCX file.'
+    }
+
+    return null
+  }
+
+  useEffect(() => {
+    backendApi.publicListActiveJobs()
+      .then((res) => setJobs(res.items))
+      .catch((err) => setLoadError(err instanceof Error ? err.message : 'Failed to load jobs'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    const pathname = window.location.pathname.replace(/\/+$/, '')
+
+    if (pathname === '/jobs/post') {
+      setView('post')
+      return
+    }
+
+    const jobId = new URLSearchParams(window.location.search).get('job')
+
+    if (pathname !== '/jobs/apply' || !jobId || jobs.length === 0) {
+      return
+    }
+
+    const matchedJob = jobs.find((job) => job.id === jobId)
+    if (matchedJob) {
+      setSelectedJob(matchedJob)
+      setView('apply')
+      return
+    }
+
+    setView('listings')
+    setSelectedJob(null)
+    setSubmitError('The selected job could not be found or is no longer active.')
+    window.history.replaceState({}, '', '/jobs')
+  }, [jobs])
+
+  const handlePostJob = () => {
+    window.history.pushState({}, '', '/jobs/post')
+    setView('post')
+    setPostSubmitted(false)
+    setPostError('')
+    resetPostForm()
+  }
+
+  const handleSubmitJobPosting = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPostError('')
+    if (!postContactName.trim() || !postContactPhone.trim()) {
+      setPostError('Your name and phone number are required.')
+      return
+    }
+    if (!postTitle.trim() || !postDescription.trim()) {
+      setPostError('Job title and description are required.')
+      return
+    }
+    setPostSubmitting(true)
+    try {
+      await backendApi.publicSubmitJobPosting({
+        contactName: postContactName.trim(),
+        contactPhone: postContactPhone.trim(),
+        contactEmail: postContactEmail.trim() || undefined,
+        title: postTitle.trim(),
+        description: postDescription.trim(),
+        requirements: postRequirements.trim() || undefined,
+        location: postLocation.trim() || undefined,
+        type: (postJobType || undefined) as any,
+      })
+      setPostSubmitted(true)
+      resetPostForm()
+    } catch (err) {
+      setPostError(err instanceof Error ? err.message : 'Submission failed. Please try again.')
+    } finally {
+      setPostSubmitting(false)
+    }
+  }
+
+  const handleApply = (job: JobPostingApi) => {
+    window.history.pushState({}, '', `/jobs/apply?job=${encodeURIComponent(job.id)}`)
+    setSelectedJob(job)
+    setView('apply')
+    setSubmitted(false)
+    setSubmitError('')
+    resetApplicationForm()
+  }
+
+  const handleSubmitApplication = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSubmitError('')
+    if (!appName.trim() || !appPhone.trim()) {
+      setSubmitError('Name and phone number are required.')
+      return
+    }
+    if (appResumeFile) {
+      const validationError = validateResumeFile(appResumeFile)
+      if (validationError) {
+        setSubmitError(validationError)
+        return
+      }
+    }
+    if (!selectedJob) return
+    setSubmitting(true)
+    try {
+      await backendApi.publicApplyForJob(selectedJob.id, {
+        name: appName.trim(),
+        phone: appPhone.trim(),
+        email: appEmail.trim() || undefined,
+        coverLetter: appCoverLetter.trim() || undefined,
+        resumeFile: appResumeFile ?? undefined,
+      })
+      setSubmitted(true)
+      resetApplicationForm()
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Submission failed. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--landing-bg)', fontFamily: 'var(--font-sans)', display: 'flex', flexDirection: 'column' }}>
+      <style>{`
+        .public-jobs-header {
+          flex-wrap: wrap;
+        }
+
+        .public-jobs-main {
+          padding: 40px 16px;
+        }
+
+        .public-jobs-panel {
+          padding: 36px;
+        }
+
+        .public-jobs-grid-2 {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+        }
+
+        .public-jobs-actions {
+          display: flex;
+          gap: 10px;
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+
+        .public-jobs-actions .btn {
+          flex: 1 1 180px;
+        }
+
+        @media (max-width: 768px) {
+          .public-jobs-main {
+            padding: 24px 12px;
+          }
+
+          .public-jobs-panel {
+            padding: 22px;
+            border-radius: 14px;
+          }
+
+          .public-jobs-grid-2 {
+            grid-template-columns: 1fr;
+          }
+
+          .public-jobs-back-btn {
+            width: 100%;
+          }
+
+          .public-jobs-top-action {
+            width: 100%;
+            max-width: 280px;
+          }
+
+          .public-jobs-form .form-input {
+            font-size: 16px;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .public-jobs-panel {
+            padding: 18px;
+          }
+        }
+      `}</style>
+      {/* Header */}
+      <header className="public-jobs-header public-page-header" style={{ background: 'var(--glass-bg)', backdropFilter: 'blur(16px)', borderBottom: '1px solid var(--border-dark)', padding: '16px 24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <img src="/favicon.png" alt="IFCA Abu Dhabi" style={{ width: '36px', height: '36px', borderRadius: '8px' }} />
+        <div style={{ flex: 1 }}>
+          <h1 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary-dark)' }}>IFCA Abu Dhabi</h1>
+          <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>Careers &amp; Opportunities</p>
+        </div>
+        {(view === 'apply' || view === 'post') && (
+          <button
+            className="btn btn-secondary public-jobs-back-btn"
+            onClick={() => {
+              window.history.pushState({}, '', '/jobs')
+              setView('listings')
+              setSelectedJob(null)
+              setSubmitError('')
+            }}
+          >
+            ← Back to Listings
+          </button>
+        )}
+      </header>
+
+      {/* Body */}
+      <main className="public-jobs-main public-page-main" style={{ flex: 1 }}>
+        {view === 'listings' && (
+          <div style={{ maxWidth: '760px', margin: '0 auto' }}>
+            <div style={{ marginBottom: '32px', textAlign: 'center' }}>
+              <h2 style={{ margin: '0 0 8px', fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-primary-dark)' }}>Open Positions</h2>
+              <p style={{ margin: '0 0 16px', color: 'var(--text-secondary-dark)' }}>Join IFCA Abu Dhabi — serving our community with purpose.</p>
+              <button className="btn btn-secondary public-jobs-top-action" onClick={handlePostJob} style={{ fontSize: '0.88rem' }}>
+                + Post a Job
+              </button>
+            </div>
+
+            {loading && (
+              <div style={{ textAlign: 'center', color: 'var(--text-secondary-dark)', padding: '40px' }}>Loading opportunities…</div>
+            )}
+            {loadError && (
+              <div style={{ textAlign: 'center', color: 'var(--error)', padding: '40px' }}>{loadError}</div>
+            )}
+            {!loading && !loadError && jobs.length === 0 && (
+              <div style={{ textAlign: 'center', color: 'var(--text-secondary-dark)', padding: '60px', background: 'var(--surface-dark)', borderRadius: '12px', border: '1px solid var(--border-dark)' }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>📋</div>
+                <p style={{ margin: 0, fontWeight: 600 }}>No open positions at this time.</p>
+                <p style={{ margin: '6px 0 0', fontSize: '0.88rem' }}>Please check back later for new opportunities.</p>
+              </div>
+            )}
+            {!loading && !loadError && jobs.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {jobs.map((job) => (
+                  <JobCard key={job.id} job={job} onApply={handleApply} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {view === 'apply' && selectedJob && (
+          <div style={{ maxWidth: '560px', margin: '0 auto' }}>
+            <div className="public-jobs-panel public-page-card" style={{ background: 'var(--surface-dark)', border: '1px solid var(--border-dark)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }}>
+              {submitted ? (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '16px' }}>✅</div>
+                  <h2 style={{ margin: '0 0 8px', color: 'var(--text-primary-dark)' }}>Application Submitted</h2>
+                  <p style={{ margin: '0 0 20px', color: 'var(--text-secondary-dark)' }}>
+                    Thank you for applying for <strong>{selectedJob.title}</strong>. We will review your application and reach out if there is a match.
+                  </p>
+                  <div className="public-jobs-actions">
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => {
+                        window.history.pushState({}, '', '/jobs')
+                        setView('listings')
+                        setSelectedJob(null)
+                        setSubmitError('')
+                      }}
+                    >
+                      View More Positions
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => handleApply(selectedJob)}>Apply Again</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <h2 style={{ margin: '0 0 4px', color: 'var(--text-primary-dark)', fontSize: '1.3rem' }}>Apply — {selectedJob.title}</h2>
+                  <p style={{ margin: '0 0 24px', color: 'var(--text-secondary-dark)', fontSize: '0.88rem' }}>
+                    {JOB_TYPE_LABELS[selectedJob.type] ?? selectedJob.type}
+                    {selectedJob.location && ` · ${selectedJob.location}`}
+                  </p>
+
+                  {submitError && (
+                    <div style={{ background: 'var(--error-light)', border: '1px solid var(--error)', borderRadius: '8px', padding: '12px 16px', marginBottom: '20px', color: 'var(--error)', fontSize: '0.88rem' }}>
+                      {submitError}
+                    </div>
+                  )}
+
+                  <form className="public-jobs-form" onSubmit={handleSubmitApplication} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div className="public-jobs-grid-2">
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>
+                          Full Name <span style={{ color: 'var(--error)' }}>*</span>
+                        </label>
+                        <input className="form-input" type="text" value={appName} onChange={(e) => setAppName(e.target.value)} placeholder="Your full name" required />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>
+                          Phone <span style={{ color: 'var(--error)' }}>*</span>
+                        </label>
+                        <input className="form-input" type="tel" value={appPhone} onChange={(e) => setAppPhone(e.target.value)} placeholder="+971 50 000 0000" required />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Email Address</label>
+                      <input className="form-input" type="email" value={appEmail} onChange={(e) => setAppEmail(e.target.value)} placeholder="your@email.com (optional)" />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Resume Upload</label>
+                      <FileUploadZone
+                        accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        maxBytes={MAX_RESUME_SIZE_BYTES}
+                        allowedExtensions={ALLOWED_RESUME_EXTENSIONS}
+                        hint="PDF, DOC or DOCX · Max 1 MB · Optional"
+                        file={appResumeFile}
+                        onChange={(f, err) => {
+                          setAppResumeFile(f)
+                          setSubmitError(err ?? '')
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Cover Letter / Message</label>
+                      <textarea
+                        className="form-input"
+                        value={appCoverLetter}
+                        onChange={(e) => setAppCoverLetter(e.target.value)}
+                        placeholder="Tell us about yourself and why you're interested in this role…"
+                        rows={5}
+                        style={{ resize: 'vertical' }}
+                      />
+                    </div>
+
+                    <button type="submit" className="btn btn-primary" disabled={submitting} style={{ marginTop: '4px' }}>
+                      {submitting ? 'Submitting…' : 'Submit Application'}
+                    </button>
+                  </form>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+        {view === 'post' && (
+          <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+            <div className="public-jobs-panel public-page-card" style={{ background: 'var(--surface-dark)', border: '1px solid var(--border-dark)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }}>
+              {postSubmitted ? (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '16px' }}>✅</div>
+                  <h2 style={{ margin: '0 0 8px', color: 'var(--text-primary-dark)' }}>Job Submitted for Review</h2>
+                  <p style={{ margin: '0 0 20px', color: 'var(--text-secondary-dark)' }}>
+                    Thank you! Your job posting has been received and is pending admin review. We will publish it once approved.
+                  </p>
+                  <div className="public-jobs-actions">
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => {
+                        window.history.pushState({}, '', '/jobs')
+                        setView('listings')
+                      }}
+                    >
+                      View Open Positions
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => { setPostSubmitted(false); setPostError('') }}>Post Another Job</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <h2 style={{ margin: '0 0 4px', color: 'var(--text-primary-dark)', fontSize: '1.3rem' }}>Post a Job</h2>
+                  <p style={{ margin: '0 0 24px', color: 'var(--text-secondary-dark)', fontSize: '0.88rem' }}>
+                    Submit a job opening — our team will review and publish it shortly.
+                  </p>
+
+                  {postError && (
+                    <div style={{ background: 'var(--error-light)', border: '1px solid var(--error)', borderRadius: '8px', padding: '12px 16px', marginBottom: '20px', color: 'var(--error)', fontSize: '0.88rem' }}>
+                      {postError}
+                    </div>
+                  )}
+
+                  <form className="public-jobs-form" onSubmit={handleSubmitJobPosting} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-secondary-dark)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Your Contact Details</p>
+
+                    <div className="public-jobs-grid-2">
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>
+                          Your Name <span style={{ color: 'var(--error)' }}>*</span>
+                        </label>
+                        <input className="form-input" type="text" value={postContactName} onChange={(e) => setPostContactName(e.target.value)} placeholder="Full name" required />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>
+                          Phone <span style={{ color: 'var(--error)' }}>*</span>
+                        </label>
+                        <input className="form-input" type="tel" value={postContactPhone} onChange={(e) => setPostContactPhone(e.target.value)} placeholder="+971 50 000 0000" required />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Contact Email</label>
+                      <input className="form-input" type="email" value={postContactEmail} onChange={(e) => setPostContactEmail(e.target.value)} placeholder="your@email.com (optional)" />
+                    </div>
+
+                    <hr style={{ border: 'none', borderTop: '1px solid var(--border-dark)', margin: '4px 0' }} />
+                    <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-secondary-dark)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job Details</p>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>
+                        Job Title <span style={{ color: 'var(--error)' }}>*</span>
+                      </label>
+                      <input className="form-input" type="text" value={postTitle} onChange={(e) => setPostTitle(e.target.value)} placeholder="e.g. Community Outreach Coordinator" required />
+                    </div>
+
+                    <div className="public-jobs-grid-2">
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Job Type</label>
+                        <select className="form-input" value={postJobType} onChange={(e) => setPostJobType(e.target.value)}>
+                          <option value="">Select type</option>
+                          <option value="full_time">Full Time</option>
+                          <option value="part_time">Part Time</option>
+                          <option value="volunteer">Volunteer</option>
+                          <option value="contract">Contract</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Location</label>
+                        <input className="form-input" type="text" value={postLocation} onChange={(e) => setPostLocation(e.target.value)} placeholder="e.g. Abu Dhabi (optional)" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>
+                        Description <span style={{ color: 'var(--error)' }}>*</span>
+                      </label>
+                      <textarea
+                        className="form-input"
+                        value={postDescription}
+                        onChange={(e) => setPostDescription(e.target.value)}
+                        placeholder="Describe the role, responsibilities, and what you're looking for…"
+                        rows={5}
+                        style={{ resize: 'vertical' }}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Requirements</label>
+                      <textarea
+                        className="form-input"
+                        value={postRequirements}
+                        onChange={(e) => setPostRequirements(e.target.value)}
+                        placeholder="List any qualifications, experience, or skills required (optional)…"
+                        rows={3}
+                        style={{ resize: 'vertical' }}
+                      />
+                    </div>
+
+                    <button type="submit" className="btn btn-primary" disabled={postSubmitting} style={{ marginTop: '4px' }}>
+                      {postSubmitting ? 'Submitting…' : 'Submit Job Posting'}
+                    </button>
+                  </form>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </main>
+
+      <footer style={{ textAlign: 'center', padding: '20px', fontSize: '0.78rem', color: 'var(--text-secondary-dark)', borderTop: '1px solid var(--border-dark)' }}>
+        © {new Date().getFullYear()} IFCA Abu Dhabi. All rights reserved.
+      </footer>
+    </div>
+  )
+}

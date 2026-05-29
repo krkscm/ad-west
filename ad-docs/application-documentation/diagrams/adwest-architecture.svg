@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="880" viewBox="0 0 1400 880" role="img" aria-label="ADWest System Architecture">
+  <defs>
+    <style>
+      .title { font: 700 28px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 500 14px 'Segoe UI', Arial, sans-serif; fill: #334155; }
+      .h { font: 700 16px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .t { font: 500 13px 'Segoe UI', Arial, sans-serif; fill: #1e293b; }
+      .small { font: 500 12px 'Segoe UI', Arial, sans-serif; fill: #334155; }
+      .box { stroke: #94a3b8; stroke-width: 1.4; rx: 16; ry: 16; }
+      .edge { stroke: #334155; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .dash { stroke-dasharray: 6 6; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#334155" />
+    </marker>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8fbff"/>
+      <stop offset="100%" stop-color="#eef5ff"/>
+    </linearGradient>
+    <linearGradient id="frontend" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#dbeafe"/>
+      <stop offset="100%" stop-color="#bfdbfe"/>
+    </linearGradient>
+    <linearGradient id="backend" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#dcfce7"/>
+      <stop offset="100%" stop-color="#bbf7d0"/>
+    </linearGradient>
+    <linearGradient id="db" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fee2e2"/>
+      <stop offset="100%" stop-color="#fecaca"/>
+    </linearGradient>
+    <linearGradient id="ext" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fef3c7"/>
+      <stop offset="100%" stop-color="#fde68a"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1400" height="880" fill="url(#bg)"/>
+
+  <text x="38" y="48" class="title">ADWest Application Architecture (Reverse Engineered)</text>
+  <text x="38" y="73" class="subtitle">Frontend: React + Vite (3000) | Backend: NestJS (3001, /api/v1) | Persistence: PostgreSQL</text>
+
+  <rect class="box" x="36" y="120" width="310" height="250" fill="url(#frontend)"/>
+  <text x="56" y="154" class="h">Client Layer</text>
+  <text x="56" y="184" class="t">- Admin Browser Session</text>
+  <text x="56" y="206" class="t">- Member Browser Session</text>
+  <text x="56" y="228" class="t">- Public Visitors</text>
+  <text x="56" y="260" class="t">Routes:</text>
+  <text x="56" y="282" class="small">/helpdesk, /jobs, /events/:id/register</text>
+  <text x="56" y="304" class="small">Admin dashboard + settings pages</text>
+  <text x="56" y="326" class="small">Member portal pages</text>
+
+  <rect class="box" x="392" y="120" width="370" height="250" fill="url(#frontend)"/>
+  <text x="412" y="154" class="h">Web App Layer (ad-west-web)</text>
+  <text x="412" y="184" class="t">React + TypeScript + Vite</text>
+  <text x="412" y="206" class="t">Providers: Auth, Theme, Toast, ConfirmDialog</text>
+  <text x="412" y="228" class="t">API Client: backendApi.ts</text>
+  <text x="412" y="260" class="t">Auth Flows:</text>
+  <text x="412" y="282" class="small">credential login, member login, Google OAuth popup</text>
+  <text x="412" y="304" class="t">Proxy target: /api/v1 -&gt; backend service</text>
+
+  <rect class="box" x="808" y="120" width="556" height="380" fill="url(#backend)"/>
+  <text x="828" y="154" class="h">API Layer (ad-west-api)</text>
+  <text x="828" y="182" class="t">NestJS Modules</text>
+  <text x="828" y="212" class="small">- UserManagement (auth, roles, menu, audit, Google config, Gmail)</text>
+  <text x="828" y="236" class="small">- CoreBusiness (org, permissions, programs, reports, docs, attendance)</text>
+  <text x="828" y="260" class="small">- PublicGateway (helpdesk, jobs, public event registration)</text>
+  <text x="828" y="284" class="small">- MemberServices (reimbursements, events, notifications)</text>
+  <text x="828" y="308" class="small">- EnumValues, ApprovalWorkflowDefinitions, Health</text>
+  <text x="828" y="340" class="t">Cross-cutting:</text>
+  <text x="828" y="362" class="small">Guards, validation pipe, exception filter, swagger</text>
+  <text x="828" y="384" class="small">Auth/session verification for admin/member routes</text>
+  <text x="828" y="406" class="small">Public routes intentionally unauthenticated</text>
+
+  <rect class="box" x="392" y="414" width="370" height="190" fill="url(#ext)"/>
+  <text x="412" y="448" class="h">External Integration</text>
+  <text x="412" y="476" class="t">Google OAuth + Gmail API</text>
+  <text x="412" y="500" class="small">- Start: /auth/google/start</text>
+  <text x="412" y="522" class="small">- Callback: /auth/google/callback</text>
+  <text x="412" y="544" class="small">- Config: /settings/google-integration-config</text>
+  <text x="412" y="566" class="small">DB-backed config with env fallback</text>
+
+  <rect class="box" x="808" y="546" width="556" height="250" fill="url(#db)"/>
+  <text x="828" y="580" class="h">Data Layer (PostgreSQL)</text>
+  <text x="828" y="610" class="t">Migration scripts in ad-docs/database-script</text>
+  <text x="828" y="634" class="small">- Core schema/indexes/triggers</text>
+  <text x="828" y="656" class="small">- Auth/session tables</text>
+  <text x="828" y="678" class="small">- Public gateway tables</text>
+  <text x="828" y="700" class="small">- Member services tables</text>
+  <text x="828" y="722" class="small">- Google integration config (041)</text>
+  <text x="828" y="752" class="t">Persistence mode switch:</text>
+  <text x="828" y="774" class="small">DB mode or in-memory runtime fallback (feature-dependent)</text>
+
+  <path class="edge" d="M346 246 L392 246"/>
+  <path class="edge" d="M762 246 L808 246"/>
+  <path class="edge" d="M1100 500 L1100 546"/>
+  <path class="edge dash" d="M762 500 L808 500"/>
+  <path class="edge dash" d="M576 370 L576 414"/>
+
+  <text x="365" y="232" class="small">HTTPS</text>
+  <text x="777" y="232" class="small">REST /api/v1</text>
+  <text x="1114" y="534" class="small">TypeORM/SQL</text>
+  <text x="771" y="490" class="small">OAuth/Gmail</text>
+
+  <rect x="36" y="722" width="726" height="108" rx="12" ry="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="56" y="752" class="h">Legend</text>
+  <text x="56" y="776" class="small">Blue: frontend/client layers | Green: backend modules | Red: persistence layer | Yellow: external integrations</text>
+  <text x="56" y="798" class="small">Solid arrow: primary runtime flow | Dashed arrow: integration/secondary flow</text>
+</svg>
