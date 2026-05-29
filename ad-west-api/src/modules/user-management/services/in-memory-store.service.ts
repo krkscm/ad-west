@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AdminRole } from '../enums/admin-role.enum';
 import { AdminUser, RoleAssignment } from '../interfaces/admin-user.interface';
 import { AuditLogEntry } from '../interfaces/audit-log.interface';
-import { MemberUser, OtpRequest } from '../interfaces/member.interface';
+import { MemberUser } from '../interfaces/member.interface';
 import { SessionRecord } from '../interfaces/session.interface';
 import { UserStore } from '../interfaces/user-store.interface';
 import { CryptoService } from './crypto.service';
@@ -12,36 +12,93 @@ export class InMemoryStoreService implements UserStore {
   private readonly admins = new Map<string, AdminUser>();
   private readonly members = new Map<string, MemberUser>();
   private readonly sessions = new Map<string, SessionRecord>();
-  private readonly otps = new Map<string, OtpRequest>();
   private readonly auditLogs: AuditLogEntry[] = [];
 
   constructor(private readonly cryptoService: CryptoService) {
-    const seedRole: RoleAssignment = {
-      role: AdminRole.SUPER_ADMIN,
-      scopeType: 'global',
-    };
-
-    const adminId = 'admin_001';
     const now = new Date().toISOString();
+    const adminSeeds: Array<{
+      id: string;
+      code: string;
+      name: string;
+      email: string;
+      password: string;
+      roles: RoleAssignment[];
+      roleDefinitionId?: string;
+    }> = [
+      {
+        id: 'admin_super_001',
+        code: 'ADMIN_SUPER_001',
+        name: 'System Super Admin',
+        email: 'super.admin@adwest.local',
+        password: 'SuperAdmin@123',
+        roles: [{ role: AdminRole.SUPER_ADMIN, scopeType: 'global' }],
+      },
+      {
+        id: 'admin_zone_001',
+        code: 'ADMIN_ZONE_001',
+        name: 'West Zone Admin',
+        email: 'zone.admin@adwest.local',
+        password: 'ZoneAdmin@123',
+        roles: [{ role: AdminRole.ZONE_ADMIN, scopeType: 'zone', scopeId: 'zone_wz' }],
+      },
+      {
+        id: 'admin_sreny_001',
+        code: 'ADMIN_SRENY_001',
+        name: 'SV Sreny Admin',
+        email: 'sreny.admin@adwest.local',
+        password: 'SrenyAdmin@123',
+        roles: [{ role: AdminRole.SRENY_ADMIN, scopeType: 'sreny', scopeId: 'sreny_sv' }],
+      },
+    ];
 
-    this.admins.set(adminId, {
-      id: adminId,
-      name: 'System Super Admin',
-      email: 'admin@adwest.local',
-      passwordHash: this.cryptoService.hashPassword('Admin@123'),
-      active: true,
-      mfaEnabled: false,
-      roles: [seedRole],
-      createdAt: now,
-      updatedAt: now,
+    adminSeeds.forEach((seed) => {
+      this.admins.set(seed.id, {
+        id: seed.id,
+        code: seed.code,
+        name: seed.name,
+        email: seed.email,
+        roleDefinitionId: seed.roleDefinitionId,
+        passwordHash: this.cryptoService.hashPassword(seed.password),
+        active: true,
+        failedAttempts: 0,
+        roles: seed.roles,
+        createdAt: now,
+        updatedAt: now,
+      });
     });
 
-    this.members.set('member_001', {
-      id: 'member_001',
-      fullName: 'Demo Member',
-      email: 'member@adwest.local',
-      phone: '971500000001',
-      active: true,
+    const memberSeeds: MemberUser[] = [
+      {
+        id: 'member_001',
+        fullName: 'John Doe',
+        email: 'john.doe@email.com',
+        phone: '971500000001',
+        passwordHash: this.cryptoService.hashPassword('Member@123'),
+        failedAttempts: 0,
+        active: true,
+      },
+      {
+        id: 'member_002',
+        fullName: 'Priya Shah',
+        email: 'priya.shah@email.com',
+        phone: '971500000002',
+        passwordHash: this.cryptoService.hashPassword('Member@123'),
+        failedAttempts: 0,
+        active: true,
+      },
+      {
+        id: 'member_003',
+        fullName: 'Arjun Patel',
+        email: 'arjun.patel@email.com',
+        phone: '971500000003',
+        passwordHash: this.cryptoService.hashPassword('Member@123'),
+        failedAttempts: 0,
+        active: true,
+      },
+    ];
+
+    memberSeeds.forEach((member) => {
+      this.members.set(member.id, member);
     });
   }
 
@@ -51,6 +108,13 @@ export class InMemoryStoreService implements UserStore {
 
   async getAdminById(id: string): Promise<AdminUser | undefined> {
     return this.admins.get(id);
+  }
+
+  async getAdminByCode(code: string): Promise<AdminUser | undefined> {
+    const normalized = code.trim().toUpperCase();
+    return Array.from(this.admins.values()).find(
+      (admin) => admin.code.toUpperCase() === normalized,
+    );
   }
 
   async getAdminByEmail(email: string): Promise<AdminUser | undefined> {
@@ -68,28 +132,33 @@ export class InMemoryStoreService implements UserStore {
     this.admins.set(admin.id, admin);
   }
 
+  async deleteAdmin(id: string): Promise<void> {
+    this.admins.delete(id);
+  }
+
   async getMembers(): Promise<MemberUser[]> {
     return Array.from(this.members.values());
   }
 
   async findMemberByIdentity(
-    name: string,
     phone?: string,
     email?: string,
   ): Promise<MemberUser | undefined> {
-    const normalizedName = name.trim().toLowerCase();
     const normalizedPhone = phone?.trim();
     const normalizedEmail = email?.trim().toLowerCase();
 
     return Array.from(this.members.values()).find((member) => {
-      const sameName = member.fullName.trim().toLowerCase() === normalizedName;
       const phoneMatch = normalizedPhone ? member.phone === normalizedPhone : false;
       const emailMatch = normalizedEmail
         ? member.email?.toLowerCase() === normalizedEmail
         : false;
 
-      return sameName && (phoneMatch || emailMatch);
+      return phoneMatch || emailMatch;
     });
+  }
+
+  async saveMember(member: MemberUser): Promise<void> {
+    this.members.set(member.id, member);
   }
 
   async saveSession(session: SessionRecord): Promise<void> {
@@ -102,18 +171,6 @@ export class InMemoryStoreService implements UserStore {
 
   async revokeSession(tokenId: string): Promise<void> {
     this.sessions.delete(tokenId);
-  }
-
-  async saveOtp(request: OtpRequest): Promise<void> {
-    this.otps.set(request.id, request);
-  }
-
-  async getOtp(requestId: string): Promise<OtpRequest | undefined> {
-    return this.otps.get(requestId);
-  }
-
-  async removeOtp(requestId: string): Promise<void> {
-    this.otps.delete(requestId);
   }
 
   async saveAudit(entry: AuditLogEntry): Promise<void> {

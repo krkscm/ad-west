@@ -26,8 +26,6 @@ const getInitialAdmins = (): AdminUser[] => [
     name: 'Sarah Connor (Super Admin)',
     email: 'superadmin@adwest.org',
     passwordHash: '8e811c75c5e8c171:5e7d5830b53d8a7c645bc2fa5bbd323b63297a7cc262db80eb9d0e2e9c20a95f5669b32943343a6d96924dcf58925576a8b75e7a909bb6b5c3cb84074211a7c7', // password123
-    totpSecret: 'e86095ff5978a6ff6007e0c451b6973e86f8a4cd', // Hex formatted secret
-    mfaEnabled: false, // Start false so the user can experience the MFA Enrollment Setup
     roles: [
       { id: 'role_1', adminUserId: 'admin_super', role: 'Super Admin', scopeType: 'global', scopeId: 'global' }
     ],
@@ -38,8 +36,6 @@ const getInitialAdmins = (): AdminUser[] => [
     name: 'Bruce Wayne (Zone Admin)',
     email: 'zoneadmin@adwest.org',
     passwordHash: '8e811c75c5e8c171:5e7d5830b53d8a7c645bc2fa5bbd323b63297a7cc262db80eb9d0e2e9c20a95f5669b32943343a6d96924dcf58925576a8b75e7a909bb6b5c3cb84074211a7c7', // password123
-    totpSecret: 'b335ad3cfbe4cc5b82531cd86fbf8c6df3d1e1f1',
-    mfaEnabled: true, // Start true to demo login challenge
     roles: [
       { id: 'role_2', adminUserId: 'admin_zone', role: 'Zone Admin', scopeType: 'zone', scopeId: 'zone_west_coast' }
     ],
@@ -50,10 +46,8 @@ const getInitialAdmins = (): AdminUser[] => [
     name: 'Peter Parker (Sreny Admin)',
     email: 'srenyadmin@adwest.org',
     passwordHash: '8e811c75c5e8c171:5e7d5830b53d8a7c645bc2fa5bbd323b63297a7cc262db80eb9d0e2e9c20a95f5669b32943343a6d96924dcf58925576a8b75e7a909bb6b5c3cb84074211a7c7', // password123
-    totpSecret: 'f87a80b06ad7db1aee348574d3fb0cc6e312a02b',
-    mfaEnabled: true,
     roles: [
-      { id: 'role_3', adminUserId: 'admin_sreny', role: 'Sreny Admin', scopeType: 'sreny', scopeId: 'sreny_silicon_valley' }
+      { id: 'role_3', adminUserId: 'admin_sreny', role: 'Sreny Admin', scopeType: 'sreny', scopeId: 'sreny_demo_one' }
     ],
     createdAt: new Date(2026, 3, 5).toISOString()
   }
@@ -73,7 +67,7 @@ const getInitialContacts = (): Contact[] => [
     address: 'Marina Heights, Dubai, UAE',
     status: 'active',
     memberships: [
-      { srenyId: 'sreny_silicon_valley', srenyName: 'Silicon Valley Sreny', joinedDate: '2025-01-10', status: 'active' }
+      { srenyId: 'sreny_demo_one', srenyName: 'Demo Sreny One', joinedDate: '2025-01-10', status: 'active' }
     ]
   },
   {
@@ -88,8 +82,8 @@ const getInitialContacts = (): Contact[] => [
     address: '123 Market St, San Francisco, CA',
     status: 'active',
     memberships: [
-      { srenyId: 'sreny_silicon_valley', srenyName: 'Silicon Valley Sreny', joinedDate: '2025-02-14', status: 'active' },
-      { srenyId: 'sreny_oakland', srenyName: 'Oakland Sreny', joinedDate: '2025-06-01', status: 'active' }
+      { srenyId: 'sreny_demo_one', srenyName: 'Demo Sreny One', joinedDate: '2025-02-14', status: 'active' },
+      { srenyId: 'sreny_demo_two', srenyName: 'Demo Sreny Two', joinedDate: '2025-06-01', status: 'active' }
     ]
   },
   {
@@ -104,7 +98,7 @@ const getInitialContacts = (): Contact[] => [
     address: 'Corniche Rd, Abu Dhabi, UAE',
     status: 'active',
     memberships: [
-      { srenyId: 'sreny_abu_dhabi_core', srenyName: 'Abu Dhabi Core', joinedDate: '2024-09-01', status: 'active' }
+      { srenyId: 'sreny_demo_three', srenyName: 'Demo Sreny Three', joinedDate: '2024-09-01', status: 'active' }
     ]
   }
 ];
@@ -364,9 +358,9 @@ export const mockDatabase = {
   // PROGRAMS (METRICS ONLY)
   getPrograms() {
     return [
-      { id: 'prog_1', name: 'Annual Youth Summit 2026', date: '2026-06-15', sreny: 'Silicon Valley Sreny' },
-      { id: 'prog_2', name: 'Charity Food Drive', date: '2026-06-22', sreny: 'Oakland Sreny' },
-      { id: 'prog_3', name: 'Community Health Awareness Seminars', date: '2026-07-02', sreny: 'Abu Dhabi Core' }
+      { id: 'prog_1', name: 'Annual Youth Summit 2026', date: '2026-06-15', sreny: 'Demo Sreny One' },
+      { id: 'prog_2', name: 'Charity Food Drive', date: '2026-06-22', sreny: 'Demo Sreny Two' },
+      { id: 'prog_3', name: 'Community Health Awareness Seminars', date: '2026-07-02', sreny: 'Demo Sreny Three' }
     ];
   }
 };

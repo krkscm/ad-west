@@ -1,7 +1,7 @@
 # Domain Entity Relationship Diagram
 
 ## Scope
-MVP core domain entities and their primary relationships.
+Core Business core domain entities and their primary relationships.
 
 ```mermaid
 erDiagram
@@ -30,6 +30,6 @@ erDiagram
 ```
 
 ## Verification Checklist
-- [ ] Entity list aligns with MVP data model baseline.
+- [ ] Entity list aligns with Core Business data model baseline.
 - [ ] Relationship cardinality matches expected behavior.
 - [ ] Sensitive entities are included in audit and access reviews.

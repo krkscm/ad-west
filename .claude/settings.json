@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"d:\\\\Projects\\\\ADWest\\\\ad-west\\\\ad-west-api\\\\src\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(PGPASSWORD=24may1990 psql -U kiran -d ifca-auhwest -c \"SELECT id, name, active FROM adwest.srenies ORDER BY name;\")",
+      "Bash(PGPASSWORD=24may1990 psql -U kiran -d ifca-auhwest -c ' *)",
+      "Bash(PGPASSWORD=24may1990 psql -U kiran -d ifca-auhwest -c \"SELECT key, icon, length\\(icon\\) as char_len, octet_length\\(icon\\) as byte_len FROM adwest.menu_items WHERE key IN \\('sreni-9097614d-5411-43ff-86e2-bc7ba3561598', 'sreni-9097614d-5411-43ff-86e2-bc7ba3561598-calendar'\\);\")",
+      "Bash(PGPASSWORD=24may1990 psql -U kiran -d ifca-auhwest -c \"SELECT key, icon, octet_length\\(icon\\) as bytes FROM adwest.menu_items WHERE key LIKE 'sreni-%' AND key NOT LIKE '%-calendar' LIMIT 3;\")",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/api/v1/org/locations/97654074-4928-42a2-b00c-d27a874338d9 -X DELETE -H 'Authorization: Bearer eyJzdWIiOiJhZG1pbl9zdXBlcl8wMDEiLCJ0eXBlIjoiYWRtaW4iLCJyb2xlcyI6WyJTVVBFUl9BRE1JTiJdLCJyb2xlQXNzaWdubWVudHMiOlt7InJvbGUiOiJTVVBFUl9BRE1JTiIsInNjb3BlVHlwZSI6Imdsb2JhbCJ9XSwic2lkIjoic2Vzc183M2JjMDRiYjRlYTE1NDhiIiwiZW1haWwiOiJzdXBlci5hZG1pbkBhZHdlc3QubG9jYWwiLCJleHAiOjE3Nzk4MjEzODl9.Q01cYD45I9kGBtv1J-i-Z7MFR9AWQeMHy0SFzKqvu84' -H 'Content-Type: application/json')",
+      "Bash(curl -s http://localhost:3001/api/v1/org/locations/97654074-4928-42a2-b00c-d27a874338d9 -X DELETE -H 'Authorization: Bearer eyJzdWIiOiJhZG1pbl9zdXBlcl8wMDEiLCJ0eXBlIjoiYWRtaW4iLCJyb2xlcyI6WyJTVVBFUl9BRE1JTiJdLCJyb2xlQXNzaWdubWVudHMiOlt7InJvbGUiOiJTVVBFUl9BRE1JTiIsInNjb3BlVHlwZSI6Imdsb2JhbCJ9XSwic2lkIjoic2Vzc183M2JjMDRiYjRlYTE1NDhiIiwiZW1haWwiOiJzdXBlci5hZG1pbkBhZHdlc3QubG9jYWwiLCJleHAiOjE3Nzk4MjEzODl9.Q01cYD45I9kGBtv1J-i-Z7MFR9AWQeMHy0SFzKqvu84' -H 'Content-Type: application/json')",
+      "Bash(PGPASSWORD=24may1990 psql -U kiran -d ifca-auhwest -c \"SELECT id, name, level, active FROM adwest.locations ORDER BY level, name;\")",
+      "PowerShell($token = \\(Invoke-RestMethod -Uri 'http://localhost:3001/api/v1/auth/login' -Method POST -ContentType 'application/json' -Body '{\"email\":\"super@example.com\",\"password\":\"Admin@12345\"}' -ErrorAction SilentlyContinue\\).accessToken; if \\($token\\) { Write-Host \"Got token: $\\($token.Substring\\(0,20\\)\\)...\" } else { Write-Host \"Login failed or server not running\" })",
+      "PowerShell($body = '{\"email\":\"kiran@adwest.com\",\"password\":\"Admin@12345\"}'; $token = \\(Invoke-RestMethod -Uri 'http://localhost:3001/api/v1/auth/login' -Method POST -ContentType 'application/json' -Body $body -ErrorAction SilentlyContinue\\).accessToken; if \\($token\\) { Write-Host \"Got token\"; $result = Invoke-RestMethod -Uri 'http://localhost:3001/api/v1/org/locations/97654074-4928-42a2-b00c-d27a874338d9' -Method DELETE -Headers @{Authorization=\"Bearer $token\"} -ErrorAction SilentlyContinue; Write-Host \"DELETE result: $\\($result | ConvertTo-Json\\)\" } else { Write-Host \"Token fetch failed\" })",
+      "PowerShell(Invoke-RestMethod -Uri 'http://localhost:3001/api/v1/auth/login' -Method POST -ContentType 'application/json' -Body '{\"email\":\"admin@adwest.com\",\"password\":\"Admin@12345\"}' 2>&1)",
+      "PowerShell(Get-Process -Name \"node\" 2>$null)",
+      "PowerShell($p = Get-Process -Id 28452 2>$null; if \\($p\\) { $p.MainWindowTitle; \\(Get-WmiObject Win32_Process -Filter \"ProcessId=28452\"\\).CommandLine })",
+      "PowerShell(Stop-Process -Id 28452 -Force)",
+      "Bash(node --enable-source-maps dist/main)",
+      "Bash(curl -s -X POST http://localhost:3001/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"admin@adwest.com\",\"password\":\"Admin@12345\"}')",
+      "PowerShell(Get-Process -Name \"node\")",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(python3 -c ' *)",
+      "Bash(powershell -Command ' *)",
+      "Bash(curl -s \"http://localhost:3001/api/v1/settings/approval-workflows?page=1&pageSize=20\" -H \"Authorization: Bearer eyJzdWIiOiJhZG1pbl9zdXBlcl8wMDEiLCJ0eXBlIjoiYWRtaW4iLCJyb2xlcyI6WyJTVVBFUl9BRE1JTiJdLCJyb2xlQXNzaWdubWVudHMiOlt7InJvbGUiOiJTVVBFUl9BRE1JTiIsInNjb3BlVHlwZSI6Imdsb2JhbCJ9XSwic2lkIjoic2Vzc19hMjU3ZGZjZDIxMDZhYWFhIiwiZW1haWwiOiJzdXBlci5hZG1pbkBhZHdlc3QubG9jYWwiLCJleHAiOjE3Nzk4NjkyMzJ9.ikyM1w2tx8e22TXSD5xb2PdjDpFI2vXZ6f4l8GdfCVg\" -H \"Content-Type: application/json\")",
+      "Bash(Get-Process -Id 34760 -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object Id, ProcessName, CommandLine)",
+      "PowerShell(Stop-Process -Id 34760 -Force)",
+      "Bash(curl -s \"http://localhost:3001/api/v1/settings/approval-workflows?page=1&pageSize=20\" -H \"Authorization: Bearer eyJzdWIiOiJhZG1pbl9zdXBlcl8wMDEiLCJ0eXBlIjoiYWRtaW4iLCJyb2xlcyI6WyJTVVBFUl9BRE1JTiJdLCJyb2xlQXNzaWdubWVudHMiOlt7InJvbGUiOiJTVVBFUl9BRE1JTiIsInNjb3BlVHlwZSI6Imdsb2JhbCJ9XSwic2lkIjoic2Vzc19hMjU3ZGZjZDIxMDZhYWFhIiwiZW1haWwiOiJzdXBlci5hZG1pbkBhZHdlc3QubG9jYWwiLCJleHAiOjE3Nzk4NjkyMzJ9.ikyM1w2tx8e22TXSD5xb2PdjDpFI2vXZ6f4l8GdfCVg\")",
+      "Bash(node dist/main.js)",
+      "Bash(curl -s 'http://localhost:3001/api/v1/settings/approval-workflows?page=1&pageSize=20' -H 'Authorization: Bearer eyJzdWIiOiJhZG1pbl9zdXBlcl8wMDEiLCJ0eXBlIjoiYWRtaW4iLCJyb2xlcyI6WyJTVVBFUl9BRE1JTiJdLCJyb2xlQXNzaWdubWVudHMiOlt7InJvbGUiOiJTVVBFUl9BRE1JTiIsInNjb3BlVHlwZSI6Imdsb2JhbCJ9XSwic2lkIjoic2Vzc19hMjU3ZGZjZDIxMDZhYWFhIiwiZW1haWwiOiJzdXBlci5hZG1pbkBhZHdlc3QubG9jYWwiLCJleHAiOjE3Nzk4NjkyMzJ9.ikyM1w2tx8e22TXSD5xb2PdjDpFI2vXZ6f4l8GdfCVg')"
+    ]
+  }
+}

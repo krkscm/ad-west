@@ -1,24 +1,28 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { Roles } from '../decorators/roles.decorator';
 import { AssignRoleDto } from '../dto/assign-role.dto';
 import { CreateAdminUserDto } from '../dto/create-admin-user.dto';
+import { ListAdminUsersQueryDto } from '../dto/list-admin-users-query.dto';
 import { ResetAdminPasswordDto } from '../dto/reset-admin-password.dto';
+import { UpdateAdminProfileDto } from '../dto/update-admin-profile.dto';
 import { UpdateAdminUserStatusDto } from '../dto/update-admin-user-status.dto';
 import { AdminRole } from '../enums/admin-role.enum';
 import { AuthGuard } from '../guards/auth.guard';
 import { RolesGuard } from '../guards/roles.guard';
 import { AuthPrincipal } from '../interfaces/auth-principal.interface';
 import { AdminUser } from '../interfaces/admin-user.interface';
-import { AdminUsersService } from '../services/admin-users.service';
+import { AdminUsersService, PaginatedAdminUsersResponse } from '../services/admin-users.service';
 
 @Controller('admin-users')
 @UseGuards(AuthGuard, RolesGuard)
@@ -27,8 +31,16 @@ export class AdminUsersController {
 
   @Get()
   @Roles(AdminRole.SUPER_ADMIN, AdminRole.ZONE_ADMIN)
-  async listAdmins(): Promise<Array<Omit<AdminUser, 'passwordHash' | 'totpSecret'>>> {
+  async listAdmins(): Promise<Array<Omit<AdminUser, 'passwordHash'>>> {
     return this.adminUsersService.listAdmins();
+  }
+
+  @Get('paginated')
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ZONE_ADMIN)
+  async listAdminsPaginated(
+    @Query() query: ListAdminUsersQueryDto,
+  ): Promise<PaginatedAdminUsersResponse> {
+    return this.adminUsersService.listAdminsPaginated(query);
   }
 
   @Post()
@@ -36,8 +48,18 @@ export class AdminUsersController {
   async createAdmin(
     @Body() dto: CreateAdminUserDto,
     @CurrentUser() principal: AuthPrincipal,
-  ): Promise<Omit<AdminUser, 'passwordHash' | 'totpSecret'>> {
+  ): Promise<Omit<AdminUser, 'passwordHash'>> {
     return this.adminUsersService.createAdmin(dto, principal);
+  }
+
+  @Patch(':id')
+  @Roles(AdminRole.SUPER_ADMIN)
+  async updateProfile(
+    @Param('id') id: string,
+    @Body() dto: UpdateAdminProfileDto,
+    @CurrentUser() principal: AuthPrincipal,
+  ): Promise<Omit<AdminUser, 'passwordHash'>> {
+    return this.adminUsersService.updateProfile(id, dto, principal);
   }
 
   @Patch(':id/status')
@@ -46,7 +68,7 @@ export class AdminUsersController {
     @Param('id') id: string,
     @Body() dto: UpdateAdminUserStatusDto,
     @CurrentUser() principal: AuthPrincipal,
-  ): Promise<Omit<AdminUser, 'passwordHash' | 'totpSecret'>> {
+  ): Promise<Omit<AdminUser, 'passwordHash'>> {
     return this.adminUsersService.updateStatus(id, dto, principal);
   }
 
@@ -60,13 +82,22 @@ export class AdminUsersController {
     return this.adminUsersService.resetPassword(id, dto, principal);
   }
 
+  @Delete(':id')
+  @Roles(AdminRole.SUPER_ADMIN)
+  async deleteAdmin(
+    @Param('id') id: string,
+    @CurrentUser() principal: AuthPrincipal,
+  ): Promise<{ success: boolean }> {
+    return this.adminUsersService.deleteAdmin(id, principal);
+  }
+
   @Post(':id/roles')
   @Roles(AdminRole.SUPER_ADMIN)
   async assignRole(
     @Param('id') id: string,
     @Body() dto: AssignRoleDto,
     @CurrentUser() principal: AuthPrincipal,
-  ): Promise<Omit<AdminUser, 'passwordHash' | 'totpSecret'>> {
+  ): Promise<Omit<AdminUser, 'passwordHash'>> {
     return this.adminUsersService.assignRole(id, dto, principal);
   }
 }

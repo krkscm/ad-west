@@ -1,10 +1,11 @@
 # System Architecture Diagram
 
 ## Scope
-ADWest Zone Community Management Platform MVP (Modules 1 to 8).
+ADWest Zone Community Management Platform Core Business (Modules 1 to 8).
 
 ## Source Alignment
-- business-intake/BRS_Zone_MVP_Plan.md
+- business-intake/BRS_Zone_Requirement.md
+- business-intake/BRS_Zone_Remaining_Requirement.md
 - business-intake-modular/03-functional-modules/01-module-catalog.md
 
 ## Diagram Notes
@@ -24,7 +25,7 @@ flowchart LR
 
   subgraph BE[Backend Layer]
     API[NestJS API\nModules 1-8]
-    AUTH[Auth + RBAC + MFA\nJWT + TOTP]
+    AUTH[Auth + RBAC\nJWT + Password + Captcha + Lockout]
     CRM[Contact + Dedup Services]
     EVT[Program + Attendance Services]
     HD[Helpdesk Services]
@@ -35,11 +36,6 @@ flowchart LR
     PG[(PostgreSQL)]
     RD[(Redis)]
     MN[(MinIO)]
-  end
-
-  subgraph AUTO[Automation]
-    N8N[n8n Workflows\nN8N-COM-013/004/005/002]
-    MAIL[Email Provider]
   end
 
   U1 --> SS
@@ -60,28 +56,24 @@ flowchart LR
   AUD --> PG
   API --> MN
 
-  API --> N8N
-  N8N --> MAIL
-  MAIL --> U1
-  MAIL --> U2
-
   classDef ext fill:#fff3cd,stroke:#b8860b,color:#333;
   classDef core fill:#e8f4fd,stroke:#1f77b4,color:#111;
   classDef data fill:#eef7ee,stroke:#2e8b57,color:#111;
 
-  class U1,U2,MAIL ext;
-  class SS,AP,API,AUTH,CRM,EVT,HD,AUD,N8N core;
+  class U1,U2 ext;
+  class SS,AP,API,AUTH,CRM,EVT,HD,AUD core;
   class PG,RD,MN data;
 ```
 
 ## Verification Checklist
 - [ ] Module boundaries match current module catalog.
-- [ ] Security controls (JWT, RBAC, TOTP) are represented.
+- [ ] Security controls (JWT, RBAC, captcha, lockout) are represented.
 - [ ] Data stores (PostgreSQL, Redis, MinIO) are represented.
-- [ ] n8n workflow boundary and email-only notification model are represented.
-- [ ] Diagram reflects current MVP constraints.
+- [ ] No n8n or messaging dependencies are represented in current Core Business baseline.
+- [ ] Diagram reflects current Core Business constraints.
 
 ## Change Log
 | Version | Date | Updated By | Summary | Approved By |
 |---|---|---|---|---|
 | 1.0.0 | 2026-05-23 | Architecture Owner | Initial modular architecture baseline | Sponsor |
+| 1.1.0 | 2026-05-24 | Architecture Owner | Removed n8n and messaging boundary from active baseline per product directive | Sponsor |

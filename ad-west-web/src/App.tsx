@@ -1,36 +1,41 @@
-import { useState } from 'react';
 import { ToastProvider } from './components/common/Toast';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import { LandingPage } from './pages/LandingPage';
-import { AdminLoginPage } from './pages/AdminLoginPage';
+import { ConfirmDialogProvider } from './components/common/ConfirmDialog';
+import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './context/auth-context';
+import { ThemeProvider } from './context/ThemeContext';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { MemberPortalPage } from './pages/MemberPortalPage';
+import { AdminLoginPage } from './pages/AdminLoginPage';
+import { ForcePasswordChangePage } from './pages/ForcePasswordChangePage';
 
 function AppContent() {
-  const [currentPage, setCurrentPage] = useState<'landing' | 'admin' | 'member'>('landing');
-  const { adminUser } = useAuth();
+  const { adminUser, memberUser, mustResetPassword } = useAuth();
 
-  // Simple state-based router
-  switch (currentPage) {
-    case 'admin':
-      if (adminUser) {
-        return <AdminDashboardPage />;
-      }
-      return <AdminLoginPage onBack={() => setCurrentPage('landing')} />;
-    case 'member':
-      return <MemberPortalPage onBack={() => setCurrentPage('landing')} />;
-    case 'landing':
-    default:
-      return <LandingPage onNavigate={(dest) => setCurrentPage(dest)} />;
+  if (adminUser && mustResetPassword) {
+    return <ForcePasswordChangePage />;
   }
+
+  if (adminUser) {
+    return <AdminDashboardPage />;
+  }
+
+  if (memberUser) {
+    return <MemberPortalPage onBack={() => undefined} />;
+  }
+
+  return <AdminLoginPage />;
 }
 
 function App() {
   return (
     <ToastProvider>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
+      <ConfirmDialogProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
+        </ThemeProvider>
+      </ConfirmDialogProvider>
     </ToastProvider>
   );
 }

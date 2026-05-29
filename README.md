@@ -141,6 +141,9 @@ The API will be available at `http://localhost:3001`
 - **State Management:** Use React Context for global state
 - **API Calls:** Use the centralized `api` utility in `src/utils/api.ts`
 - **Styling:** Keep styles modular and co-located with components when possible
+- **Location Definitions:** Existing locations can now be edited and moved between `Zone` and `Sthan` levels from the settings page.
+- **Admin Navigation:** `Permission Sets` and `Users` now live as standalone full-page admin sections instead of nested settings entries.
+- **Access Grants:** The access-grants settings surface and related API routes have been removed.
 
 ### Backend (ad-west-api)
 - **Routes:** Organize API endpoints by feature in `app/api/`
@@ -159,7 +162,7 @@ VITE_API_URL=http://localhost:3001/api
 
 ### Backend (.env.local)
 ```
-DATABASE_URL=postgresql://user:password@localhost:5432/ad_west
+DATABASE_URL=postgresql://user:password@localhost:5432/ifca-auhwest
 NODE_ENV=development
 API_PORT=3001
 LOG_LEVEL=debug

@@ -1,25 +1,22 @@
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
-import { AdminRole, ScopeType } from '../enums/admin-role.enum';
+import { IsBoolean, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class CreateAdminUserDto {
   @IsString()
+  @MaxLength(40)
+  code!: string;
+
+  @IsString()
   @MinLength(2)
   name!: string;
-
-  @IsEmail()
-  email!: string;
 
   @IsString()
   @MinLength(8)
   password!: string;
 
-  @IsEnum(AdminRole)
-  role!: AdminRole;
-
-  @IsEnum(['global', 'zone', 'sreny'])
-  scopeType!: ScopeType;
+  @IsString()
+  roleDefinitionId!: string;
 
   @IsOptional()
-  @IsString()
-  scopeId?: string;
+  @IsBoolean()
+  active?: boolean;
 }

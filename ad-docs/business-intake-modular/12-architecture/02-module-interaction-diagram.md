@@ -1,7 +1,7 @@
 # Module Interaction Diagram
 
 ## Scope
-Interaction boundaries across MVP modules M-01 to M-08.
+Interaction boundaries across Core Business modules M-01 to M-08.
 
 ## Source Alignment
 - business-intake-modular/03-functional-modules/01-module-catalog.md
@@ -49,7 +49,7 @@ flowchart LR
 ```
 
 ## Verification Checklist
-- [ ] All eight MVP modules are represented.
+- [ ] All eight Core Business modules are represented.
 - [ ] Dependency directions match current product behavior.
 - [ ] RBAC control boundary is clearly visible.
 - [ ] Self-service and helpdesk interaction paths are accurate.

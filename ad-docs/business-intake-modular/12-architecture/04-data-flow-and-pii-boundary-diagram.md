@@ -1,10 +1,11 @@
 # Data Flow and PII Boundary Diagram
 
 ## Scope
-MVP data flow for contact, self-service, helpdesk, and notification processes with PII boundary markers.
+Core Business data flow for contact, self-service, helpdesk, and notification processes with PII boundary markers.
 
 ## Source Alignment
-- business-intake/BRS_Zone_MVP_Plan.md
+- business-intake/BRS_Zone_Requirement.md
+- business-intake/BRS_Zone_Remaining_Requirement.md
 - business-intake-modular/04-cross-cutting-requirements/01-security-and-privacy.md
 - business-intake-modular/05-data-domain/03-critical-data-rules.md
 
@@ -33,7 +34,6 @@ flowchart LR
     PG[(PostgreSQL)]
     RD[(Redis)]
     MN[(MinIO)]
-    N8N[n8n Workflows]
   end
 
   MU --> SS
@@ -54,9 +54,7 @@ flowchart LR
   EVT --> PG
   AUD --> PG
   API --> MN
-
-  API --> N8N
-  N8N --> MAIL
+  API --> MAIL
   MAIL --> MU
   MAIL --> AU
 
@@ -65,7 +63,7 @@ flowchart LR
   classDef data fill:#eef7ee,stroke:#2e8b57,color:#111;
 
   class MU,AU,MAIL ext;
-  class SS,AP,API,AUTH,CRM,HD,EVT,AUD,N8N pii;
+  class SS,AP,API,AUTH,CRM,HD,EVT,AUD pii;
   class PG,RD,MN data;
 ```
 
@@ -85,3 +83,4 @@ flowchart LR
 | Version | Date | Updated By | Summary | Approved By |
 |---|---|---|---|---|
 | 1.0.0 | 2026-05-23 | Architecture Owner | Initial PII boundary and data-flow baseline | Compliance Lead |
+| 1.1.0 | 2026-05-25 | Architecture Owner | Removed n8n flow from current-phase PII boundary baseline | Compliance Lead |

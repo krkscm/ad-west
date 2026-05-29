@@ -4,5 +4,5 @@
 - [ ] PostgreSQL ready.
 - [ ] Redis ready.
 - [ ] MinIO ready.
-- [ ] n8n and mail integration validated.
+- [ ] Confirm n8n and message broker services are not required/enabled for current phase.
 - [ ] Docker Compose baseline validated.

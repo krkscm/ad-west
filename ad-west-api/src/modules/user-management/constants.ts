@@ -1,1 +1,2 @@
 export const USER_STORE = 'USER_STORE';
+export const ROLE_DEFINITION_STORE = 'ROLE_DEFINITION_STORE';

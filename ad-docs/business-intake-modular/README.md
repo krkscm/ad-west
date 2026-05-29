@@ -10,7 +10,8 @@ This folder decomposes business intake into small, maintainable modules that dir
 - Every module mapped to SDLC and acceptance docs.
 
 ## Source Baseline
-- ../business-intake/BRS_Zone_MVP_Plan.md
+- ../business-intake/BRS_Zone_Requirement.md
+- ../business-intake/BRS_Zone_Remaining_Requirement.md
 
 ## Folder Map
 - 00-governance

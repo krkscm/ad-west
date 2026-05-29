@@ -3,13 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AdminUser } from '../interfaces/admin-user.interface';
 import { AuditLogEntry } from '../interfaces/audit-log.interface';
-import { MemberUser, OtpRequest } from '../interfaces/member.interface';
+import { MemberUser } from '../interfaces/member.interface';
 import { SessionRecord } from '../interfaces/session.interface';
 import { UserStore } from '../interfaces/user-store.interface';
 import { AdminUserEntity } from '../entities/admin-user.entity';
 import { AuditLogEntity } from '../entities/audit-log.entity';
 import { MemberUserEntity } from '../entities/member-user.entity';
-import { OtpRequestEntity } from '../entities/otp-request.entity';
 import { SessionEntity } from '../entities/session.entity';
 
 @Injectable()
@@ -21,8 +20,6 @@ export class PostgresStoreService implements UserStore {
     private readonly memberRepo: Repository<MemberUserEntity>,
     @InjectRepository(SessionEntity)
     private readonly sessionRepo: Repository<SessionEntity>,
-    @InjectRepository(OtpRequestEntity)
-    private readonly otpRepo: Repository<OtpRequestEntity>,
     @InjectRepository(AuditLogEntity)
     private readonly auditRepo: Repository<AuditLogEntity>,
   ) {}
@@ -33,6 +30,13 @@ export class PostgresStoreService implements UserStore {
 
   async getAdminById(id: string): Promise<AdminUser | undefined> {
     const found = await this.adminRepo.findOne({ where: { id } });
+    return found ?? undefined;
+  }
+
+  async getAdminByCode(code: string): Promise<AdminUser | undefined> {
+    const found = await this.adminRepo.findOne({
+      where: { code: code.toUpperCase() },
+    });
     return found ?? undefined;
   }
 
@@ -51,31 +55,34 @@ export class PostgresStoreService implements UserStore {
     await this.adminRepo.insert(admin);
   }
 
+  async deleteAdmin(id: string): Promise<void> {
+    await this.adminRepo.delete(id);
+  }
+
   async getMembers(): Promise<MemberUser[]> {
     return this.memberRepo.find();
   }
 
   async findMemberByIdentity(
-    name: string,
     phone?: string,
     email?: string,
   ): Promise<MemberUser | undefined> {
-    const normalizedName = name.trim().toLowerCase();
     const normalizedPhone = phone?.trim();
     const normalizedEmail = email?.trim().toLowerCase();
 
-    const members = await this.memberRepo.find({
-      where: { fullName: name },
-    });
+    const members = await this.memberRepo.find();
 
     return members.find((member) => {
-      const sameName = member.fullName.trim().toLowerCase() === normalizedName;
       const phoneMatch = normalizedPhone ? member.phone === normalizedPhone : false;
       const emailMatch = normalizedEmail
         ? member.email?.toLowerCase() === normalizedEmail
         : false;
-      return sameName && (phoneMatch || emailMatch);
+      return phoneMatch || emailMatch;
     });
+  }
+
+  async saveMember(member: MemberUser): Promise<void> {
+    await this.memberRepo.save(member);
   }
 
   async saveSession(session: SessionRecord): Promise<void> {
@@ -91,18 +98,6 @@ export class PostgresStoreService implements UserStore {
 
   async revokeSession(tokenId: string): Promise<void> {
     await this.sessionRepo.delete({ tokenId });
-  }
-
-  async saveOtp(request: OtpRequest): Promise<void> {
-    await this.otpRepo.save(request);
-  }
-
-  async getOtp(requestId: string): Promise<OtpRequest | undefined> {
-    return (await this.otpRepo.findOne({ where: { id: requestId } })) ?? undefined;
-  }
-
-  async removeOtp(requestId: string): Promise<void> {
-    await this.otpRepo.delete({ id: requestId });
   }
 
   async saveAudit(entry: AuditLogEntry): Promise<void> {

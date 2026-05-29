@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
 import { AdminRole, ScopeType } from '../enums/admin-role.enum';
 
 export class AssignRoleDto {
@@ -11,4 +11,12 @@ export class AssignRoleDto {
   @IsOptional()
   @IsString()
   scopeId?: string;
+
+  @IsOptional()
+  @IsDateString()
+  effectiveFrom?: string;
+
+  @IsOptional()
+  @IsDateString()
+  effectiveTo?: string;
 }

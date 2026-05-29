@@ -1,0 +1,68 @@
+﻿{
+    "FRM008":  {
+                   "endpoint":  "PATCH /api/v1/contacts/{contactId}/srenies/{srenyId}/metadata",
+                   "request":  {
+                                   "metadata":  {
+                                                    "committee":  "membership",
+                                                    "dutyWindow":  "weekday-evening",
+                                                    "designation":  "coordinator"
+                                                }
+                               },
+                   "response":  {
+                                    "contactId":  "ct_qhxlltse",
+                                    "srenyId":  "sreny_b0avop2z",
+                                    "metadata":  {
+                                                     "committee":  "membership",
+                                                     "dutyWindow":  "weekday-evening",
+                                                     "designation":  "coordinator"
+                                                 }
+                                }
+               },
+    "FRM035":  {
+                   "metricsEndpoint":  "GET /api/v1/helpdesk/tickets/metrics",
+                   "metricsResponse":  {
+                                           "total":  0,
+                                           "open":  0,
+                                           "inProgress":  0,
+                                           "resolved":  0,
+                                           "closed":  0,
+                                           "byCategory":  {
+
+                                                          }
+                                       },
+                   "searchEndpoint":  "GET /api/v1/helpdesk/tickets?search=issue",
+                   "searchResponse":  {
+                                          "count":  0,
+                                          "firstHit":  null
+                                      }
+               },
+    "FRM017":  {
+                   "importEndpoint":  "POST /api/v1/imports/contacts",
+                   "importRequest":  {
+                                         "fileType":  "csv",
+                                         "fileName":  "merge-propagation-evidence.csv",
+                                         "hasHeader":  true
+                                     },
+                   "importResponse":  {
+                                          "importId":  "imp_48d2qc0s",
+                                          "status":  "ready_for_review"
+                                      },
+                   "duplicateEndpoint":  "GET /api/v1/imports/{importId}/duplicates",
+                   "duplicateResponse":  {
+                                             "duplicateId":  "dup_0fe4rhk5",
+                                             "leftContactId":  "ct_yxlyg0ij",
+                                             "rightContactId":  "ct_uox4iati",
+                                             "decisionBefore":  "pending"
+                                         },
+                   "mergeEndpoint":  "POST /api/v1/imports/{importId}/duplicates/{duplicateId}/merge",
+                   "mergeResponse":  {
+                                         "success":  true
+                                     },
+                   "postMerge":  {
+                                     "mergedContactStatus":  "deleted",
+                                     "registrationsOnSurvivor":  0,
+                                     "ticketsOnSurvivor":  0,
+                                     "ticketsOnMerged":  0
+                                 }
+               }
+}

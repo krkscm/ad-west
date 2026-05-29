@@ -1,4 +1,4 @@
-﻿# Coverage Definition and Criteria
+# Coverage Definition and Criteria
 
 ## Coverage Goal
 100 percent planning-document coverage means each business intake requirement, constraint, deferral, and delivery commitment is mapped to:
@@ -19,7 +19,7 @@
 
 ## Completion Criteria
 - No intake item remains unmapped.
-- No MVP feature lacks acceptance criteria.
+- No Core Business feature lacks acceptance criteria.
 - No deferred item lacks explicit exclusion control.
 - Signoff checklist is completed with approver names and dates.
 

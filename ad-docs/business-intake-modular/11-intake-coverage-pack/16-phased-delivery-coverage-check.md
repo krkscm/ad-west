@@ -7,7 +7,7 @@
 - Sprint 1-2: foundation and authentication.
 - Sprint 3-4: contact core, import, dedup.
 - Sprint 5-6: programs and attendance.
-- Sprint 7: self-service and OTP workflows.
+- Sprint 7: self-service and credential+captcha workflows.
 - Sprint 8: helpdesk, notifications, wrap-up and readiness.
 
 ## Verification Checklist

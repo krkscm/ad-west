@@ -10,7 +10,7 @@ This section contains editable architecture artifacts for review, verification, 
 - 04-data-flow-and-pii-boundary-diagram.md
 - 05-requirement-to-diagram-coverage.md
 - 06-use-case-diagram.md
-- 07-sequence-self-service-otp-and-edit-request.md
+- 07-sequence-self-service-password-captcha-and-edit-request.md
 - 08-sequence-import-dedup-and-merge.md
 - 09-sequence-helpdesk-ticket-lifecycle.md
 - 10-domain-entity-relationship-diagram.md

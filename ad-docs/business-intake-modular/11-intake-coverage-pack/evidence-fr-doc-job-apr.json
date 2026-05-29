@@ -1,0 +1,176 @@
+{
+  "metadata": {
+    "generatedAt": "2026-05-24T00:00:00Z",
+    "source": "BRS_Zone_Community_Management_Platform + activated module implementation",
+    "evidenceType": "governance-traceability-and-implementation-contract",
+    "runtimeExecuted": false,
+    "notes": "This pack captures endpoint contracts and implemented coverage for FR-DOC/FR-JOB/FR-APR. Runtime API capture can be appended as a follow-up evidence run. Messaging and n8n channels remain controlled-deferred by scope policy."
+  },
+  "FRM048_FRM049_DOC": {
+    "frIds": [
+      "FR-DOC-001",
+      "FR-DOC-002",
+      "FR-DOC-003",
+      "FR-DOC-004",
+      "FR-DOC-005",
+      "FR-DOC-006",
+      "FR-DOC-007",
+      "FR-DOC-008",
+      "FR-DOC-009",
+      "FR-DOC-010"
+    ],
+    "endpoints": [
+      "GET /api/v1/documents/folders",
+      "POST /api/v1/documents/folders",
+      "GET /api/v1/documents/files",
+      "POST /api/v1/documents/files",
+      "POST /api/v1/documents/files/{documentId}/new-version",
+      "GET /api/v1/reports/templates",
+      "POST /api/v1/reports/templates",
+      "GET /api/v1/reports/submissions",
+      "POST /api/v1/reports/submissions/{submissionId}/review",
+      "GET /api/v1/members/me/reports/templates",
+      "GET /api/v1/members/me/reports/submissions",
+      "POST /api/v1/members/me/reports/submissions"
+    ],
+    "sampleRequests": {
+      "createFolder": {
+        "srenyId": "sreny_example",
+        "name": "Weekly Reports"
+      },
+      "createDocument": {
+        "srenyId": "sreny_example",
+        "folderId": "folder_example",
+        "fileName": "sreny-weekly-summary.pdf",
+        "fileType": "application/pdf",
+        "category": "weekly_update",
+        "description": "Initial generated weekly file",
+        "accessLevel": "sreny"
+      },
+      "createReportTemplate": {
+        "srenyId": "sreny_example",
+        "name": "Monthly Activity Report",
+        "fields": [
+          { "key": "period", "label": "Period", "type": "text", "required": true },
+          { "key": "attendance", "label": "Attendance Count", "type": "number", "required": true }
+        ]
+      }
+    },
+    "implementationRefs": [
+      "ad-west-api/src/modules/core-business/core-business.controller.ts",
+      "ad-west-api/src/modules/core-business/core-business.service.ts",
+      "ad-west-api/src/modules/core-business/dto/core-business.dto.ts",
+      "ad-west-web/src/utils/backendApi.ts",
+      "ad-west-web/src/pages/AdminDashboardPage.tsx",
+      "ad-west-web/src/pages/MemberPortalPage.tsx",
+      "ad-docs/database-script/015_document_job_approval_modules.sql"
+    ],
+    "status": "Complete"
+  },
+  "FRM050_FRM052_JOB": {
+    "frIds": [
+      "FR-JOB-001",
+      "FR-JOB-002",
+      "FR-JOB-003",
+      "FR-JOB-004",
+      "FR-JOB-005",
+      "FR-JOB-006",
+      "FR-JOB-007",
+      "FR-JOB-008",
+      "FR-JOB-009",
+      "FR-JOB-010",
+      "FR-JOB-011"
+    ],
+    "endpoints": [
+      "GET /api/v1/jobs/listings",
+      "POST /api/v1/jobs/listings",
+      "PATCH /api/v1/jobs/listings/{jobId}/status",
+      "GET /api/v1/jobs/resumes",
+      "GET /api/v1/jobs/resume-access-logs",
+      "GET /api/v1/members/me/jobs",
+      "POST /api/v1/members/me/jobs/{jobId}/interest",
+      "GET /api/v1/members/me/resumes",
+      "POST /api/v1/members/me/resumes"
+    ],
+    "sampleRequests": {
+      "createJob": {
+        "srenyId": "sreny_example",
+        "title": "Community Program Coordinator",
+        "organization": "ADWest Community Network",
+        "location": "Dubai",
+        "jobType": "part_time",
+        "description": "Coordinate local programs and attendance support.",
+        "skills": ["coordination", "excel", "community-engagement"]
+      },
+      "expressInterest": {
+        "note": "Interested in contributing to local sreny operations."
+      },
+      "uploadResume": {
+        "fileName": "member-resume.pdf",
+        "fileType": "application/pdf",
+        "summary": "Updated member resume from self-service portal.",
+        "skills": ["coordination", "community-outreach"]
+      }
+    },
+    "implementationRefs": [
+      "ad-west-api/src/modules/core-business/core-business.controller.ts",
+      "ad-west-api/src/modules/core-business/core-business.service.ts",
+      "ad-west-api/src/modules/core-business/dto/core-business.dto.ts",
+      "ad-west-web/src/utils/backendApi.ts",
+      "ad-west-web/src/pages/AdminDashboardPage.tsx",
+      "ad-west-web/src/pages/MemberPortalPage.tsx",
+      "ad-docs/database-script/015_document_job_approval_modules.sql"
+    ],
+    "status": "Complete"
+  },
+  "FRM053_APR": {
+    "frIds": [
+      "FR-APR-001",
+      "FR-APR-002",
+      "FR-APR-003",
+      "FR-APR-004",
+      "FR-APR-005",
+      "FR-APR-006"
+    ],
+    "endpoints": [
+      "GET /api/v1/approvals/workflows",
+      "POST /api/v1/approvals/workflows",
+      "GET /api/v1/approvals/items",
+      "POST /api/v1/approvals/items",
+      "POST /api/v1/approvals/items/{itemId}/review",
+      "GET /api/v1/approvals/notifications"
+    ],
+    "sampleRequests": {
+      "createWorkflow": {
+        "name": "Document Submission Approval",
+        "targetType": "document_submission",
+        "mode": "parallel_any",
+        "escalationHours": 48,
+        "steps": ["sreny_admin_review", "zone_admin_review"]
+      },
+      "submitApprovalItem": {
+        "workflowId": "workflow_example",
+        "targetId": "document_example",
+        "summary": "Automated approval item from ops coverage"
+      },
+      "reviewApprovalItem": {
+        "decision": "approved",
+        "note": "Approved via admin ops coverage flow"
+      }
+    },
+    "implementationRefs": [
+      "ad-west-api/src/modules/core-business/core-business.controller.ts",
+      "ad-west-api/src/modules/core-business/core-business.service.ts",
+      "ad-west-api/src/modules/core-business/dto/core-business.dto.ts",
+      "ad-west-web/src/utils/backendApi.ts",
+      "ad-west-web/src/pages/AdminDashboardPage.tsx",
+      "ad-docs/database-script/015_document_job_approval_modules.sql"
+    ],
+    "status": "Complete",
+    "scopeNotes": [
+      "FR-APR-003 in-app notification behavior is implemented.",
+      "External notification channels (email/WhatsApp via n8n) are controlled deferred in current phase scope."
+    ]
+  }
+}
+

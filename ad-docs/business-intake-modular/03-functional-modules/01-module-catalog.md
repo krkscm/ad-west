@@ -1,6 +1,6 @@
-﻿# Functional Module Catalog
+# Functional Module Catalog
 
-| Module ID | Module Name | Priority | MVP Status |
+| Module ID | Module Name | Priority | Core Business Status |
 |---|---|---|---|
 | M-01 | Organizational Structure | High | In Scope |
 | M-02 | Master Contact List and CRM | Critical | In Scope |

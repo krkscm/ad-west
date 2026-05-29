@@ -3,15 +3,8 @@ export interface MemberUser {
   fullName: string;
   email?: string;
   phone?: string;
+  passwordHash: string;
+  failedAttempts: number;
+  lockedUntil?: number;
   active: boolean;
-}
-
-export interface OtpRequest {
-  id: string;
-  purpose: 'member-login';
-  memberId: string;
-  destination: string;
-  code: string;
-  expiresAt: number;
-  attempts: number;
 }

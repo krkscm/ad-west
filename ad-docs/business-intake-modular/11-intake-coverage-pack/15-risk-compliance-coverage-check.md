@@ -1,4 +1,4 @@
-﻿# Risk and Compliance Coverage Check
+# Risk and Compliance Coverage Check
 
 ## Intake Risk Themes
 - Poor quality imported Sreny data.
@@ -8,7 +8,7 @@
 
 ## Coverage Controls
 - Import validation and dedup-first priority.
-- Email-first notifications in MVP.
+- Email-first notifications in Core Business.
 - Simplified governance yearly rollover process.
 - Soft-delete and data-erasure process in requirements and controls.
 

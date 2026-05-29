@@ -1,7 +1,8 @@
 ﻿# Security Control Baseline
 
 - JWT authentication.
-- TOTP MFA for admin users.
+- Captcha-gated credential login for admin and member users.
+- Account lockout after repeated failed login attempts.
 - RBAC enforcement.
 - Audit logging for sensitive operations.
 

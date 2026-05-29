@@ -1,16 +1,16 @@
 import { Column, Entity, PrimaryColumn } from 'typeorm';
 
-@Entity('auth_sessions')
+@Entity({ schema: 'adwest', name: 'auth_sessions' })
 export class SessionEntity {
-  @PrimaryColumn({ type: 'varchar', length: 80 })
+  @PrimaryColumn({ name: 'token_id', type: 'varchar', length: 80 })
   tokenId!: string;
 
-  @Column({ type: 'varchar', length: 64 })
+  @Column({ name: 'user_id', type: 'varchar', length: 64 })
   userId!: string;
 
   @Column({ type: 'varchar', length: 16 })
   type!: 'admin' | 'member';
 
-  @Column({ type: 'bigint' })
+  @Column({ name: 'expires_at', type: 'bigint' })
   expiresAt!: number;
 }

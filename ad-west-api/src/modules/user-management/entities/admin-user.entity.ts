@@ -1,10 +1,13 @@
 import { Column, Entity, PrimaryColumn } from 'typeorm';
 import { RoleAssignment } from '../interfaces/admin-user.interface';
 
-@Entity('admin_users')
+@Entity({ schema: 'adwest', name: 'auth_admin_users' })
 export class AdminUserEntity {
   @PrimaryColumn({ type: 'varchar', length: 64 })
   id!: string;
+
+  @Column({ type: 'varchar', length: 40, unique: true })
+  code!: string;
 
   @Column({ type: 'varchar', length: 120 })
   name!: string;
@@ -12,24 +15,27 @@ export class AdminUserEntity {
   @Column({ type: 'varchar', length: 160, unique: true })
   email!: string;
 
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ name: 'role_definition_id', type: 'varchar', length: 64, nullable: true })
+  roleDefinitionId?: string;
+
+  @Column({ name: 'password_hash', type: 'varchar', length: 255 })
   passwordHash!: string;
 
   @Column({ type: 'boolean', default: true })
   active!: boolean;
 
-  @Column({ type: 'boolean', default: false })
-  mfaEnabled!: boolean;
+  @Column({ name: 'failed_attempts', type: 'int', default: 0 })
+  failedAttempts!: number;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  totpSecret?: string;
+  @Column({ name: 'locked_until', type: 'bigint', nullable: true })
+  lockedUntil?: number;
 
   @Column({ type: 'jsonb', default: () => "'[]'" })
   roles!: RoleAssignment[];
 
-  @Column({ type: 'varchar', length: 40 })
+  @Column({ name: 'created_at', type: 'varchar', length: 40 })
   createdAt!: string;
 
-  @Column({ type: 'varchar', length: 40 })
+  @Column({ name: 'updated_at', type: 'varchar', length: 40 })
   updatedAt!: string;
 }

@@ -1,14 +1,14 @@
-﻿# Executive One-Page Plan Summary
+# Executive One-Page Plan Summary
 
 ## Problem
 Member records are fragmented across Srenies, causing operational inefficiency and duplicate data.
 
-## MVP Decision
+## Core Business Decision
 Deliver the minimum platform scope that resolves contact fragmentation first, then supports governance and operations.
 
-## MVP In Scope
+## Core Business In Scope
 - Modules 1-8 only.
-- Email-first OTP and notifications.
+- Password+captcha authentication with no messaging workflows in current phase.
 - Fixed three-role RBAC model.
 - Manual import dedup process using phone and email rules.
 

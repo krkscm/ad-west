@@ -2,7 +2,7 @@
 
 ## In-Scope Capabilities
 - Public verification using name and phone or email.
-- Email OTP session with 10-minute expiry.
+- Password + captcha login.
 - Member profile and membership view.
 - Contact edit requests with simple approve or reject.
 - Program and attendance history view.
@@ -10,18 +10,19 @@
 
 ## Acceptance Criteria
 - Verification succeeds only for valid member identity.
-- OTP expires after 10 minutes and cannot be reused.
+- Captcha is required for login and expires after 3 minutes.
+- Account lockout is enforced after repeated failed login attempts.
 - Member can submit edit request and receive status outcome.
 - Program and attendance history match source data.
 - Helpdesk actions are visible in member view.
 
 ## Exclusions to Enforce
-- SMS-based OTP.
+- SMS-based login delivery.
 - Job board access.
 - Multi-level edit approval workflows.
 
 ## Test Evidence Checklist
-- [ ] Verification and OTP tests.
+- [ ] Verification and password+captcha login tests.
 - [ ] Session expiry and replay protection tests.
 - [ ] Edit-request workflow tests.
 - [ ] Data consistency checks for member views.

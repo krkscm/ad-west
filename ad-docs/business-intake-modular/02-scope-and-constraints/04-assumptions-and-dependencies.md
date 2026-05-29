@@ -1,5 +1,5 @@
 ﻿# Assumptions and Dependencies
 
 - Legacy files are available in CSV/XLSX.
-- Mail integration is available.
-- n8n and environment setup are ready per plan.
+- Core module execution does not require n8n, message brokers, SMS, or WhatsApp integrations.
+- Any external messaging enablement requires a future approved change request.

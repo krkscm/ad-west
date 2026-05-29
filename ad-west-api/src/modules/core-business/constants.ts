@@ -1,0 +1,2 @@
+export const CORE_BUSINESS_STORE = 'CORE_BUSINESS_STORE';
+

@@ -1,7 +1,7 @@
-﻿# Data Model Coverage Check
+# Data Model Coverage Check
 
 ## Purpose
-Confirm that all MVP essential entities from intake are represented in design and implementation planning.
+Confirm that all Core Business essential entities from intake are represented in design and implementation planning.
 
 ## Entity Coverage
 - Zone, Sreny, GovBodyStructure, GovBodyAssignment.

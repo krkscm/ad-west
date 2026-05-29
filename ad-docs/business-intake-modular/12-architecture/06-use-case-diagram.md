@@ -1,7 +1,7 @@
 # Use Case Diagram
 
 ## Scope
-Actor-to-capability mapping for the MVP functional scope.
+Actor-to-capability mapping for the Core Business functional scope.
 
 ```mermaid
 flowchart LR
@@ -11,7 +11,7 @@ flowchart LR
   Zone[Zone Admin]
   Sreny[Sreny Admin]
 
-  UC1[Verify Identity and OTP Login]
+  UC1[Credential + Captcha Login]
   UC2[View Profile and Membership]
   UC3[Raise and Track Helpdesk Ticket]
   UC4[View Program and Attendance History]
@@ -24,7 +24,7 @@ flowchart LR
   UC10[Manage Attendance and Reports]
   UC11[Manage Helpdesk Lifecycle]
   UC12[Review Audit Logs]
-  UC13[Manage RBAC and MFA]
+  UC13[Manage RBAC and Admin Users]
 
   Member --> UC1
   Member --> UC2
@@ -53,6 +53,6 @@ flowchart LR
 ```
 
 ## Verification Checklist
-- [ ] All MVP modules are represented by at least one use case.
+- [ ] All Core Business modules are represented by at least one use case.
 - [ ] Member and admin actor boundaries are clear.
 - [ ] RBAC-sensitive admin capabilities are separated.

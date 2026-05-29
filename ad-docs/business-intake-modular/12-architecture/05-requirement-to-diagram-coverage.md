@@ -9,7 +9,7 @@ Map intake traceability IDs to architecture diagrams so verification can happen 
 - D-03: 03-deployment-runtime-diagram.md
 - D-04: 04-data-flow-and-pii-boundary-diagram.md
 - D-05: 06-use-case-diagram.md
-- D-06: 07-sequence-self-service-otp-and-edit-request.md
+- D-06: 07-sequence-self-service-password-captcha-and-edit-request.md
 - D-07: 08-sequence-import-dedup-and-merge.md
 - D-08: 09-sequence-helpdesk-ticket-lifecycle.md
 - D-09: 10-domain-entity-relationship-diagram.md
@@ -25,10 +25,10 @@ Map intake traceability IDs to architecture diagrams so verification can happen 
 | TR-011 to TR-015 | Import, mapping, dedup, merge, summary | D-01, D-02, D-07, D-09 |
 | TR-016 to TR-019 | Programs, sessions, registration, waitlist | D-01, D-02, D-05, D-09 |
 | TR-020 to TR-022 | Attendance capture, upload, reporting | D-01, D-02, D-05, D-09 |
-| TR-023 to TR-024 | Helpdesk lifecycle and notifications | D-01, D-02, D-08, D-12 |
-| TR-025 to TR-028 | Self-service, OTP, edit requests, history | D-01, D-04, D-05, D-06, D-12 |
-| TR-029 to TR-032 | Admin RBAC, MFA, dashboard, audit viewer | D-01, D-02, D-10 |
-| TR-033 to TR-036 | n8n notification workflows | D-01, D-03, D-12 |
+| TR-023 to TR-024 | Helpdesk lifecycle (notifications deferred) | D-01, D-02, D-08 |
+| TR-025 to TR-028 | Self-service credential+captcha login, edit requests, history | D-01, D-04, D-05, D-06 |
+| TR-029 to TR-032 | Admin RBAC, credential+captcha login, dashboard, audit viewer | D-01, D-02, D-10 |
+| TR-033 to TR-036 | Deferred notification workflow blueprint (future phase) | D-12 |
 | TR-037 to TR-038 | Tech stack and data model | D-01, D-03, D-09 |
 | TR-039 to TR-040 | Delivery and risk/compliance controls | D-11 |
 | TR-041 to TR-050 | Deferred scope controls | D-11 |

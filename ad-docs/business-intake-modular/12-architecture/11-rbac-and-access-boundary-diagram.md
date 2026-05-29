@@ -41,6 +41,6 @@ flowchart TB
 ```
 
 ## Verification Checklist
-- [ ] Only three MVP roles are represented.
+- [ ] Only three Core Business roles are represented.
 - [ ] Audit log access limited to Zone Admin and Super Admin.
 - [ ] Assignment boundaries match admin scope constraints.

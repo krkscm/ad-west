@@ -1,10 +1,11 @@
 # Deployment and Runtime Diagram
 
 ## Scope
-Runtime deployment view for MVP infrastructure and integration boundaries.
+Runtime deployment view for Core Business infrastructure and integration boundaries.
 
 ## Source Alignment
-- business-intake/BRS_Zone_MVP_Plan.md
+- business-intake/BRS_Zone_Requirement.md
+- business-intake/BRS_Zone_Remaining_Requirement.md
 - business-intake-modular/06-integrations-and-automation/03-environment-readiness-checklist.md
 
 ## Diagram Notes
@@ -25,7 +26,6 @@ flowchart TB
   subgraph APP[Application Runtime - Docker Compose]
     FE[Frontend App\nReact + TypeScript]
     API[NestJS API]
-    N8N[n8n Service]
   end
 
   subgraph DATA[Stateful Services]
@@ -36,7 +36,6 @@ flowchart TB
 
   subgraph EXT[External Services]
     MAIL[Email Provider]
-    OTP[Authenticator App\nTOTP]
   end
 
   MU --> LB
@@ -49,10 +48,7 @@ flowchart TB
   API --> PG
   API --> RD
   API --> MN
-  API --> N8N
-
-  N8N --> MAIL
-  API --> OTP
+  API --> MAIL
 
   classDef edge fill:#fdecec,stroke:#c0392b,color:#111;
   classDef app fill:#e8f4fd,stroke:#1f77b4,color:#111;
@@ -60,18 +56,19 @@ flowchart TB
   classDef ext fill:#fff3cd,stroke:#b8860b,color:#111;
 
   class LB edge;
-  class FE,API,N8N app;
+  class FE,API app;
   class PG,RD,MN data;
-  class MAIL,OTP,MU,AU ext;
+  class MAIL,MU,AU ext;
 ```
 
 ## Verification Checklist
-- [ ] Runtime services reflect MVP stack decisions.
+- [ ] Runtime services reflect Core Business stack decisions.
 - [ ] Data stores match approved architecture baseline.
-- [ ] n8n and email integration boundary is clear.
-- [ ] Authentication and MFA boundary is represented.
+- [ ] No n8n or message-broker dependency is represented.
+- [ ] Authentication boundary is represented (password + captcha + lockout).
 
 ## Change Log
 | Version | Date | Updated By | Summary | Approved By |
 |---|---|---|---|---|
 | 1.0.0 | 2026-05-23 | Architecture Owner | Initial deployment/runtime baseline | Sponsor |
+| 1.1.0 | 2026-05-25 | Architecture Owner | Removed n8n runtime dependency from current-phase baseline | Sponsor |

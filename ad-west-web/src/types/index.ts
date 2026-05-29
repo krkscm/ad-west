@@ -22,8 +22,6 @@ export interface AdminUser {
   name: string;
   email: string;
   passwordHash: string;
-  totpSecret: string;
-  mfaEnabled: boolean;
   roles: RoleAssignment[];
   createdAt: string;
 }

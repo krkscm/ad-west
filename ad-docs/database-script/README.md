@@ -1,0 +1,87 @@
+# Database Script
+
+This folder contains executable PostgreSQL scripts for ADWest.
+
+## Database Policy
+- ADWest is PostgreSQL-only.
+- Do not add MySQL, SQL Server, Oracle, or multi-DB variants.
+- All future DB scripts in this folder must be PostgreSQL dialect.
+
+## Run Order
+1. 000_extensions.sql
+2. 001_schema.sql
+3. 002_indexes.sql
+4. 003_triggers.sql
+5. 010_seed_minimal.sql (optional)
+6. 011_auth_store.sql (recommended for persistent API auth)
+7. 012_auth_security_hardening.sql (required for password+captcha login hardening)
+8. 013_auth_remove_otp_mfa_legacy.sql (recommended cleanup for password+captcha-only deployments)
+9. 014_core_business_frm_008_017_035_persistence.sql (FRM-008/017/035 DB persistence support)
+10. 015_document_job_approval_modules.sql (FR-DOC/FR-JOB/FR-APR DB persistence support)
+11. 016_core_business_runtime_state_store.sql (Core Business runtime snapshot persistence for DB mode)
+12. 017_approval_workflow_runtime_metadata.sql (FR-APR workflow mode/escalation/audit metadata persistence)
+13. 018_role_definitions.sql (Settings Roles Definition CRUD persistence)
+14. 019_unified_locations.sql
+15. 020_locations_active_flag.sql
+16. 021_sreni_enhancements.sql
+17. 022_permissions_policy_engine.sql
+18. 023_permissions_redesign.sql
+19. 024_users.sql
+20. 025_menu_management.sql
+21. 026_drop_scope_grants.sql
+22. 027_approval_mode_permission_set_hierarchy.sql (Settings approval definitions now use enum_values approval_mode and permission-set hierarchy mapping)
+23. 028_admin_code_role_definition.sql (Administrator CRUD now uses admin code and role-definition linkage)
+24. 029_user_login_credentials.sql (Application users now own login credentials and super-admin access)
+25. 030_sreni_contacts.sql (Per-Sreni contact list persistence with flexible JSONB row storage)
+26. 031_sreni_menu_backfill_normalization.sql (DB-level normalization/backfill for Sreni parent/calendar/contacts menus)
+27. 032_sreni_calendar_events.sql (Per-Sreni calendar event persistence with zone/sthan scope support)
+28. 033_sreni_attendance_metrics_and_captures.sql (Attendance metric definitions, per-event captures, and attendance menu backfill; API also self-heals missing Sreni attendance child menu rows on menu list)
+
+## Why This Standard Exists
+- Deterministic setup for new environments.
+- Performance-focused indexing from day one.
+- Versioned, auditable, forward-only DB changes.
+
+## Rules for Future Implementations
+- Any schema, index, or data migration change must be added here as a new ordered script.
+- Never modify previously executed migration scripts in shared environments.
+- Prefer additive changes, backfill, then tighten constraints.
+- Keep scripts idempotent where practical (`IF NOT EXISTS`, guarded blocks).
+- Keep optimization decisions aligned to PostgreSQL features (GIN/BRIN indexes, JSONB, CITEXT, pg_trgm).
+
+## Naming Convention for New Scripts
+- 011_<short_description>.sql
+- 012_<short_description>.sql
+
+## Execution Commands
+```powershell
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/000_extensions.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/001_schema.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/002_indexes.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/003_triggers.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/010_seed_minimal.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/011_auth_store.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/012_auth_security_hardening.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/013_auth_remove_otp_mfa_legacy.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/014_core_business_frm_008_017_035_persistence.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/015_document_job_approval_modules.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/016_core_business_runtime_state_store.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/017_approval_workflow_runtime_metadata.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/018_role_definitions.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/019_unified_locations.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/020_locations_active_flag.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/021_sreni_enhancements.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/022_permissions_policy_engine.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/023_permissions_redesign.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/024_users.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/025_menu_management.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/026_drop_scope_grants.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/027_approval_mode_permission_set_hierarchy.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/028_admin_code_role_definition.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/029_user_login_credentials.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/030_sreni_contacts.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/031_sreni_menu_backfill_normalization.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/032_sreni_calendar_events.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/033_sreni_attendance_metrics_and_captures.sql"
+```
+
