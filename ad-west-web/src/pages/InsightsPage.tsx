@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   ResponsiveContainer,
   PieChart, Pie, Cell, Tooltip as RTooltip, Legend,
@@ -31,24 +31,36 @@ const TOOLTIP_STYLE: React.CSSProperties = {
   color: 'var(--text-primary-dark)',
 }
 
+const parseNumericValue = (value: unknown): number => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  if (typeof value !== 'string') return 0
+
+  const cleaned = value.replace(/[^\d.-]/g, '')
+  if (!cleaned) return 0
+  const parsed = Number(cleaned)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
 // ─── Helper components ────────────────────────────────────────────────────────
 
 function ChartCard({ title, subtitle, badge, children }: { title: string; subtitle?: string; badge?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="glass-panel" style={{ padding: '20px' }}>
+    <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: subtitle ? '2px' : '16px' }}>
         <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>{title}</h3>
         {badge}
       </div>
       {subtitle && <p style={{ margin: '0 0 16px', fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>{subtitle}</p>}
-      {children}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        {children}
+      </div>
     </div>
   )
 }
 
-function EmptyChart({ message = 'No data yet', height = 200 }: { message?: string; height?: number }) {
+function EmptyChart({ message = 'No data yet', height = 200 }: { message?: string; height?: number | string }) {
   return (
-    <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary-dark)', fontSize: '0.85rem' }}>
+    <div style={{ height, minHeight: typeof height === 'number' ? height : 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary-dark)', fontSize: '0.85rem', flex: height === '100%' ? 1 : undefined }}>
       {message}
     </div>
   )
@@ -77,42 +89,69 @@ export function InsightsPage() {
   const [jobApplications, setJobApplications] = useState<any[]>([])
   const [events, setEvents] = useState<any[]>([])
   const [srenies, setSrenies] = useState<any[]>([])
-  const [contacts, setContacts] = useState<any[]>([])
+  const [contactCountsBySreni, setContactCountsBySreni] = useState<Record<string, number>>({})
   const [monthlyReports, setMonthlyReports] = useState<any[]>([])
   const [reportParams, setReportParams] = useState<any[]>([])
 
   useEffect(() => {
-    Promise.allSettled([
-      backendApi.listHelpdeskTickets(),
-      backendApi.listJobPostings(),
-      backendApi.listAllJobApplications(),
-      backendApi.listSpecialEvents(),
-      backendApi.listSreniDefinitions(),
-      backendApi.listContacts(),
-      backendApi.listAllMonthlyReports(),
-      backendApi.listReportMetricDefinitions(),
-    ]).then(([t, jp, ja, ev, sr, ct, mr, rp]) => {
-      if (t.status === 'fulfilled')  setTickets((t.value as any).items ?? t.value)
+    let cancelled = false
+
+    const loadInsights = async () => {
+      const [t, jp, ja, ev, sr, mr, rp] = await Promise.allSettled([
+        backendApi.listHelpdeskTickets(),
+        backendApi.listJobPostings(),
+        backendApi.listAllJobApplications(),
+        backendApi.listSpecialEvents(),
+        backendApi.listSreniDefinitions(),
+        backendApi.listAllMonthlyReports(),
+        backendApi.listReportMetricDefinitions(),
+      ])
+
+      if (cancelled) return
+
+      if (t.status === 'fulfilled') setTickets((t.value as any).items ?? t.value)
       if (jp.status === 'fulfilled') setJobPostings((jp.value as any).items ?? jp.value)
       if (ja.status === 'fulfilled') setJobApplications((ja.value as any).items ?? ja.value)
       if (ev.status === 'fulfilled') setEvents((ev.value as any).items ?? ev.value)
-      if (sr.status === 'fulfilled') setSrenies(Array.isArray(sr.value) ? sr.value : (sr.value as any).items ?? [])
-      if (ct.status === 'fulfilled') setContacts(Array.isArray(ct.value) ? ct.value : (ct.value as any).items ?? [])
+
+      const sreniItems = sr.status === 'fulfilled'
+        ? (Array.isArray(sr.value) ? sr.value : (sr.value as any).items ?? [])
+        : []
+
+      setSrenies(sreniItems)
+
       if (mr.status === 'fulfilled') setMonthlyReports(Array.isArray(mr.value) ? mr.value : (mr.value as any).items ?? [])
       if (rp.status === 'fulfilled') setReportParams(Array.isArray(rp.value) ? rp.value : (rp.value as any).items ?? [])
-    }).finally(() => setLoading(false))
+
+      const nextContactCounts: Record<string, number> = {}
+      if (sreniItems.length > 0) {
+        const contactResults = await Promise.allSettled(
+          sreniItems.map((sreni: any) => backendApi.listSreniContacts(sreni.id, 1, 1)),
+        )
+
+        if (cancelled) return
+
+        sreniItems.forEach((sreni: any, index: number) => {
+          const result = contactResults[index]
+          nextContactCounts[sreni.id] = result?.status === 'fulfilled'
+            ? result.value.total ?? result.value.items.length
+            : 0
+        })
+      }
+
+      setContactCountsBySreni(nextContactCounts)
+    }
+
+    loadInsights().finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  if (loading) {
-    return (
-      <div className="animate-slide-up" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '40vh', color: 'var(--text-secondary-dark)' }}>
-        Loading insights…
-      </div>
-    )
-  }
-
   const now = new Date().toISOString()
-  const sreniMap = new Map(srenies.map((s) => [s.id, s.name]))
 
   // ── Helpdesk ──
   const ticketStatusColors: Record<string, string> = { open: C.error, in_progress: C.warning, resolved: C.success, closed: C.slate }
@@ -147,41 +186,49 @@ export function InsightsPage() {
 
   // ── 1. Sreni Contacts Distribution ──
   // Count contacts per sreni using the srenyIds array on each contact
-  const contactsBySreni = srenies
-    .map((s, i) => ({
-      name: s.name?.length > 14 ? s.name.slice(0, 14) + '…' : s.name,
-      fullName: s.name,
-      Contacts: contacts.filter((c) => Array.isArray(c.srenyIds) ? c.srenyIds.includes(s.id) : c.sreniId === s.id || c.srenyId === s.id).length,
-      fill: SRENI_COLORS[i % SRENI_COLORS.length],
-    }))
-    .filter((s) => s.Contacts > 0)
-    .sort((a, b) => b.Contacts - a.Contacts)
+  const contactsBySreni = useMemo(() => {
+    return srenies
+      .map((s, i) => ({
+        name: s.name?.length > 14 ? s.name.slice(0, 14) + '…' : s.name,
+        fullName: s.name,
+        Contacts: contactCountsBySreni[s.id] ?? 0,
+        fill: SRENI_COLORS[i % SRENI_COLORS.length],
+      }))
+      .filter((s) => s.Contacts > 0)
+      .sort((a, b) => b.Contacts - a.Contacts)
+  }, [srenies, contactCountsBySreni])
 
-  const totalContacts = contacts.length
+  const totalContacts = Object.values(contactCountsBySreni).reduce((sum, count) => sum + count, 0)
 
   // ── 2. Revenue Generation by Sreni ──
   // Aggregate numeric report entries per sreni — look for revenue/collection/amount/fee fields
   const REVENUE_KEYS = /revenue|collection|amount|fee|income|total|receipt|fund/i
-  const revenueMap = new Map<string, number>()
+  const revenueMap = useMemo(() => {
+    const next = new Map<string, number>()
 
-  monthlyReports.forEach((report) => {
-    if (!report.sreniId || !report.entries) return
-    const current = revenueMap.get(report.sreniId) ?? 0
-    const revenueFromReport = Object.entries(report.entries as Record<string, string>)
-      .filter(([key]) => REVENUE_KEYS.test(key))
-      .reduce((sum, [, val]) => sum + (parseFloat(val) || 0), 0)
-    revenueMap.set(report.sreniId, current + revenueFromReport)
-  })
+    monthlyReports.forEach((report) => {
+      if (!report.sreniId || !report.entries) return
+      const current = next.get(report.sreniId) ?? 0
+      const revenueFromReport = Object.entries(report.entries as Record<string, unknown>)
+        .filter(([key]) => REVENUE_KEYS.test(key))
+        .reduce((sum, [, val]) => sum + parseNumericValue(val), 0)
+      next.set(report.sreniId, current + revenueFromReport)
+    })
 
-  const revenueData = srenies
-    .map((s, i) => ({
-      name: s.name?.length > 14 ? s.name.slice(0, 14) + '…' : s.name,
-      fullName: s.name,
-      'Revenue (AED)': revenueMap.get(s.id) ?? 0,
-      fill: SRENI_COLORS[i % SRENI_COLORS.length],
-    }))
-    .filter((s) => s['Revenue (AED)'] > 0)
-    .sort((a, b) => b['Revenue (AED)'] - a['Revenue (AED)'])
+    return next
+  }, [monthlyReports])
+
+  const revenueData = useMemo(() => {
+    return srenies
+      .map((s, i) => ({
+        name: s.name?.length > 14 ? s.name.slice(0, 14) + '…' : s.name,
+        fullName: s.name,
+        'Revenue (AED)': revenueMap.get(s.id) ?? 0,
+        fill: SRENI_COLORS[i % SRENI_COLORS.length],
+      }))
+      .filter((s) => s['Revenue (AED)'] > 0)
+      .sort((a, b) => b['Revenue (AED)'] - a['Revenue (AED)'])
+  }, [srenies, revenueMap])
 
   const hasRevenueData = revenueData.length > 0
   const totalRevenue = revenueData.reduce((sum, r) => sum + r['Revenue (AED)'], 0)
@@ -202,39 +249,114 @@ export function InsightsPage() {
   const monthName = new Date().toLocaleString('en-AE', { month: 'long' })
 
   // Reports submitted this month
-  const thisMonthReports = monthlyReports.filter(
-    (r) => r.year === currentYear && r.month === currentMonth && r.status === 'submitted'
-  )
+  const thisMonthReports = useMemo(() => {
+    return monthlyReports.filter(
+      (r) => r.year === currentYear && r.month === currentMonth && r.status === 'submitted'
+    )
+  }, [monthlyReports, currentYear, currentMonth])
   const submittedCount = new Set(thisMonthReports.map((r) => r.sreniId)).size
   const pendingCount = srenies.length - submittedCount
   const submissionPct = srenies.length > 0 ? Math.round((submittedCount / srenies.length) * 100) : 0
 
-  // Build metric achievement: sum actual values from submitted reports vs target
-  const metricsWithTarget = reportParams.filter(
-    (m: any) => m.inputType === 'number' && m.target != null && m.target > 0
-  )
+  // Build metric achievement: compare total actuals against the combined target for all srenis.
+  const metricsWithTarget = useMemo(() => {
+    return reportParams.filter(
+      (m: any) => m.inputType === 'number' && m.target != null && m.target > 0
+    )
+  }, [reportParams])
 
-  const metricAchievementData = metricsWithTarget.map((metric: any, i: number) => {
-    const actual = thisMonthReports.reduce((sum: number, report: any) => {
-      const val = parseFloat(report.entries?.[metric.name] ?? '0')
-      return sum + (isNaN(val) ? 0 : val)
-    }, 0)
-    const pct = Math.min(100, Math.round((actual / metric.target) * 100))
-    return {
-      name: metric.name.length > 18 ? metric.name.slice(0, 18) + '…' : metric.name,
-      fullName: metric.name,
-      Achieved: actual,
-      Target: metric.target,
-      unit: metric.unit ?? '',
-      pct,
-      fill: SRENI_COLORS[i % SRENI_COLORS.length],
-    }
-  })
+  const metricAchievementData = useMemo(() => {
+    return metricsWithTarget.map((metric: any, i: number) => {
+      const actual = thisMonthReports.reduce((sum: number, report: any) => {
+        const raw = report.entries?.[metric.name]
+        return sum + parseNumericValue(raw)
+      }, 0)
+      const combinedTarget = metric.target * srenies.length
+      const pct = combinedTarget > 0 ? Math.min(100, Math.round((actual / combinedTarget) * 100)) : 0
+      return {
+        name: metric.name.length > 18 ? metric.name.slice(0, 18) + '…' : metric.name,
+        fullName: metric.name,
+        Achieved: actual,
+        Target: combinedTarget,
+        PerSreniTarget: metric.target,
+        unit: metric.unit ?? '',
+        pct,
+        fill: SRENI_COLORS[i % SRENI_COLORS.length],
+      }
+    })
+  }, [metricsWithTarget, thisMonthReports, srenies.length])
 
   const hasMetricTargets = metricAchievementData.length > 0
-  const overallAchievementPct = hasMetricTargets
-    ? Math.round(metricAchievementData.reduce((s: number, m: any) => s + m.pct, 0) / metricAchievementData.length)
-    : submissionPct
+  const perSreniTargetTotal = useMemo(
+    () => metricsWithTarget.reduce((sum: number, metric: any) => sum + metric.target, 0),
+    [metricsWithTarget],
+  )
+
+  const achievementBySreni = useMemo(() => {
+    const reportsBySreni = new Map<string, any>()
+    thisMonthReports.forEach((report: any) => {
+      reportsBySreni.set(report.sreniId, report)
+    })
+
+    return srenies.map((sreni: any, index: number) => {
+      const report = reportsBySreni.get(sreni.id)
+
+      if (!hasMetricTargets) {
+        const pct = report ? 100 : 0
+        return {
+          id: sreni.id,
+          name: sreni.name,
+          achieved: report ? 1 : 0,
+          target: 1,
+          pct,
+          statusLabel: report ? 'Submitted' : 'Pending',
+          color: pct >= 80 ? C.success : pct >= 50 ? C.warning : C.error,
+          fill: SRENI_COLORS[index % SRENI_COLORS.length],
+        }
+      }
+
+      const achieved = metricsWithTarget.reduce((sum: number, metric: any) => {
+        const raw = report?.entries?.[metric.name]
+        return sum + parseNumericValue(raw)
+      }, 0)
+      const target = perSreniTargetTotal
+      const pct = target > 0 ? Math.min(100, Math.round((achieved / target) * 100)) : 0
+
+      return {
+        id: sreni.id,
+        name: sreni.name,
+        achieved,
+        target,
+        pct,
+        statusLabel: report ? 'Submitted' : 'No report',
+        color: pct >= 80 ? C.success : pct >= 50 ? C.warning : C.error,
+        fill: SRENI_COLORS[index % SRENI_COLORS.length],
+      }
+    })
+  }, [hasMetricTargets, metricsWithTarget, perSreniTargetTotal, srenies, thisMonthReports])
+
+  const overallAchievementPct = useMemo(() => {
+    if (!hasMetricTargets) return submissionPct
+
+    const totals = achievementBySreni.reduce(
+      (sum, sreni: any) => ({
+        achieved: sum.achieved + sreni.achieved,
+        target: sum.target + sreni.target,
+      }),
+      { achieved: 0, target: 0 },
+    )
+
+    if (totals.target <= 0) return 0
+    return Math.min(100, Math.round((totals.achieved / totals.target) * 100))
+  }, [achievementBySreni, hasMetricTargets, submissionPct])
+
+  if (loading) {
+    return (
+      <div className="animate-slide-up" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '40vh', color: 'var(--text-secondary-dark)' }}>
+        Loading insights…
+      </div>
+    )
+  }
 
   return (
     <div className="animate-slide-up" style={{ display: 'grid', gap: '20px' }}>
@@ -322,30 +444,31 @@ export function InsightsPage() {
           subtitle={`${totalContacts} total contacts across ${srenies.length} srenis`}
         >
           {contactsBySreni.length === 0 ? (
-            <EmptyChart message="No contacts mapped to srenis yet" height={220} />
+            <EmptyChart message="No contacts mapped to srenis yet" height="100%" />
           ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={contactsBySreni} barSize={20} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-dark)" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--text-secondary-dark)' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--text-secondary-dark)' }} axisLine={false} tickLine={false} width={80} />
-                <RTooltip
-                  contentStyle={TOOLTIP_STYLE}
-                  cursor={{ fill: 'rgba(99,102,241,0.06)' }}
-                  formatter={(val: any, _: any, props: any) => [val, props.payload.fullName]}
-                />
-                <Bar dataKey="Contacts" radius={[0, 4, 4, 0]}>
-                  {contactsBySreni.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <div style={{ flex: 1, minHeight: 260 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={contactsBySreni} barSize={20} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-dark)" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--text-secondary-dark)' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--text-secondary-dark)' }} axisLine={false} tickLine={false} width={80} />
+                  <RTooltip
+                    contentStyle={TOOLTIP_STYLE}
+                    cursor={{ fill: 'rgba(99,102,241,0.06)' }}
+                    formatter={(val: any, _: any, props: any) => [val, props.payload.fullName]}
+                  />
+                  <Bar dataKey="Contacts" radius={[0, 4, 4, 0]}>
+                    {contactsBySreni.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           )}
         </ChartCard>
 
         {/* Chart 2: Revenue by Sreni */}
         <ChartCard
           title="Revenue by Sreni"
-          subtitle={hasRevenueData ? `AED ${totalRevenue.toLocaleString()} total · from submitted reports` : 'Populated from report submissions'}
           badge={
             !hasRevenueData
               ? <span className="badge badge-info" style={{ fontSize: '0.68rem', whiteSpace: 'nowrap' }}>Awaiting reports</span>
@@ -353,15 +476,10 @@ export function InsightsPage() {
           }
         >
           {srenies.length === 0 ? (
-            <EmptyChart message="No srenis configured" height={220} />
+            <EmptyChart message="No srenis configured" height="100%" />
           ) : (
-            <>
-              {!hasRevenueData && (
-                <p style={{ margin: '0 0 10px', fontSize: '0.76rem', color: 'var(--text-secondary-dark)', lineHeight: 1.5 }}>
-                  Revenue data is pulled from monthly report submissions. As srenis submit reports with financial fields (collection, fees, receipts), totals will appear here automatically.
-                </p>
-              )}
-              <ResponsiveContainer width="100%" height={hasRevenueData ? 220 : 160}>
+            <div style={{ flex: 1, minHeight: 260 }}>
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={revenueChartData} barSize={20} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border-dark)" horizontal={false} />
                   <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--text-secondary-dark)' }} axisLine={false} tickLine={false} />
@@ -376,14 +494,13 @@ export function InsightsPage() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-            </>
+            </div>
           )}
         </ChartCard>
 
         {/* Chart 3: Monthly Target Achievement — per metric */}
         <ChartCard
           title={`${monthName} Target Achievement`}
-          subtitle={`${submittedCount} of ${srenies.length} srenis submitted reports`}
           badge={
             <span
               className={`badge ${overallAchievementPct >= 80 ? 'badge-success' : overallAchievementPct >= 50 ? 'badge-warning' : 'badge-error'}`}
@@ -404,35 +521,28 @@ export function InsightsPage() {
             </div>
           </div>
 
-          {!hasMetricTargets ? (
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)', padding: '8px 0' }}>
-              <p style={{ margin: '0 0 6px', fontWeight: 600 }}>No metric targets configured yet.</p>
-              <p style={{ margin: 0, lineHeight: 1.5 }}>
-                Go to <strong>Settings → Report Metrics</strong> and set a <strong>Monthly Target</strong> value on each number metric to see achievement tracking here.
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gap: '10px' }}>
-              {metricAchievementData.map((m: any) => (
-                <div key={m.fullName}>
+          <div style={{ display: 'grid', gap: '10px' }}>
+              {achievementBySreni.map((sreni: any) => (
+                <div key={sreni.id}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }} title={m.fullName}>
-                      {m.fullName}
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '48%' }} title={sreni.name}>
+                      {sreni.name}
                     </span>
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)', flexShrink: 0 }}>
-                      <strong style={{ color: m.pct >= 80 ? C.success : m.pct >= 50 ? C.warning : C.error }}>
-                        {m.Achieved.toLocaleString()}
+                      <strong style={{ color: sreni.color }}>
+                        {hasMetricTargets ? sreni.achieved.toLocaleString() : sreni.statusLabel}
                       </strong>
-                      {' / '}{m.Target.toLocaleString()}{m.unit ? ` ${m.unit}` : ''} · <strong>{m.pct}%</strong>
+                      {hasMetricTargets
+                        ? ` / ${sreni.target.toLocaleString()} · ${sreni.pct}%`
+                        : ` · ${sreni.pct}%`}
                     </span>
                   </div>
                   <div style={{ height: '7px', background: 'var(--border-dark)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${m.pct}%`, background: m.pct >= 80 ? C.success : m.pct >= 50 ? C.warning : C.error, borderRadius: '4px', transition: 'width 0.5s' }} />
+                    <div style={{ height: '100%', width: `${sreni.pct}%`, background: sreni.color, borderRadius: '4px', transition: 'width 0.5s' }} />
                   </div>
                 </div>
               ))}
-            </div>
-          )}
+          </div>
         </ChartCard>
       </div>
 

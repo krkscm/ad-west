@@ -35,7 +35,27 @@ function AppContent() {
     return publicContent;
   }
 
-  const { adminUser, memberUser, mustResetPassword } = useAuth();
+  const { adminUser, memberUser, mustResetPassword, isInitializing } = useAuth();
+
+  if (isInitializing) {
+    return (
+      <div className="app-bootstrap-screen admin-theme">
+        <div className="app-bootstrap-orb app-bootstrap-orb-primary" />
+        <div className="app-bootstrap-orb app-bootstrap-orb-accent" />
+        <div className="glass-panel app-bootstrap-card">
+          <div className="app-bootstrap-spinner" aria-hidden="true">
+            <span className="app-bootstrap-spinner-ring app-bootstrap-spinner-ring-outer" />
+            <span className="app-bootstrap-spinner-ring app-bootstrap-spinner-ring-inner" />
+            <span className="app-bootstrap-spinner-dot" />
+          </div>
+          <div className="app-bootstrap-copy">
+            <h2>Preparing your workspace</h2>
+            <p>Signing you in and loading your dashboard.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (adminUser && mustResetPassword) {
     return <ForcePasswordChangePage />;

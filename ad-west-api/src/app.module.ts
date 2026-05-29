@@ -1,6 +1,8 @@
 import { config as loadEnv } from 'dotenv';
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { HealthModule } from '@modules/health/health.module';
 import { CoreBusinessModule } from '@modules/core-business/core-business.module';
@@ -46,6 +48,15 @@ function createTypeOrmModule() {
       isGlobal: true,
       envFilePath: '.env.local',
     }),
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          name: 'default',
+          ttl: Number(process.env.THROTTLE_DEFAULT_TTL_MS || 60000),
+          limit: Number(process.env.THROTTLE_DEFAULT_LIMIT || 240),
+        },
+      ],
+    }),
     ...(useDbPersistence ? [createTypeOrmModule()] : []),
     AppControllerModule,
     HealthModule,
@@ -55,6 +66,12 @@ function createTypeOrmModule() {
     EnumValuesModule.register(useDbPersistence),
     PublicGatewayModule.register(useDbPersistence),
     MemberServicesModule.register(useDbPersistence),
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

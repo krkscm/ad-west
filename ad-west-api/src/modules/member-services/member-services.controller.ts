@@ -13,6 +13,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { CurrentUser } from '@modules/user-management/decorators/current-user.decorator';
@@ -276,6 +277,7 @@ export class PublicEventsController {
   }
 
   @Post(':id/register')
+  @Throttle({ default: { limit: 12, ttl: 60000 } })
   async register(
     @Param('id') id: string,
     @Body() body: { formData: Record<string, unknown> },

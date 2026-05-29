@@ -14,6 +14,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { createReadStream } from 'fs';
@@ -38,6 +39,7 @@ export class PublicHelpdeskController {
   constructor(private readonly service: PublicGatewayService) {}
 
   @Post('tickets')
+  @Throttle({ default: { limit: 8, ttl: 60000 } })
   async submitTicket(
     @Body()
     body: {
@@ -99,6 +101,7 @@ export class PublicJobsController {
   }
 
   @Post()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async submitPublicJob(
     @Body()
     body: {
@@ -129,6 +132,7 @@ export class PublicJobsController {
   }
 
   @Post(':jobId/apply')
+  @Throttle({ default: { limit: 8, ttl: 60000 } })
   @UseInterceptors(
     FileInterceptor('resume', {
       storage: memoryStorage(),

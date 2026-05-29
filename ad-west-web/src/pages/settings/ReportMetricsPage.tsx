@@ -144,7 +144,7 @@ export const ReportMetricsPage: React.FC = () => {
               </div>
               <div>
                 <label className="form-label">
-                  Monthly Target
+                  Monthly Target Per Sreni
                   {form.inputType !== 'number' && <span style={{ color: 'var(--text-secondary-dark)', fontWeight: 400 }}> (number metrics only)</span>}
                 </label>
                 <input
@@ -152,7 +152,7 @@ export const ReportMetricsPage: React.FC = () => {
                   type="number"
                   min="0"
                   step="any"
-                  placeholder={form.inputType === 'number' ? 'e.g. 50' : '—'}
+                  placeholder={form.inputType === 'number' ? 'e.g. 50 per sreni' : '—'}
                   value={form.target}
                   onChange={(e) => setForm(f => ({ ...f, target: e.target.value }))}
                   disabled={form.inputType !== 'number'}

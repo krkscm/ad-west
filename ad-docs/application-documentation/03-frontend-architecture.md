@@ -18,10 +18,8 @@ Routing is URL-path based in app code:
 
 ## Core Frontend Contexts
 
-- `AuthProvider`: token/session/user state
-- `ThemeProvider`: theme state
-- `ToastProvider`: UI notifications
-- `ConfirmDialogProvider`: confirmation modal workflow
+- `AuthProvider`: token/session/user state, including startup restoration gating so authenticated routes do not briefly fall through to the login screen during refresh.
+- The auth bootstrap gate now uses a branded full-screen loader shell instead of plain text so refresh-state transitions stay visually consistent with the admin theme.
 
 ## Main Application Pages
 
@@ -50,6 +48,8 @@ Routing is URL-path based in app code:
 - Gmail inbox/send APIs
 - Member services and helpdesk admin APIs
 
+HTTP execution behavior in `src/utils/api.ts` now includes endpoint normalization checks (rejects absolute URLs), per-request timeout via `AbortController`, and unified response parsing for consistency.
+
 ## UI Architecture Notes
 
 - Shared utility classes and theme variables live in global SCSS.
@@ -60,4 +60,10 @@ Routing is URL-path based in app code:
 - Admin dashboard now supports very-small-device drawer-like navigation behavior.
 - Admin dashboard tab routing includes integrated navigation to Insights and Responsibility Chart flows.
 - Insights now starts directly with analytics charts/tables; top KPI strip was removed.
+- Insights contact totals are derived from per-Sreni contact APIs so the page stays aligned with the current backend route model instead of calling a removed global contacts endpoint.
+- The three-column Sreni insights row keeps equal-height cards, and the chart/empty-state bodies stretch within those cards so sparse widgets do not leave fixed-height content floating in excess space.
+- Insights target achievement always renders per-Sreni rows: it falls back to submission-completion achievement when no metric targets exist, and switches to actual-vs-target achievement per Sreni once numeric monthly targets are configured.
 - Dynamic Sreni child menu routing now includes `sreni-<id>-analytics` for advanced Sreni-level performance analysis.
+- Insights calculations include memoized aggregation paths and robust numeric parsing for better large-data performance and reporting accuracy.
+- The app-shell CSP kept in `index.html` avoids directives like `frame-ancestors` that browsers ignore when delivered via a meta tag; those must be set as HTTP headers if enforced later.
+- Notification/date-time controls include explicit component-level responsive breakpoints so layout remains readable across mobile/tablet widths.

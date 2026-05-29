@@ -8,6 +8,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { MemberLoginDto } from '../dto/member-login.dto';
@@ -22,6 +23,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Get('captcha')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   captchaChallenge(): {
     captchaToken: string;
     captchaImage: string;
@@ -47,6 +49,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async login(
     @Body() dto: { identifier: string; password: string; captchaToken: string; captchaAnswer: string },
   ): Promise<{ accessToken: string }> {
@@ -63,6 +66,7 @@ export class AuthController {
   }
 
   @Post('member/login')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async memberLogin(@Body() dto: MemberLoginDto): Promise<{ accessToken: string }> {
     return this.authService.memberLogin(dto);
   }

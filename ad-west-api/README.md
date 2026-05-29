@@ -78,6 +78,7 @@ npm start
 - `npm run test:watch` - Run tests in watch mode
 - `npm run test:cov` - Generate coverage report
 - `npm run test:e2e` - Run end-to-end tests
+- `npm run load:test` - Run targeted load tests (auth, gateway lists, insights dependencies) and generate latency budget reports
 
 ## API Endpoints
 
@@ -211,6 +212,8 @@ Run `ad-docs/database-script/044_sreni_analytics_menu.sql` to backfill the `Anal
 - **Input validation:** Automatic validation using decorators
 - **Error handling:** Centralized exception handling with custom filters
 - **Configuration:** Environment-based configuration management
+- **Bootstrap hardening:** API bootstrap enforces CORS allow-list validation, request-size limits, strict security headers, optional trust-proxy handling, and environment-aware Swagger exposure
+- **Rate limiting:** Global throttler guard is enabled with route-level `@Throttle` limits on auth/public submission endpoints (captcha, login, public helpdesk/job/event submissions)
 - **Runtime extraction:** Large `core-business` clusters are split into lazy runtime services under `src/modules/core-business/services/` to keep the main service maintainable without changing controller contracts
 - **Program runtime split:** Program, session, registration, attendance, and personal-program lookups are handled by `program-runtime.service.ts`; keep new related logic there instead of growing the root service
 - **Org runtime split:** Zone, location, sreni, sthan, and governance lifecycle flows are handled by `org-runtime.service.ts`; route new governance logic there instead of the root service

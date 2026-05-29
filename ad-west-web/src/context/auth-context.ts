@@ -20,6 +20,7 @@ export interface AuthContextType {
   adminUser: AdminSessionUser | null
   memberUser: Contact | null
   mustResetPassword: boolean
+  isInitializing: boolean
   getCaptchaChallenge: () => Promise<{ success: boolean; captchaToken?: string; captchaImage?: string; expiresInSeconds?: number; error?: string }>
   login: (identifier: string, password: string, captchaToken: string, captchaAnswer: string) => Promise<{ success: boolean; error?: string }>
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>

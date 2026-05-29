@@ -26,6 +26,8 @@ src/
 - For `TimeField`, the native picker indicator remains visible; overlap prevention is handled by spacing and explicit right-bounded placeholder layout rules.
 - `DateTimePicker` now uses a wider responsive date/time grid (including wider time-slot allocation) to avoid placeholder clipping in dense admin forms.
 - `DateTimePicker` and `DateRangePicker` explicitly collapse to a single-column layout on smaller screens for mobile readability.
+- `src/utils/api.ts` enforces endpoint normalization, default request timeout handling, and unified error/response processing for safer and more resilient API calls.
+- Vite build output uses targeted manual chunk splitting (React, charts, editor, workflow) for improved caching and initial load performance.
 
 ## Getting Started
 

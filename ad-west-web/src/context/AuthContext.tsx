@@ -55,6 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [memberUser, setMemberUser] = useState<Contact | null>(null)
   const [memberToken, setMemberToken] = useState<string | null>(localStorage.getItem('adwest_member_token'))
   const [mustResetPassword, setMustResetPassword] = useState<boolean>(false)
+  const [isInitializing, setIsInitializing] = useState<boolean>(true)
 
   const loadAdminSession = async (adminToken: string) => {
     localStorage.setItem('adwest_token', adminToken)
@@ -145,21 +146,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   useEffect(() => {
-    if (token) {
-      void loadAdminSession(token)
-    }
+    let cancelled = false
 
-    const savedMember = localStorage.getItem('adwest_member')
-    if (savedMember) {
-      try {
-        setMemberUser(JSON.parse(savedMember) as Contact)
-      } catch {
-        localStorage.removeItem('adwest_member')
+    const initializeSession = async () => {
+      if (token) {
+        await loadAdminSession(token)
+      }
+
+      const savedMember = localStorage.getItem('adwest_member')
+      if (savedMember) {
+        try {
+          setMemberUser(JSON.parse(savedMember) as Contact)
+        } catch {
+          localStorage.removeItem('adwest_member')
+        }
+      }
+
+      if (memberToken && !memberUser) {
+        await loadMemberSession(memberToken)
       }
     }
 
-    if (memberToken && !memberUser) {
-      void loadMemberSession(memberToken)
+    initializeSession().finally(() => {
+      if (!cancelled) {
+        setIsInitializing(false)
+      }
+    })
+
+    return () => {
+      cancelled = true
     }
   }, [])
 
@@ -293,6 +308,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         adminUser,
         memberUser,
         mustResetPassword,
+        isInitializing,
         getCaptchaChallenge,
         login,
         loginWithGoogle,

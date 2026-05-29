@@ -30,6 +30,20 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    build: {
+      target: 'es2020',
+      cssCodeSplit: true,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            react: ['react', 'react-dom'],
+            charts: ['recharts'],
+            editor: ['@tiptap/react', '@tiptap/starter-kit'],
+            workflow: ['@xyflow/react'],
+          },
+        },
+      },
+    },
     test: {
       environment: 'jsdom',
       globals: true,
