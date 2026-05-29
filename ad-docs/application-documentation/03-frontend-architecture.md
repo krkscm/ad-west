@@ -31,6 +31,8 @@ Routing is URL-path based in app code:
 - Settings pages including Responsibility Chart, Google Integration, and Report Config
 - Helpdesk admin pages: tickets, job postings, job applications
 - Member Services admin pages: reimbursements, special events, notifications, Gmail workspace
+- Per-Sreni `Analytics Studio` page (`src/pages/SreniAnalyticsStudioPage.tsx`) with tabbed Detailed Reports, Pivot Studio, and Graph Studio across contacts, events, and attendance domains, including expanded chart types (line, bar, area, composed, pie, radar)
+- Analytics Studio interaction controls are aligned with shared admin UI patterns (switch-toggle for binary controls and button-based selectors for multi-select option sets)
 - Member portal
 - Forced password change page
 
@@ -51,7 +53,11 @@ Routing is URL-path based in app code:
 ## UI Architecture Notes
 
 - Shared utility classes and theme variables live in global SCSS.
+- Shared date/time entry controls are centralized via `src/components/common/DateFields.tsx` to keep placeholders and picker interactions consistent across modules.
+- Notification authoring and similar admin forms use wider responsive DateTimePicker layout blocks to preserve full date/time placeholder readability without icon overlap.
+- Date/time composite controls (`DateTimePicker` and `DateRangePicker`) include explicit mobile breakpoints that stack fields to one column, and notification form actions also stack for small-screen usability.
 - Public pages use shared responsive hooks plus page-specific styles.
 - Admin dashboard now supports very-small-device drawer-like navigation behavior.
 - Admin dashboard tab routing includes integrated navigation to Insights and Responsibility Chart flows.
 - Insights now starts directly with analytics charts/tables; top KPI strip was removed.
+- Dynamic Sreni child menu routing now includes `sreni-<id>-analytics` for advanced Sreni-level performance analysis.

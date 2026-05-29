@@ -503,6 +503,12 @@ export class OrgRuntimeService {
        ON CONFLICT (key) DO NOTHING`,
       [`sreni-${record.id}-reports`, `sreni-${record.id}`, menuNow],
     );
+    await this.ctx.dataSource.query(
+      `INSERT INTO adwest.menu_items (id, key, label, parent_key, icon, sort_order, active, created_at, updated_at)
+       VALUES (gen_random_uuid()::text, $1, 'Analytics Studio', $2, '📈', 60, true, $3, $3)
+       ON CONFLICT (key) DO NOTHING`,
+      [`sreni-${record.id}-analytics`, `sreni-${record.id}`, menuNow],
+    );
     return record;
   }
 

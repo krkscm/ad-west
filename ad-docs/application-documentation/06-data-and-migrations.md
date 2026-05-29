@@ -27,11 +27,13 @@ Ordered SQL scripts in `ad-docs/database-script` are the canonical migration sou
 - `041_google_integration_config.sql`
 - `042_drop_audit_fks.sql`
 - `043_report_metric_target.sql`
+- `044_sreni_analytics_menu.sql`
 
 Script intent summary:
 - `041_google_integration_config.sql`: DB-backed Google OAuth/Gmail configuration and settings menu seed
 - `042_drop_audit_fks.sql`: Drops selected member-services audit FK constraints to avoid runtime write failures in mixed persistence/admin-origin scenarios
 - `043_report_metric_target.sql`: Adds `target` field to report metric definitions for target-vs-actual reporting
+- `044_sreni_analytics_menu.sql`: Backfills `Analytics Studio` child menu (`sreni-<id>-analytics`) for all existing Srenis
 
 ## Operational Guidance
 

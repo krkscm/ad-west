@@ -23,6 +23,7 @@ import { SreniContactListPage } from './SreniContactListPage';
 import { SreniAttendancePage } from './SreniAttendancePage';
 import { SreniDocumentsPage } from './SreniDocumentsPage';
 import { SreniReportsPage } from './SreniReportsPage';
+import { SreniAnalyticsStudioPage } from './SreniAnalyticsStudioPage';
 import { AttendanceMetricsPage } from './settings/AttendanceMetricsPage';
 import { ReportConfigSettingsPage } from './settings/ReportConfigSettingsPage';
 import { ResponsibilityChartPage } from './settings/ResponsibilityChartPage';
@@ -95,6 +96,7 @@ type ActiveTab =
   | `sreni-attendance-${string}`
   | `sreni-documents-${string}`
   | `sreni-reports-${string}`
+  | `sreni-analytics-${string}`
   | 'my-approvals';
 
 const SETTINGS_ROOT_TAB: ActiveTab = 'settings-admins';
@@ -126,6 +128,7 @@ const resolveTabFromHash = (hash: string): ActiveTab | null => {
   if (normalizedHash.startsWith('sreni-attendance-')) return normalizedHash as ActiveTab;
   if (normalizedHash.startsWith('sreni-documents-')) return normalizedHash as ActiveTab;
   if (normalizedHash.startsWith('sreni-reports-')) return normalizedHash as ActiveTab;
+  if (normalizedHash.startsWith('sreni-analytics-')) return normalizedHash as ActiveTab;
   return null;
 };
 
@@ -206,6 +209,9 @@ const buildBreadcrumbItems = (
   } else if (tabStr.startsWith('sreni-reports-')) {
     items.push({ label: options?.sreniName ?? 'Sreni' });
     items.push({ label: 'Reports' });
+  } else if (tabStr.startsWith('sreni-analytics-')) {
+    items.push({ label: options?.sreniName ?? 'Sreni' });
+    items.push({ label: 'Analytics Studio' });
   } else {
     items.push({ label: 'Dashboard', targetTab: 'dashboard' });
     if (activeTab !== 'dashboard') {
@@ -479,7 +485,10 @@ export const AdminDashboardPage: React.FC = () => {
   const activeSreniReportsKey = (activeTab as string).startsWith('sreni-reports-')
     ? (activeTab as string).slice('sreni-reports-'.length)
     : null;
-  const activeSreniKey = activeSreniCalendarKey ?? activeSreniContactsKey ?? activeSreniAttendanceKey ?? activeSreniDocumentsKey ?? activeSreniReportsKey;
+  const activeSreniAnalyticsKey = (activeTab as string).startsWith('sreni-analytics-')
+    ? (activeTab as string).slice('sreni-analytics-'.length)
+    : null;
+  const activeSreniKey = activeSreniCalendarKey ?? activeSreniContactsKey ?? activeSreniAttendanceKey ?? activeSreniDocumentsKey ?? activeSreniReportsKey ?? activeSreniAnalyticsKey;
   const activeSreniMenuLabel = activeSreniKey
     ? sreniParentMenus.find(m => m.key === `sreni-${activeSreniKey}`)?.label
     : undefined;
@@ -901,7 +910,8 @@ export const AdminDashboardPage: React.FC = () => {
             const attendanceTab = `sreni-attendance-${sreniId}` as ActiveTab;
             const documentsTab = `sreni-documents-${sreniId}` as ActiveTab;
             const reportsTab = `sreni-reports-${sreniId}` as ActiveTab;
-            const isSreniTabActive = activeTab === calTab || activeTab === contactsTab || activeTab === attendanceTab || activeTab === documentsTab || activeTab === reportsTab;
+            const analyticsTab = `sreni-analytics-${sreniId}` as ActiveTab;
+            const isSreniTabActive = activeTab === calTab || activeTab === contactsTab || activeTab === attendanceTab || activeTab === documentsTab || activeTab === reportsTab || activeTab === analyticsTab;
             const isSectionOpen = openSreniKeys.has(sreni.key) || isSreniTabActive;
             const children = sreniChildMenus.filter(c => c.parentKey === sreni.key);
 
@@ -935,7 +945,8 @@ export const AdminDashboardPage: React.FC = () => {
                       const isAttendance = child.key.endsWith('-attendance');
                       const isDocuments = child.key.endsWith('-documents');
                       const isReports = child.key.endsWith('-reports');
-                      const childSreniId = child.key.replace(/^sreni-/, '').replace(/-(calendar|contacts|attendance|documents|reports)$/, '');
+                      const isAnalytics = child.key.endsWith('-analytics');
+                      const childSreniId = child.key.replace(/^sreni-/, '').replace(/-(calendar|contacts|attendance|documents|reports|analytics)$/, '');
                       const childTab = isContacts
                         ? `sreni-contacts-${childSreniId}` as ActiveTab
                         : isAttendance
@@ -944,6 +955,8 @@ export const AdminDashboardPage: React.FC = () => {
                         ? `sreni-documents-${childSreniId}` as ActiveTab
                         : isReports
                         ? `sreni-reports-${childSreniId}` as ActiveTab
+                        : isAnalytics
+                        ? `sreni-analytics-${childSreniId}` as ActiveTab
                         : `sreni-calendar-${childSreniId}` as ActiveTab;
                       const isChildActive = activeTab === childTab;
                       return (
@@ -1822,6 +1835,13 @@ export const AdminDashboardPage: React.FC = () => {
             const sreniMenu = sreniParentMenus.find(m => m.key === `sreni-${activeSreniReportsKey}`);
             return sreniMenu ? (
               <SreniReportsPage sreniId={activeSreniReportsKey} sreniName={sreniMenu.label} />
+            ) : null;
+          })()}
+
+          {(activeTab as string).startsWith('sreni-analytics-') && activeSreniAnalyticsKey && (() => {
+            const sreniMenu = sreniParentMenus.find(m => m.key === `sreni-${activeSreniAnalyticsKey}`);
+            return sreniMenu ? (
+              <SreniAnalyticsStudioPage sreniId={activeSreniAnalyticsKey} sreniName={sreniMenu.label} />
             ) : null;
           })()}
 

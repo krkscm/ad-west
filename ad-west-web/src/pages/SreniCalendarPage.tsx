@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal } from '../components/common/Modal';
 import { useToast } from '../components/common/Toast';
+import { DateField, TimeField } from '../components/common/DateFields';
 import { useAuth } from '../context/auth-context';
 import { backendApi, CalendarEventApi, LocationDefinitionApi } from '../utils/backendApi';
 
@@ -445,9 +446,7 @@ export const SreniCalendarPage: React.FC<Props> = ({ sreniId, sreniName }) => {
           {!editingEvent && (
             <div>
               <label className="form-label">Date</label>
-              <input
-                className="form-input"
-                type="date"
+              <DateField
                 value={selectedDate}
                 onChange={e => setSelectedDate(e.target.value)}
               />
@@ -456,11 +455,11 @@ export const SreniCalendarPage: React.FC<Props> = ({ sreniId, sreniName }) => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
               <label className="form-label">Start Time</label>
-              <input className="form-input" type="time" value={formStart} onChange={e => setFormStart(e.target.value)} />
+              <TimeField value={formStart} onChange={e => setFormStart(e.target.value)} />
             </div>
             <div>
               <label className="form-label">End Time</label>
-              <input className="form-input" type="time" value={formEnd} onChange={e => setFormEnd(e.target.value)} />
+              <TimeField value={formEnd} onChange={e => setFormEnd(e.target.value)} />
             </div>
           </div>
           <div>

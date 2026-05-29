@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { backendApi, EventFormFieldApi, EventRegistrationApi, FormFieldType, SpecialEventApi } from '../../utils/backendApi'
 import { useToast } from '../../components/common/Toast'
+import { useConfirm } from '../../components/common/ConfirmDialog'
 import { SwitchToggle } from '../../components/common/SwitchToggle'
 import { DateRangePicker } from '../../components/common/DateTimePicker'
 
@@ -23,6 +24,7 @@ function fmt(iso: string) {
 
 export function SpecialEventsPage() {
   const { addToast } = useToast()
+  const confirm = useConfirm()
   const [events, setEvents] = useState<SpecialEventApi[]>([])
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState<Mode>('list')
@@ -94,7 +96,8 @@ export function SpecialEventsPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this event? All registrations will be removed.')) return
+    const ok = await confirm({ title: 'Delete Event', message: 'Delete this event? All registrations will also be removed.', confirmLabel: 'Delete', danger: true })
+    if (!ok) return
     try {
       await backendApi.deleteSpecialEvent(id)
       setEvents((prev) => prev.filter((ev) => ev.id !== id))

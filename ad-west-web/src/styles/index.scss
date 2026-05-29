@@ -676,6 +676,60 @@ h1, h2, h3, h4, h5, h6 {
   outline: none;
 }
 
+.date-time-field {
+  position: relative;
+  width: 100%;
+}
+
+.date-time-field .form-input {
+  padding-right: 42px;
+}
+
+.date-time-field__placeholder {
+  position: absolute;
+  left: 16px;
+  right: 44px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 0.95rem;
+  color: var(--text-secondary-dark);
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.date-time-field .form-input[type='time'] ~ .date-time-field__placeholder {
+  right: 56px;
+}
+
+.date-time-field.is-filled .date-time-field__placeholder,
+.date-time-field:focus-within .date-time-field__placeholder {
+  display: none;
+}
+
+.date-time-field .form-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.78;
+}
+
+/* Prevent native date/time format text from overlapping custom placeholder. */
+.date-time-field:not(.is-filled) .form-input[type='date']:not(:focus)::-webkit-datetime-edit,
+.date-time-field:not(.is-filled) .form-input[type='time']:not(:focus)::-webkit-datetime-edit {
+  color: transparent;
+}
+
+.date-time-field:not(.is-filled) .form-input[type='date']:not(:focus),
+.date-time-field:not(.is-filled) .form-input[type='time']:not(:focus) {
+  caret-color: transparent;
+}
+
+/* Time inputs need a little extra right space so text never collides with the picker icon. */
+.date-time-field .form-input[type='time'] {
+  padding-right: 52px;
+}
+
 .form-input:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
@@ -1108,6 +1162,26 @@ h1, h2, h3, h4, h5, h6 {
   opacity: 1;
 }
 
+.notification-form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.date-time-picker__grid {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) minmax(132px, 0.6fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
+.date-range-picker__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
 /* Tooltip & helper info boxes */
 .helper-box {
   background-color: var(--info-light);
@@ -1264,6 +1338,15 @@ h1, h2, h3, h4, h5, h6 {
 
   .public-page-card {
     padding: 20px !important;
+  }
+
+  .date-time-picker__grid,
+  .date-range-picker__grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .notification-form-actions .btn {
+    flex: 1 1 100%;
   }
 }
 

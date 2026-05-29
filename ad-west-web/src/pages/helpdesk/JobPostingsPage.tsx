@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { backendApi, JobPostingApi, JobType } from '../../utils/backendApi'
 import { useToast } from '../../components/common/Toast'
+import { useConfirm } from '../../components/common/ConfirmDialog'
+import { DateField } from '../../components/common/DateFields'
 
 const JOB_TYPES: { value: JobType; label: string }[] = [
   { value: 'full_time', label: 'Full Time' },
@@ -22,6 +24,7 @@ const BLANK_FORM = { title: '', description: '', requirements: '', location: '',
 
 export function JobPostingsPage() {
   const { addToast } = useToast()
+  const confirm = useConfirm()
   const [jobs, setJobs] = useState<JobPostingApi[]>([])
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState<FormMode>('list')
@@ -107,7 +110,8 @@ export function JobPostingsPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this job posting? All associated applications will also be removed.')) return
+    const ok = await confirm({ title: 'Delete Job Posting', message: 'Delete this job posting? All associated applications will also be removed.', confirmLabel: 'Delete', danger: true })
+    if (!ok) return
     setDeleting(id)
     try {
       await backendApi.deleteJobPosting(id)
@@ -169,7 +173,7 @@ export function JobPostingsPage() {
 
             <div>
               <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Closing Date (optional)</label>
-              <input className="form-input" type="date" value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} />
+              <DateField value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} />
             </div>
 
             <div style={{ display: 'flex', gap: '10px', marginTop: '4px', flexWrap: 'wrap' }}>

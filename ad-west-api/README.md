@@ -178,6 +178,7 @@ Run `ad-docs/database-script/038_auth_login_performance_indexes.sql` to add logi
 Run `ad-docs/database-script/039_public_gateway.sql` when enabling DB persistence for public helpdesk tickets, job postings, and job applications.
 Run `ad-docs/database-script/040_member_services.sql` for member services persistence.
 Run `ad-docs/database-script/041_google_integration_config.sql` to enable DB-backed Google OAuth/Gmail settings and menu seed.
+Run `ad-docs/database-script/044_sreni_analytics_menu.sql` to backfill the `Analytics Studio` child menu for all existing Srenis.
 
 ### Admin Users (Password Login)
 - Admin login now uses admin code as the visible identifier; existing records are backfilled from the stored admin accounts.

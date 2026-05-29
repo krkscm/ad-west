@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { backendApi, EventFormFieldApi, SpecialEventApi } from '../../utils/backendApi'
+import { DateField } from '../../components/common/DateFields'
 
 function getEventId(): string {
   const parts = window.location.pathname.split('/')
@@ -53,7 +54,21 @@ function FormField({ field, value, onChange }: {
     )
   }
 
-  const inputType: Record<string, string> = { text: 'text', number: 'number', email: 'email', phone: 'tel', date: 'date' }
+  if (field.fieldType === 'date') {
+    return (
+      <div>
+        {label}
+        <DateField
+          value={String(value ?? '')}
+          onChange={(e) => onChange(e.target.value)}
+          placeholderText={field.placeholder?.trim() || 'DD-MM-YYYY'}
+          required={field.isRequired}
+        />
+      </div>
+    )
+  }
+
+  const inputType: Record<string, string> = { text: 'text', number: 'number', email: 'email', phone: 'tel' }
   return (
     <div>
       {label}

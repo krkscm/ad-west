@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
@@ -57,6 +57,10 @@ function Divider() {
 }
 
 export function HtmlEditor({ value, onChange, disabled, minHeight = 200 }: HtmlEditorProps) {
+  const [showLinkInput, setShowLinkInput] = useState(false)
+  const [linkUrl, setLinkUrl] = useState('')
+  const linkInputRef = useRef<HTMLInputElement>(null)
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -71,14 +75,26 @@ export function HtmlEditor({ value, onChange, disabled, minHeight = 200 }: HtmlE
     },
   })
 
-  const setLink = () => {
+  const openLinkInput = () => {
     if (!editor) return
     const prev = editor.getAttributes('link').href as string | undefined
-    const url = window.prompt('Enter URL', prev ?? 'https://')
-    if (url === null) return
-    if (url === '') { editor.chain().focus().extendMarkRange('link').unsetLink().run(); return }
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
+    setLinkUrl(prev ?? 'https://')
+    setShowLinkInput(true)
+    setTimeout(() => linkInputRef.current?.select(), 50)
   }
+
+  const applyLink = () => {
+    if (!editor) return
+    if (!linkUrl.trim()) {
+      editor.chain().focus().extendMarkRange('link').unsetLink().run()
+    } else {
+      editor.chain().focus().extendMarkRange('link').setLink({ href: linkUrl.trim() }).run()
+    }
+    setShowLinkInput(false)
+    setLinkUrl('')
+  }
+
+  const cancelLink = () => { setShowLinkInput(false); setLinkUrl('') }
 
   if (!editor) return null
 
@@ -154,13 +170,31 @@ export function HtmlEditor({ value, onChange, disabled, minHeight = 200 }: HtmlE
         <Divider />
 
         {/* Link + clear */}
-        <ToolBtn onClick={setLink} active={editor.isActive('link')} disabled={disabled} title="Insert link">
+        <ToolBtn onClick={openLinkInput} active={editor.isActive('link') || showLinkInput} disabled={disabled} title="Insert link">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         </ToolBtn>
         <ToolBtn onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()} disabled={disabled} title="Clear formatting">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M20.37 8.91l-1 1.73-9.1-5.26 1-1.73 9.1 5.26z"/><path d="M13 22H7l4.18-7.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
         </ToolBtn>
       </div>
+
+      {/* Inline link input */}
+      {showLinkInput && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderBottom: '1px solid var(--border-dark)', background: 'var(--surface-dark-elevated)' }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2.2" strokeLinecap="round" style={{ flexShrink: 0 }}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          <input
+            ref={linkInputRef}
+            type="url"
+            value={linkUrl}
+            onChange={(e) => setLinkUrl(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyLink() } if (e.key === 'Escape') cancelLink() }}
+            placeholder="https://"
+            style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '0.85rem', color: 'var(--text-primary-dark)', fontFamily: 'inherit' }}
+          />
+          <button type="button" onClick={applyLink} style={{ padding: '3px 10px', borderRadius: '5px', background: 'var(--primary)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600 }}>Apply</button>
+          <button type="button" onClick={cancelLink} style={{ padding: '3px 8px', borderRadius: '5px', background: 'transparent', color: 'var(--text-secondary-dark)', border: '1px solid var(--border-dark)', cursor: 'pointer', fontSize: '0.78rem' }}>Cancel</button>
+        </div>
+      )}
 
       {/* Editor area */}
       <EditorContent

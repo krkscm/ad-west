@@ -27,6 +27,7 @@ Primary business orchestration, including:
 - Sreni runtime flows
 - Documents, reports, and approval runtime operations
 - Attendance, calendar, and operational metrics
+- Dynamic Sreni menu child seeding/backfill (including `Reports` and `Analytics Studio` children)
 
 ### User Management Module
 - Admin/member authentication and session verification

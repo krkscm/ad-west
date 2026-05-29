@@ -1,4 +1,5 @@
 import React from 'react'
+import { DateField, TimeField } from './DateFields'
 
 interface DateTimePickerProps {
   value: string          // "YYYY-MM-DDTHH:mm" or ISO string
@@ -29,22 +30,17 @@ export function DateTimePicker({ value, onChange, required, minDate, label }: Da
   }
 
   return (
-    <div>
+    <div className="date-time-picker">
       {label && <label style={labelStyle}>{label}{required && <span style={{ color: 'var(--error)' }}> *</span>}</label>}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', alignItems: 'stretch' }}>
-        <input
-          className="form-input"
-          type="date"
+      <div className="date-time-picker__grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(170px, 1fr) minmax(132px, 0.6fr)', gap: '10px', alignItems: 'stretch' }}>
+        <DateField
           value={date}
           min={minDate}
           required={required}
           onChange={(e) => onChange(combine(e.target.value, time))}
         />
-        <input
-          className="form-input"
-          type="time"
+        <TimeField
           value={time}
-          style={{ width: '120px' }}
           onChange={(e) => onChange(combine(date, e.target.value))}
         />
       </div>
@@ -66,7 +62,7 @@ export function DateRangePicker({ startValue, endValue, onStartChange, onEndChan
   const startDate = splitValue(startValue).date
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+    <div className="date-range-picker__grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
       <DateTimePicker
         value={startValue}
         onChange={onStartChange}

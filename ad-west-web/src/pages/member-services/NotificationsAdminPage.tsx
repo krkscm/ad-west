@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { AppNotificationApi, NotificationTarget, backendApi } from '../../utils/backendApi'
 import { useToast } from '../../components/common/Toast'
+import { useConfirm } from '../../components/common/ConfirmDialog'
 import { DateTimePicker } from '../../components/common/DateTimePicker'
 
 const TARGET_LABELS: Record<NotificationTarget, string> = {
@@ -18,6 +19,7 @@ function isLive(n: AppNotificationApi) {
 
 export function NotificationsAdminPage() {
   const { addToast } = useToast()
+  const confirm = useConfirm()
   const [items, setItems] = useState<AppNotificationApi[]>([])
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState<Mode>('list')
@@ -88,7 +90,8 @@ export function NotificationsAdminPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this notification?')) return
+    const ok = await confirm({ title: 'Delete Notification', message: 'Delete this notification? It will stop showing to users immediately.', confirmLabel: 'Delete', danger: true })
+    if (!ok) return
     try {
       await backendApi.deleteNotification(id)
       setItems((prev) => prev.filter((n) => n.id !== id))
@@ -102,7 +105,7 @@ export function NotificationsAdminPage() {
 
   if (mode !== 'list') {
     return (
-      <div className="animate-slide-up" style={{ maxWidth: '680px' }}>
+      <div className="animate-slide-up" style={{ maxWidth: '920px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
           <button className="btn btn-secondary" onClick={() => setMode('list')}>← Back</button>
           <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800 }}>
@@ -119,7 +122,7 @@ export function NotificationsAdminPage() {
               <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Message <span style={{ color: 'var(--error)' }}>*</span></label>
               <textarea className="form-input" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} placeholder="Full notification message…" rows={5} required style={{ resize: 'vertical' }} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '14px' }}>
               <DateTimePicker
                 value={form.validFrom}
                 onChange={(v) => setForm({ ...form, validFrom: v })}
@@ -138,7 +141,7 @@ export function NotificationsAdminPage() {
                 {(Object.entries(TARGET_LABELS) as [NotificationTarget, string][]).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </div>
-            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+            <div className="notification-form-actions">
               <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : mode === 'create' ? 'Create Notification' : 'Save Changes'}</button>
               <button type="button" className="btn btn-secondary" onClick={() => setMode('list')}>Cancel</button>
             </div>

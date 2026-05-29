@@ -22,6 +22,10 @@ src/
 - SCSS is the required stylesheet format for this project.
 - New stylesheets must be created as `.scss` files (not `.css`).
 - Form-level `Active/Inactive` inputs must use the shared switch-toggle control (not checkbox/select/segmented buttons), to keep status controls visually consistent across settings pages.
+- Date/time controls must use shared `DateField`/`TimeField` components from `src/components/common/DateFields.tsx` for consistent placeholders and picker styling.
+- For `TimeField`, the native picker indicator remains visible; overlap prevention is handled by spacing and explicit right-bounded placeholder layout rules.
+- `DateTimePicker` now uses a wider responsive date/time grid (including wider time-slot allocation) to avoid placeholder clipping in dense admin forms.
+- `DateTimePicker` and `DateRangePicker` explicitly collapse to a single-column layout on smaller screens for mobile readability.
 
 ## Getting Started
 
@@ -94,6 +98,8 @@ If your backend runs on a different port, set `VITE_API_PROXY_TARGET` before sta
 - Dashboard includes a Google Workspace panel for Gmail compose and latest inbox preview from the authenticated backend session.
 - Super Admin Settings now includes `Google Integration` where Google OAuth/Gmail credentials and scopes are configured from DB-backed runtime settings.
 - Sidebar ordering keeps `My Approvals` and `Responsibility Chart` before dynamic `Sreni` menu groups for faster access.
+- Each Sreni now includes an `Analytics Studio` child menu (separate from existing `Reports`) with three tabs: `Detailed Reports`, `Pivot Studio`, and `Graph Studio`, covering contacts, events, and attendance data with advanced filtering, column customization, pivot dimensions/aggregations, and expanded chart options (line, bar, area, composed, pie, radar).
+- Analytics Studio controls follow the shared admin design system: switch-toggle for binary options and button-style selectors for multi-select controls.
 - Approval workflow stage design now uses a visual node canvas (drag nodes, connect parent-child edges, mini-map, zoom controls, auto-layout) while staying compatible with existing stage fields.
 - Approval workflow stages are now authored against Role Definitions (multi-select per stage) so approval design is role-driven instead of person-driven.
 - Approval Workflows list now includes a Coverage check action that validates whether each stage has enough eligible role-based approvers.

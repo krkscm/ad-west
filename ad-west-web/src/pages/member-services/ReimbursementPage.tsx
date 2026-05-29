@@ -3,6 +3,7 @@ import { backendApi, ReimbursementApi, ReimbursementCategory, ReimbursementStatu
 import { useAuth } from '../../context/auth-context'
 import { useToast } from '../../components/common/Toast'
 import { SwitchToggle } from '../../components/common/SwitchToggle'
+import { useConfirm } from '../../components/common/ConfirmDialog'
 import { FileUploadZone } from '../../components/common/FileUploadZone'
 
 const CATEGORY_LABELS: Record<ReimbursementCategory, string> = {
@@ -40,6 +41,7 @@ const ALLOWED_RECEIPT_EXT = ['.jpg', '.jpeg', '.png', '.pdf']
 export function ReimbursementPage() {
   const { adminUser } = useAuth()
   const { addToast } = useToast()
+  const confirm = useConfirm()
   const isSuperAdmin = adminUser?.roles?.some((r: any) => r.role === 'SUPER_ADMIN') ?? false
 
   const [items, setItems] = useState<ReimbursementApi[]>([])
@@ -119,7 +121,8 @@ export function ReimbursementPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this reimbursement request?')) return
+    const ok = await confirm({ title: 'Delete Request', message: 'Delete this reimbursement request? This cannot be undone.', confirmLabel: 'Delete', danger: true })
+    if (!ok) return
     try {
       await backendApi.deleteReimbursement(id)
       setItems((prev) => prev.filter((r) => r.id !== id))

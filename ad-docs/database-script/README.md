@@ -46,6 +46,7 @@ This folder contains executable PostgreSQL scripts for ADWest.
 36. 041_google_integration_config.sql (Adds DB-backed Google OAuth/Gmail configuration and settings menu key)
 37. 042_drop_audit_fks.sql (Drops selected member-services audit FK constraints for mixed persistence/runtime compatibility)
 38. 043_report_metric_target.sql (Adds target column for report metric definitions)
+39. 044_sreni_analytics_menu.sql (Backfills Analytics Studio child menu for all existing Srenis)
 
 ## Enum Visibility Note
 - API now serves only supported active enum domains to the UI, even if legacy rows still exist in `adwest.enum_values`.
@@ -107,5 +108,6 @@ psql "$env:DATABASE_URL" -f "ad-docs/database-script/040_member_services.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/041_google_integration_config.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/042_drop_audit_fks.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/043_report_metric_target.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/044_sreni_analytics_menu.sql"
 ```
 
