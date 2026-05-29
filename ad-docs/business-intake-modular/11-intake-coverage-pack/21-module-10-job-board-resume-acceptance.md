@@ -1,5 +1,11 @@
 # Module 10 Acceptance Baseline: Job Board and Resume
 
+## Status
+- Deprecated and removed from active API/UI runtime in the current phase.
+- DB decommission migration added: `037_remove_deprecated_jobs_resumes_and_enum_values.sql`.
+- Backend runtime internals and persistence test coverage for jobs/resumes were removed from Core Business service and spec to complete decommissioning.
+- Deprecated job/resume and profile edit-request DTO classes were removed from `core-business.dto.ts` to harden contract surface.
+
 ## In-Scope Capabilities
 - Admin job listing creation and status lifecycle (draft, active, archived).
 - Member-facing active job listing visibility.

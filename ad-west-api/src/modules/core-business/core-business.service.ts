@@ -18,14 +18,11 @@ import {
   CreateContactDto,
   CreateDocumentDto,
   CreateDocumentFolderDto,
-  CreateEditRequestDto,
-  CreateJobListingDto,
   CreateApprovalWorkflowDto,
   CreateProgramDto,
   CreateReportSubmissionDto,
   CreateReportTemplateDto,
   CreateRegistrationDto,
-  ExpressJobInterestDto,
   CreateGovernanceAssignmentDto,
   CreateGovernanceStructureDto,
   CreateSessionDto,
@@ -44,13 +41,10 @@ import {
   ReviewApprovalItemDto,
   ResubmitApprovalItemDto,
   ReviewReportSubmissionDto,
-  ReviewEditRequestDto,
   StartImportDto,
   SubmitApprovalItemDto,
   UpsertContactSrenyMetadataDto,
-  UploadResumeDto,
   UpdateContactDto,
-  UpdateJobListingStatusDto,
   UpdateProgramDto,
   UpdateGovernanceAssignmentDto,
   UpdateGovernanceStructureDto,
@@ -246,10 +240,6 @@ interface CoreBusinessRuntimeSnapshot {
   documents: DocumentRecord[];
   reportTemplates: ReportTemplateRecord[];
   reportSubmissions: ReportSubmissionRecord[];
-  jobListings: JobListingRecord[];
-  jobInterests: JobInterestRecord[];
-  resumes: ResumeRecord[];
-  resumeAccessAudit: ResumeAccessAuditRecord[];
   approvalWorkflows: ApprovalWorkflowRecord[];
   approvalItems: ApprovalItemRecord[];
   approvalNotifications: ApprovalNotificationRecord[];
@@ -407,57 +397,10 @@ export interface ReportSubmissionRecord {
   updatedAt: string;
 }
 
-export interface JobListingRecord {
-  id: string;
-  srenyId: string;
-  title: string;
-  organization: string;
-  location: string;
-  jobType: 'full_time' | 'part_time' | 'contract' | 'volunteer';
-  description: string;
-  skills: string[];
-  experienceLevel?: string;
-  applicationDeadline: string;
-  applyEmail: string;
-  status: 'draft' | 'active' | 'archived';
-  createdBy: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface JobInterestRecord {
-  id: string;
-  jobId: string;
-  contactId: string;
-  note?: string;
-  createdAt: string;
-}
-
-export interface ResumeRecord {
-  id: string;
-  contactId: string;
-  fileName: string;
-  fileType: string;
-  summary?: string;
-  skills: string[];
-  active: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ResumeAccessAuditRecord {
-  id: string;
-  resumeId: string;
-  contactId: string;
-  accessedBy: string;
-  searchTerm?: string;
-  accessedAt: string;
-}
-
 export interface ApprovalWorkflowRecord {
   id: string;
   name: string;
-  targetType: 'document_submission' | 'report_submission' | 'member_edit_request' | 'job_listing';
+  targetType: 'document_submission' | 'report_submission';
   mode: 'single' | 'sequential' | 'parallel_any';
   steps: string[];
   escalationHours?: number;
@@ -748,10 +691,6 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   private readonly documents = new Map<string, DocumentRecord>();
   private readonly reportTemplates = new Map<string, ReportTemplateRecord>();
   private readonly reportSubmissions = new Map<string, ReportSubmissionRecord>();
-  private readonly jobListings = new Map<string, JobListingRecord>();
-  private readonly jobInterests = new Map<string, JobInterestRecord>();
-  private readonly resumes = new Map<string, ResumeRecord>();
-  private readonly resumeAccessAudit = new Map<string, ResumeAccessAuditRecord>();
   /** Keyed by `${sreniId}:${rowId}` for flat iteration; grouped by sreniId for queries */
   private readonly sreniContacts = new Map<string, SreniContactRecord>();
   private readonly approvalWorkflows = new Map<string, ApprovalWorkflowRecord>();
@@ -900,24 +839,6 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
       updatedAt: now,
     });
 
-    const jobId = this.newId('job');
-    this.jobListings.set(jobId, {
-      id: jobId,
-      srenyId,
-      title: 'Community Event Coordinator',
-      organization: 'ADWest Community',
-      location: 'Dubai',
-      jobType: 'contract',
-      description: 'Coordinate event logistics and volunteer schedules.',
-      skills: ['coordination', 'communication'],
-      experienceLevel: 'mid',
-      applicationDeadline: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(),
-      applyEmail: 'jobs@adwest.local',
-      status: 'active',
-      createdBy: contactId,
-      createdAt: now,
-      updatedAt: now,
-    });
   }
 
   async onModuleInit(): Promise<void> {
@@ -2581,7 +2502,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   }
 
   createEditRequest(
-    dto: CreateEditRequestDto,
+    dto: { field: string; currentValue: string; requestedValue: string },
     principal: AuthPrincipal,
   ): EditRequestRecord {
     const profile = this.getMyProfile(principal);
@@ -2639,7 +2560,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   approveEditRequest(
     requestId: string,
     principal: AuthPrincipal,
-    dto?: ReviewEditRequestDto,
+    dto?: { note?: string },
   ): EditRequestRecord {
     const request = this.findEditRequest(requestId);
     if (request.status !== 'pending') {
@@ -2659,7 +2580,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   rejectEditRequest(
     requestId: string,
     principal: AuthPrincipal,
-    dto?: ReviewEditRequestDto,
+    dto?: { note?: string },
   ): EditRequestRecord {
     const request = this.findEditRequest(requestId);
     if (request.status !== 'pending') {
@@ -2785,146 +2706,6 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.documentReportRuntimeService;
   }
 
-  listJobListings(status?: string): JobListingRecord[] {
-    const rows = Array.from(this.jobListings.values());
-    const filtered = status ? rows.filter((item) => item.status === status) : rows;
-    return this.markExpiredJobs(filtered).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  }
-
-  listPublicJobListings(): JobListingRecord[] {
-    return this.listJobListings('active');
-  }
-
-  createJobListing(dto: CreateJobListingDto, principal: AuthPrincipal): JobListingRecord {
-    this.findSreny(dto.srenyId);
-    const now = new Date().toISOString();
-    const listing: JobListingRecord = {
-      id: this.newId('job'),
-      srenyId: dto.srenyId,
-      title: dto.title.trim(),
-      organization: dto.organization.trim(),
-      location: dto.location.trim(),
-      jobType: dto.jobType,
-      description: dto.description.trim(),
-      skills: dto.skills.map((item) => item.trim()).filter((item) => item.length > 0),
-      experienceLevel: dto.experienceLevel,
-      applicationDeadline: dto.applicationDeadline,
-      applyEmail: dto.applyEmail,
-      status: 'draft',
-      createdBy: principal.userId,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    this.jobListings.set(listing.id, listing);
-    this.scheduleJobListingStatePersistence(listing.id);
-    return listing;
-  }
-
-  updateJobListingStatus(jobId: string, dto: UpdateJobListingStatusDto): JobListingRecord {
-    const listing = this.findJobListing(jobId);
-    listing.status = dto.status;
-    listing.updatedAt = new Date().toISOString();
-    this.jobListings.set(listing.id, listing);
-    this.scheduleJobListingStatePersistence(listing.id);
-    return listing;
-  }
-
-  expressJobInterest(
-    jobId: string,
-    dto: ExpressJobInterestDto,
-    principal: AuthPrincipal,
-  ): JobInterestRecord {
-    const listing = this.findJobListing(jobId);
-    if (listing.status !== 'active') {
-      throw new BadRequestException('Only active jobs accept interest submissions');
-    }
-
-    const record: JobInterestRecord = {
-      id: this.newId('jit'),
-      jobId,
-      contactId: principal.userId,
-      note: dto.note,
-      createdAt: new Date().toISOString(),
-    };
-
-    this.jobInterests.set(record.id, record);
-    this.scheduleJobInterestStatePersistence(record.id);
-    return record;
-  }
-
-  uploadResume(dto: UploadResumeDto, principal: AuthPrincipal): ResumeRecord {
-    for (const [id, item] of this.resumes.entries()) {
-      if (item.contactId === principal.userId && item.active) {
-        const archived = {
-          ...item,
-          active: false,
-          updatedAt: new Date().toISOString(),
-        };
-        this.resumes.set(id, archived);
-        this.scheduleResumeStatePersistence(id);
-      }
-    }
-
-    const now = new Date().toISOString();
-    const resume: ResumeRecord = {
-      id: this.newId('res'),
-      contactId: principal.userId,
-      fileName: dto.fileName.trim(),
-      fileType: dto.fileType.trim().toLowerCase(),
-      summary: dto.summary,
-      skills: (dto.skills ?? []).map((item) => item.trim()).filter((item) => item.length > 0),
-      active: true,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    this.resumes.set(resume.id, resume);
-    this.scheduleResumeStatePersistence(resume.id);
-    return resume;
-  }
-
-  listMyResumes(principal: AuthPrincipal): ResumeRecord[] {
-    return Array.from(this.resumes.values())
-      .filter((item) => item.contactId === principal.userId)
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  }
-
-  listResumes(search: string | undefined, principal: AuthPrincipal): ResumeRecord[] {
-    let rows = Array.from(this.resumes.values());
-    if (search) {
-      const term = search.trim().toLowerCase();
-      rows = rows.filter((item) =>
-        [item.fileName, item.summary ?? '', item.skills.join(' ')]
-          .join(' ')
-          .toLowerCase()
-          .includes(term),
-      );
-    }
-
-    const normalizedSearch = search?.trim();
-    const now = new Date().toISOString();
-    for (const row of rows) {
-      const auditId = this.newId('rlog');
-      this.resumeAccessAudit.set(auditId, {
-        id: auditId,
-        resumeId: row.id,
-        contactId: row.contactId,
-        accessedBy: principal.userId,
-        searchTerm: normalizedSearch || undefined,
-        accessedAt: now,
-      });
-    }
-
-    return rows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  }
-
-  listResumeAccessAuditLogs(contactId?: string): ResumeAccessAuditRecord[] {
-    const rows = Array.from(this.resumeAccessAudit.values());
-    const filtered = contactId ? rows.filter((item) => item.contactId === contactId) : rows;
-    return filtered.sort((a, b) => b.accessedAt.localeCompare(a.accessedAt));
-  }
-
   listApprovalWorkflows(): ApprovalWorkflowRecord[] {
     return Array.from(this.approvalWorkflows.values());
   }
@@ -3024,20 +2805,6 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
       });
     }
     return this.approvalRuntimeService;
-  }
-
-  private markExpiredJobs(rows: JobListingRecord[]): JobListingRecord[] {
-    const now = Date.now();
-    for (const row of rows) {
-      if (row.status === 'active' && Date.parse(row.applicationDeadline) < now) {
-        row.status = 'archived';
-        row.updatedAt = new Date().toISOString();
-        this.jobListings.set(row.id, row);
-        this.scheduleJobListingStatePersistence(row.id);
-      }
-    }
-
-    return rows;
   }
 
   private findZone(zoneId: string): ZoneRecord {
@@ -3162,14 +2929,6 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
       throw new NotFoundException('Report submission not found');
     }
     return submission;
-  }
-
-  private findJobListing(jobId: string): JobListingRecord {
-    const listing = this.jobListings.get(jobId);
-    if (!listing) {
-      throw new NotFoundException('Job listing not found');
-    }
-    return listing;
   }
 
   private findApprovalWorkflow(workflowId: string): ApprovalWorkflowRecord {
@@ -3545,10 +3304,6 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
       documents: Array.from(this.documents.values()),
       reportTemplates: Array.from(this.reportTemplates.values()),
       reportSubmissions: Array.from(this.reportSubmissions.values()),
-      jobListings: Array.from(this.jobListings.values()),
-      jobInterests: Array.from(this.jobInterests.values()),
-      resumes: Array.from(this.resumes.values()),
-      resumeAccessAudit: Array.from(this.resumeAccessAudit.values()),
       approvalWorkflows: Array.from(this.approvalWorkflows.values()),
       approvalItems: Array.from(this.approvalItems.values()),
       approvalNotifications: Array.from(this.approvalNotifications.values()),
@@ -3584,10 +3339,6 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     this.loadMap(this.documents, parsed.documents);
     this.loadMap(this.reportTemplates, parsed.reportTemplates);
     this.loadMap(this.reportSubmissions, parsed.reportSubmissions);
-    this.loadMap(this.jobListings, parsed.jobListings);
-    this.loadMap(this.jobInterests, parsed.jobInterests);
-    this.loadMap(this.resumes, parsed.resumes);
-    this.loadMap(this.resumeAccessAudit, parsed.resumeAccessAudit);
     this.loadMap(this.approvalWorkflows, parsed.approvalWorkflows);
     this.loadMap(this.approvalItems, parsed.approvalItems);
     this.loadMap(this.approvalNotifications, parsed.approvalNotifications);
@@ -3620,9 +3371,6 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
       reportTemplateRows,
       reportTemplateFieldRows,
       reportSubmissionRows,
-      jobListingRows,
-      jobInterestRows,
-      resumeRows,
       approvalWorkflowRows,
       approvalWorkflowStepRows,
       approvalItemRows,
@@ -3693,15 +3441,6 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
         'SELECT id, template_id, submitted_by, answers, status, reviewed_by, reviewed_at, review_note, created_at, updated_at FROM adwest.report_submissions ORDER BY created_at ASC',
       ),
       this.dataSource!.query(
-        'SELECT id, sreny_id, title, organization, location, job_type, description, skills, experience_level, application_deadline, apply_email, status, created_by, created_at, updated_at FROM adwest.job_listings ORDER BY created_at ASC',
-      ),
-      this.dataSource!.query(
-        'SELECT id, job_id, contact_id, note, created_at FROM adwest.job_interests ORDER BY created_at ASC',
-      ),
-      this.dataSource!.query(
-        'SELECT id, contact_id, file_name, file_type, summary, skills, active, created_at, updated_at FROM adwest.resumes ORDER BY created_at ASC',
-      ),
-      this.dataSource!.query(
         'SELECT id, name, target_type, mode, escalation_hours, active, created_at, updated_at FROM adwest.approval_workflows ORDER BY created_at ASC',
       ),
       this.dataSource!.query(
@@ -3748,9 +3487,6 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     this.documents.clear();
     this.reportTemplates.clear();
     this.reportSubmissions.clear();
-    this.jobListings.clear();
-    this.jobInterests.clear();
-    this.resumes.clear();
     this.approvalWorkflows.clear();
     this.approvalItems.clear();
     this.permissions.clear();
@@ -4137,82 +3873,6 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
         reviewedBy: row.reviewed_by ?? undefined,
         reviewedAt: row.reviewed_at ? this.toIsoTimestamp(row.reviewed_at) : undefined,
         reviewNote: row.review_note ?? undefined,
-        createdAt: this.toIsoTimestamp(row.created_at),
-        updatedAt: this.toIsoTimestamp(row.updated_at),
-      });
-    }
-
-    for (const row of jobListingRows as Array<{
-      id: string;
-      sreny_id: string;
-      title: string;
-      organization: string;
-      location: string;
-      job_type: JobListingRecord['jobType'];
-      description: string;
-      skills: string[];
-      experience_level?: string | null;
-      application_deadline: string | Date;
-      apply_email: string;
-      status: JobListingRecord['status'];
-      created_by: string;
-      created_at: string | Date;
-      updated_at: string | Date;
-    }>) {
-      this.jobListings.set(row.id, {
-        id: row.id,
-        srenyId: row.sreny_id,
-        title: row.title,
-        organization: row.organization,
-        location: row.location,
-        jobType: row.job_type,
-        description: row.description,
-        skills: Array.isArray(row.skills) ? row.skills.map((item) => String(item)) : [],
-        experienceLevel: row.experience_level ?? undefined,
-        applicationDeadline: this.toIsoTimestamp(row.application_deadline),
-        applyEmail: row.apply_email,
-        status: row.status,
-        createdBy: row.created_by,
-        createdAt: this.toIsoTimestamp(row.created_at),
-        updatedAt: this.toIsoTimestamp(row.updated_at),
-      });
-    }
-
-    for (const row of jobInterestRows as Array<{
-      id: string;
-      job_id: string;
-      contact_id: string;
-      note?: string | null;
-      created_at: string | Date;
-    }>) {
-      this.jobInterests.set(row.id, {
-        id: row.id,
-        jobId: row.job_id,
-        contactId: row.contact_id,
-        note: row.note ?? undefined,
-        createdAt: this.toIsoTimestamp(row.created_at),
-      });
-    }
-
-    for (const row of resumeRows as Array<{
-      id: string;
-      contact_id: string;
-      file_name: string;
-      file_type: string;
-      summary?: string | null;
-      skills: string[];
-      active: boolean;
-      created_at: string | Date;
-      updated_at: string | Date;
-    }>) {
-      this.resumes.set(row.id, {
-        id: row.id,
-        contactId: row.contact_id,
-        fileName: row.file_name,
-        fileType: row.file_type,
-        summary: row.summary ?? undefined,
-        skills: Array.isArray(row.skills) ? row.skills.map((item) => String(item)) : [],
-        active: Boolean(row.active),
         createdAt: this.toIsoTimestamp(row.created_at),
         updatedAt: this.toIsoTimestamp(row.updated_at),
       });
@@ -4796,60 +4456,6 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private scheduleJobListingStatePersistence(jobId: string): void {
-    if (this.runtimeMode !== 'db' || !this.dataSource) {
-      return;
-    }
-
-    const listing = this.jobListings.get(jobId);
-    if (!listing) {
-      return;
-    }
-
-    const snapshot = this.cloneJobListing(listing);
-    void this.persistJobListingState(snapshot).catch((error) => {
-      this.logger.warn(
-        `Failed to persist Core Business job listing ${jobId}: ${(error as Error).message}`,
-      );
-    });
-  }
-
-  private scheduleJobInterestStatePersistence(interestId: string): void {
-    if (this.runtimeMode !== 'db' || !this.dataSource) {
-      return;
-    }
-
-    const interest = this.jobInterests.get(interestId);
-    if (!interest) {
-      return;
-    }
-
-    const snapshot = this.cloneJobInterest(interest);
-    void this.persistJobInterestState(snapshot).catch((error) => {
-      this.logger.warn(
-        `Failed to persist Core Business job interest ${interestId}: ${(error as Error).message}`,
-      );
-    });
-  }
-
-  private scheduleResumeStatePersistence(resumeId: string): void {
-    if (this.runtimeMode !== 'db' || !this.dataSource) {
-      return;
-    }
-
-    const resume = this.resumes.get(resumeId);
-    if (!resume) {
-      return;
-    }
-
-    const snapshot = this.cloneResume(resume);
-    void this.persistResumeState(snapshot).catch((error) => {
-      this.logger.warn(
-        `Failed to persist Core Business resume ${resumeId}: ${(error as Error).message}`,
-      );
-    });
-  }
-
   private scheduleApprovalWorkflowStatePersistence(workflowId: string): void {
     if (this.runtimeMode !== 'db' || !this.dataSource) {
       return;
@@ -4987,133 +4593,6 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
         submission.reviewNote ?? null,
         submission.createdAt,
         submission.updatedAt,
-      ],
-    );
-  }
-
-  private async persistJobListingState(listing: JobListingRecord): Promise<void> {
-    if (!this.dataSource || this.runtimeMode !== 'db') {
-      return;
-    }
-
-    await this.dataSource.query(
-      `
-        INSERT INTO adwest.job_listings (
-          id,
-          sreny_id,
-          title,
-          organization,
-          location,
-          job_type,
-          description,
-          skills,
-          experience_level,
-          application_deadline,
-          apply_email,
-          status,
-          created_by,
-          created_at,
-          updated_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, $14, $15)
-        ON CONFLICT (id) DO UPDATE SET
-          sreny_id = EXCLUDED.sreny_id,
-          title = EXCLUDED.title,
-          organization = EXCLUDED.organization,
-          location = EXCLUDED.location,
-          job_type = EXCLUDED.job_type,
-          description = EXCLUDED.description,
-          skills = EXCLUDED.skills,
-          experience_level = EXCLUDED.experience_level,
-          application_deadline = EXCLUDED.application_deadline,
-          apply_email = EXCLUDED.apply_email,
-          status = EXCLUDED.status,
-          created_by = EXCLUDED.created_by,
-          updated_at = EXCLUDED.updated_at
-      `,
-      [
-        listing.id,
-        listing.srenyId,
-        listing.title,
-        listing.organization,
-        listing.location,
-        listing.jobType,
-        listing.description,
-        JSON.stringify(listing.skills),
-        listing.experienceLevel ?? null,
-        listing.applicationDeadline,
-        listing.applyEmail,
-        listing.status,
-        listing.createdBy,
-        listing.createdAt,
-        listing.updatedAt,
-      ],
-    );
-  }
-
-  private async persistJobInterestState(record: JobInterestRecord): Promise<void> {
-    if (!this.dataSource || this.runtimeMode !== 'db') {
-      return;
-    }
-
-    await this.dataSource.query(
-      `
-        INSERT INTO adwest.job_interests (
-          id,
-          job_id,
-          contact_id,
-          note,
-          created_at
-        )
-        VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT (id) DO UPDATE SET
-          job_id = EXCLUDED.job_id,
-          contact_id = EXCLUDED.contact_id,
-          note = EXCLUDED.note,
-          created_at = EXCLUDED.created_at
-      `,
-      [record.id, record.jobId, record.contactId, record.note ?? null, record.createdAt],
-    );
-  }
-
-  private async persistResumeState(resume: ResumeRecord): Promise<void> {
-    if (!this.dataSource || this.runtimeMode !== 'db') {
-      return;
-    }
-
-    await this.dataSource.query(
-      `
-        INSERT INTO adwest.resumes (
-          id,
-          contact_id,
-          file_name,
-          file_type,
-          summary,
-          skills,
-          active,
-          created_at,
-          updated_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9)
-        ON CONFLICT (id) DO UPDATE SET
-          contact_id = EXCLUDED.contact_id,
-          file_name = EXCLUDED.file_name,
-          file_type = EXCLUDED.file_type,
-          summary = EXCLUDED.summary,
-          skills = EXCLUDED.skills,
-          active = EXCLUDED.active,
-          updated_at = EXCLUDED.updated_at
-      `,
-      [
-        resume.id,
-        resume.contactId,
-        resume.fileName,
-        resume.fileType,
-        resume.summary ?? null,
-        JSON.stringify(resume.skills),
-        resume.active,
-        resume.createdAt,
-        resume.updatedAt,
       ],
     );
   }
@@ -5572,18 +5051,6 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
 
   private cloneReportSubmission(submission: ReportSubmissionRecord): ReportSubmissionRecord {
     return JSON.parse(JSON.stringify(submission)) as ReportSubmissionRecord;
-  }
-
-  private cloneJobListing(listing: JobListingRecord): JobListingRecord {
-    return JSON.parse(JSON.stringify(listing)) as JobListingRecord;
-  }
-
-  private cloneJobInterest(record: JobInterestRecord): JobInterestRecord {
-    return JSON.parse(JSON.stringify(record)) as JobInterestRecord;
-  }
-
-  private cloneResume(resume: ResumeRecord): ResumeRecord {
-    return JSON.parse(JSON.stringify(resume)) as ResumeRecord;
   }
 
   private cloneApprovalWorkflow(workflow: ApprovalWorkflowRecord): ApprovalWorkflowRecord {

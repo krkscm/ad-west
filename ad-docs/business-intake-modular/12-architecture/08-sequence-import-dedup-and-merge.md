@@ -1,5 +1,8 @@
 # Sequence Diagram: Import, Dedup, and Merge
 
+## Status
+- Deprecated and removed from active API/UI runtime in the current phase.
+
 ## Scope
 Admin flow for contact import, duplicate detection, and merge decision handling.
 

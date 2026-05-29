@@ -35,30 +35,6 @@ function decodeToken(token: string): SessionPayload | null {
   }
 }
 
-function mapContactToMemberProfile(contact: {
-  id: string
-  firstName: string
-  lastName: string
-  email?: string
-  phone?: string
-  zoneId: string
-  address?: string
-}): Contact {
-  return {
-    id: contact.id,
-    zoneId: contact.zoneId,
-    firstName: contact.firstName,
-    lastName: contact.lastName,
-    phonePrimary: contact.phone || '',
-    emailPrimary: contact.email || '',
-    dob: 'N/A',
-    gender: 'N/A',
-    address: contact.address || '',
-    status: 'active',
-    memberships: [],
-  }
-}
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [token, setToken] = useState<string | null>(localStorage.getItem('adwest_token'))
   const [adminUser, setAdminUser] = useState<AdminSessionUser | null>(null)
@@ -122,19 +98,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('adwest_member_token', tokenValue)
     setMemberToken(tokenValue)
 
-    try {
-      const profile = await backendApi.getMemberProfile(tokenValue)
-      if (!profile) {
-        setMemberUser(null)
-        return
-      }
-
-      const mapped = mapContactToMemberProfile(profile)
-      setMemberUser(mapped)
-      localStorage.setItem('adwest_member', JSON.stringify(mapped))
-    } catch {
+    const payload = decodeToken(tokenValue)
+    if (!payload || payload.type !== 'member') {
       setMemberUser(null)
+      return
     }
+
+    const [firstName, ...lastNameParts] = (payload.name ?? 'Member User').trim().split(/\s+/)
+    const mapped: Contact = {
+      id: payload.sub,
+      zoneId: 'unknown-zone',
+      firstName: firstName || 'Member',
+      lastName: lastNameParts.join(' ') || 'User',
+      phonePrimary: '',
+      emailPrimary: payload.email ?? '',
+      dob: 'N/A',
+      gender: 'N/A',
+      address: '',
+      status: 'active',
+      memberships: [],
+    }
+    setMemberUser(mapped)
+    localStorage.setItem('adwest_member', JSON.stringify(mapped))
   }
 
   useEffect(() => {

@@ -280,73 +280,6 @@ export interface PaginatedUsersApi {
   totalPages: number
 }
 
-export interface ProgramApi {
-  id: string
-  title: string
-  startDate: string
-  endDate: string
-  status: 'draft' | 'published' | 'archived'
-}
-
-export interface TicketApi {
-  id: string
-  contactId: string
-  subject: string
-  description: string
-  category: string
-  priority: 'low' | 'medium' | 'high' | 'critical'
-  status: 'new' | 'in_progress' | 'resolved' | 'closed'
-  createdAt: string
-}
-
-export interface HelpdeskMetricsApi {
-  total: number
-  open: number
-  inProgress: number
-  resolved: number
-  closed: number
-  byCategory: Record<string, number>
-}
-
-export interface ImportApi {
-  id: string
-  fileName: string
-  fileType: string
-  status: 'processing' | 'ready_for_review' | 'finalized' | 'failed'
-  acceptedRows: number
-  duplicateRows: number
-  processedRows: number
-  validationErrorRows: number
-  failedReason?: string
-}
-
-export interface ImportReconciliationApi {
-  importId: string
-  status: 'processing' | 'ready_for_review' | 'finalized' | 'failed'
-  totalDuplicates: number
-  pendingDuplicates: number
-  mergedDuplicates: number
-  skippedDuplicates: number
-  canFinalize: boolean
-  issues: string[]
-}
-
-export interface DuplicateCandidateApi {
-  id: string
-  leftContactId: string
-  rightContactId: string
-  decision: 'pending' | 'merged' | 'skipped'
-}
-
-export interface TicketActivityApi {
-  id: string
-  ticketId: string
-  action: 'created' | 'assigned' | 'status_updated' | 'comment_added'
-  actorId: string
-  details?: Record<string, string>
-  createdAt: string
-}
-
 export interface CoreBusinessPersistenceReadinessApi {
   coreBusinessStore: 'in-memory' | 'db'
   authStoreMode: 'db' | 'in-memory'
@@ -354,29 +287,6 @@ export interface CoreBusinessPersistenceReadinessApi {
   readyForUat: boolean
   blockers: string[]
   nextSteps: string[]
-}
-
-export interface MemberEditRequestApi {
-  id: string
-  memberId: string
-  contactId?: string
-  memberName?: string
-  field: string
-  currentValue: string
-  requestedValue: string
-  status: 'pending' | 'approved' | 'rejected'
-  createdAt: string
-  reviewedBy?: string
-  reviewedAt?: string
-  reviewNote?: string
-}
-
-export interface AttendanceReportApi {
-  total: number
-  present: number
-  absent: number
-  late: number
-  excused: number
 }
 
 export interface DocumentFolderApi {
@@ -431,44 +341,10 @@ export interface ReportSubmissionApi {
   reviewNote?: string
 }
 
-export interface JobListingApi {
-  id: string
-  srenyId: string
-  title: string
-  organization: string
-  location: string
-  jobType: 'full_time' | 'part_time' | 'contract' | 'volunteer'
-  description: string
-  skills: string[]
-  applyBy?: string
-  status: 'draft' | 'active' | 'archived'
-  createdBy: string
-  createdAt: string
-}
-
-export interface JobInterestApi {
-  id: string
-  jobId: string
-  memberId: string
-  note?: string
-  createdAt: string
-}
-
-export interface ResumeApi {
-  id: string
-  memberId: string
-  fileName: string
-  fileType: string
-  summary?: string
-  skills: string[]
-  active: boolean
-  createdAt: string
-}
-
 export interface ApprovalWorkflowApi {
   id: string
   name: string
-  targetType: 'document_submission' | 'report_submission' | 'member_edit_request' | 'job_listing'
+  targetType: 'document_submission' | 'report_submission'
   steps: string[]
   createdAt: string
 }
@@ -822,78 +698,8 @@ export const backendApi = {
   listSrenies: (zoneId?: string) =>
     api.get<SrenyApi[]>(`/org/srenies${zoneId ? `?zoneId=${encodeURIComponent(zoneId)}` : ''}`),
 
-  upsertContactSrenyMetadata: (
-    contactId: string,
-    srenyId: string,
-    metadata: Record<string, string>,
-  ) => api.patch<ContactApi>(`/contacts/${contactId}/srenies/${srenyId}/metadata`, { metadata }),
-
   getCoreBusinessPersistenceReadiness: () =>
     api.get<CoreBusinessPersistenceReadinessApi>('/core/persistence/readiness'),
-
-  listPrograms: () => api.get<ProgramApi[]>('/programs'),
-
-  listHelpdeskTickets: (status?: string, search?: string) => {
-    const params = new URLSearchParams()
-    if (status) params.set('status', status)
-    if (search) params.set('search', search)
-    const query = params.toString()
-    return api.get<TicketApi[]>(`/helpdesk/tickets${query ? `?${query}` : ''}`)
-  },
-
-  getHelpdeskTicketMetrics: () => api.get<HelpdeskMetricsApi>('/helpdesk/tickets/metrics'),
-
-  startContactImport: (payload: { fileName: string; fileType: 'csv' | 'xlsx'; hasHeader: boolean }) =>
-    api.post<ImportApi>('/imports/contacts', payload),
-
-  listImports: (status?: 'processing' | 'ready_for_review' | 'finalized' | 'failed') =>
-    api.get<ImportApi[]>(`/imports${status ? `?status=${encodeURIComponent(status)}` : ''}`),
-
-  listImportDuplicates: (importId: string) =>
-    api.get<DuplicateCandidateApi[]>(`/imports/${importId}/duplicates`),
-
-  getImportReconciliation: (importId: string) =>
-    api.get<ImportReconciliationApi>(`/imports/${importId}/reconciliation`),
-
-  mergeDuplicate: (importId: string, duplicateId: string) =>
-    api.post<{ success: boolean }>(`/imports/${importId}/duplicates/${duplicateId}/merge`, {}),
-
-  finalizeImport: (importId: string) =>
-    api.post<ImportApi>(`/imports/${importId}/finalize`, {}),
-
-  markImportFailed: (importId: string, reason: string) =>
-    api.post<ImportApi>(`/imports/${importId}/fail`, { reason }),
-
-  listHelpdeskTicketActivity: (ticketId: string) =>
-    api.get<TicketActivityApi[]>(`/helpdesk/tickets/${ticketId}/activity`),
-
-  listAdminEditRequests: (status?: 'pending' | 'approved' | 'rejected') =>
-    api.get<MemberEditRequestApi[]>(`/edit-requests${status ? `?status=${encodeURIComponent(status)}` : ''}`),
-
-  approveAdminEditRequest: (requestId: string, note?: string) =>
-    api.post<MemberEditRequestApi>(`/edit-requests/${requestId}/approve`, note ? { note } : {}),
-
-  rejectAdminEditRequest: (requestId: string, note?: string) =>
-    api.post<MemberEditRequestApi>(`/edit-requests/${requestId}/reject`, note ? { note } : {}),
-
-  createMemberEditRequest: (payload: { field: string; currentValue: string; requestedValue: string }, token: string) =>
-    api.post<MemberEditRequestApi>('/members/me/edit-requests', payload, { token }),
-
-  listMemberEditRequests: (token: string) =>
-    api.get<MemberEditRequestApi[]>('/members/me/edit-requests', { token }),
-
-  getMemberProfile: (token: string) => api.get<ContactApi | null>('/members/me/profile', { token }),
-
-  listMemberPrograms: (token: string) => api.get<ProgramApi[]>('/members/me/programs', { token }),
-
-  listMemberTickets: (token: string) => api.get<TicketApi[]>('/members/me/helpdesk-tickets', { token }),
-
-  createMemberTicket: (
-    payload: { subject: string; description: string; category: string; priority: 'low' | 'medium' | 'high' | 'critical' },
-    token: string,
-  ) => api.post<TicketApi>('/helpdesk/tickets', payload, { token }),
-
-  getAttendanceReport: () => api.get<AttendanceReportApi>('/attendance/reports'),
 
   listDocumentFolders: (srenyId?: string) =>
     api.get<DocumentFolderApi[]>(`/documents/folders${srenyId ? `?srenyId=${encodeURIComponent(srenyId)}` : ''}`),
@@ -963,31 +769,11 @@ export const backendApi = {
   reviewReportSubmission: (submissionId: string, payload: { decision: 'approved' | 'rejected'; note?: string }) =>
     api.post<ReportSubmissionApi>(`/reports/submissions/${submissionId}/review`, payload),
 
-  listJobListings: (status?: string) =>
-    api.get<JobListingApi[]>(`/jobs/listings${status ? `?status=${encodeURIComponent(status)}` : ''}`),
-
-  createJobListing: (payload: {
-    srenyId: string
-    title: string
-    organization: string
-    location: string
-    jobType: 'full_time' | 'part_time' | 'contract' | 'volunteer'
-    description: string
-    skills: string[]
-    applyBy?: string
-  }) => api.post<JobListingApi>('/jobs/listings', payload),
-
-  updateJobListingStatus: (jobId: string, status: 'draft' | 'active' | 'archived') =>
-    api.patch<JobListingApi>(`/jobs/listings/${jobId}/status`, { status }),
-
-  listResumes: (search?: string) =>
-    api.get<ResumeApi[]>(`/jobs/resumes${search ? `?search=${encodeURIComponent(search)}` : ''}`),
-
   listApprovalWorkflows: () => api.get<ApprovalWorkflowApi[]>('/approvals/workflows'),
 
   createApprovalWorkflow: (payload: {
     name: string
-    targetType: 'document_submission' | 'report_submission' | 'member_edit_request' | 'job_listing'
+    targetType: 'document_submission' | 'report_submission'
     steps: string[]
   }) => api.post<ApprovalWorkflowApi>('/approvals/workflows', payload),
 
@@ -995,10 +781,10 @@ export const backendApi = {
     api.get<ApprovalItemApi[]>(`/approvals/items${status ? `?status=${encodeURIComponent(status)}` : ''}`),
 
   listMyApprovalActions: (status?: string) =>
-    api.get<ApprovalItemApi[]>(`/approvals/my-actions${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+    api.get<ApprovalWorkflowRuntimeItemApi[]>(`/settings/approval-workflows/runtime/my-items${status ? `?status=${encodeURIComponent(status)}` : ''}`),
 
-  listMyApprovalNotifications: (itemId?: string) =>
-    api.get<ApprovalNotificationApi[]>(`/approvals/my-notifications${itemId ? `?itemId=${encodeURIComponent(itemId)}` : ''}`),
+  listMyApprovalNotifications: (_itemId?: string) =>
+    api.get<ApprovalNotificationApi[]>('/settings/approval-workflows/runtime/my-notifications'),
 
   submitApprovalItem: (payload: { workflowId: string; targetId: string; summary?: string }) =>
     api.post<ApprovalItemApi>('/approvals/items', payload),
@@ -1008,20 +794,6 @@ export const backendApi = {
 
   resubmitApprovalItem: (itemId: string, payload: { note?: string }) =>
     api.post<ApprovalItemApi>(`/approvals/items/${itemId}/resubmit`, payload),
-
-  listMemberJobs: (token: string) => api.get<JobListingApi[]>('/members/me/jobs', { token }),
-
-  expressMemberJobInterest: (jobId: string, note: string | undefined, token: string) =>
-    api.post<JobInterestApi>(`/members/me/jobs/${jobId}/interest`, note ? { note } : {}, { token }),
-
-  listMemberResumes: (token: string) => api.get<ResumeApi[]>('/members/me/resumes', { token }),
-
-  uploadMemberResume: (payload: {
-    fileName: string
-    fileType: string
-    summary?: string
-    skills?: string[]
-  }, token: string) => api.post<ResumeApi>('/members/me/resumes', payload, { token }),
 
   listMemberReportTemplates: (token: string) => api.get<ReportTemplateApi[]>('/members/me/reports/templates', { token }),
 

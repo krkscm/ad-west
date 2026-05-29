@@ -98,6 +98,19 @@ export class ApprovalWorkflowDefinitionsController {
     return this.service.listRuntimeItems(workflowId, status);
   }
 
+  @Get('runtime/my-items')
+  listMyRuntimeItems(
+    @CurrentUser() principal: AuthPrincipal,
+    @Query('status') status?: 'pending' | 'approved' | 'rejected',
+  ): ApprovalWorkflowRuntimeItem[] {
+    return this.service.listMyRuntimeItems(principal, status);
+  }
+
+  @Get('runtime/my-notifications')
+  listMyRuntimeNotifications(): [] {
+    return [];
+  }
+
   @Get('runtime/items/:itemId')
   getRuntimeItem(@Param('itemId') itemId: string): ApprovalWorkflowRuntimeItem {
     return this.service.getRuntimeItem(itemId);

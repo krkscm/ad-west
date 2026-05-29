@@ -1,5 +1,9 @@
 ﻿# Module 04 Acceptance Baseline: Program and Event Management
 
+## Status
+- Deprecated and removed from active API/UI runtime in the current phase (legacy program/session/registration flow).
+- DB decommission migration added: `035_remove_deprecated_program_session_registration_legacy_attendance.sql`.
+
 ## In-Scope Capabilities
 - Program creation per Sreny.
 - Single-day and multi-day scheduling.

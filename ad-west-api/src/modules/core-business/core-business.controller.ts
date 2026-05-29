@@ -24,22 +24,14 @@ import { AuthPrincipal } from '@modules/user-management/interfaces/auth-principa
 import { CoreAdminAuthGuard } from './guards/core-admin-auth.guard';
 import { CoreMemberAuthGuard } from './guards/core-member-auth.guard';
 import {
-  AddMembershipDto,
-  BulkAttendanceUploadDto,
-  CreateContactDto,
   CreateDocumentDto,
   CreateDocumentFolderDto,
-  CreateEditRequestDto,
-  CreateJobListingDto,
   CreateApprovalWorkflowDto,
-  CreateProgramDto,
   CreateReportSubmissionDto,
   CreateReportTemplateDto,
-  CreateRegistrationDto,
   CreateGovernanceAssignmentDto,
   CreateGovernanceStructureDto,
   CreateLocationDto,
-  CreateSessionDto,
   CreateSrenyDto,
   CreatePermissionDto,
   UpdatePermissionDto,
@@ -53,35 +45,20 @@ import {
   CreateUserDto,
   UpdateUserDto,
   CreateSthanDto,
-  CreateTicketCommentDto,
-  CreateTicketDto,
   CreateZoneDto,
-  ExpressJobInterestDto,
-  RecordAttendanceDto,
   ReviewApprovalItemDto,
   ResubmitApprovalItemDto,
   ReviewReportSubmissionDto,
-  ReviewEditRequestDto,
-  MarkImportFailedDto,
-  StartImportDto,
   SubmitApprovalItemDto,
-  UpsertContactSrenyMetadataDto,
-  UploadResumeDto,
-  UpdateContactDto,
-  UpdateJobListingStatusDto,
-  UpdateProgramDto,
   UpdateGovernanceAssignmentDto,
   UpdateGovernanceStructureDto,
   UpdateLocationDto,
-  UpdateSessionDto,
   UpdateSrenyDto,
   UpdateSreniDefinitionDto,
   UpdateCalendarEventDto,
   UpdateAttendanceMetricDto,
   UpsertEventAttendanceCaptureDto,
   UpdateSthanDto,
-  UpdateTicketAssigneeDto,
-  UpdateTicketStatusDto,
   UpdateZoneDto,
   CreateReportMetricDefinitionDto,
   UpdateReportMetricDefinitionDto,
@@ -438,289 +415,6 @@ export class CoreBusinessController {
     return this.service.updateSthan(sthanId, dto);
   }
 
-  @Get('contacts')
-  @UseGuards(CoreAdminAuthGuard)
-  listContacts(@Query('search') search?: string) {
-    return this.service.listContacts(search);
-  }
-
-  @Post('contacts')
-  @UseGuards(CoreAdminAuthGuard)
-  createContact(@Body() dto: CreateContactDto) {
-    return this.service.createContact(dto);
-  }
-
-  @Get('contacts/:contactId')
-  @UseGuards(CoreAdminAuthGuard)
-  getContact(@Param('contactId') contactId: string) {
-    return this.service.getContact(contactId);
-  }
-
-  @Patch('contacts/:contactId')
-  @UseGuards(CoreAdminAuthGuard)
-  updateContact(@Param('contactId') contactId: string, @Body() dto: UpdateContactDto) {
-    return this.service.updateContact(contactId, dto);
-  }
-
-  @Delete('contacts/:contactId')
-  @UseGuards(CoreAdminAuthGuard)
-  deleteContact(@Param('contactId') contactId: string) {
-    return this.service.softDeleteContact(contactId);
-  }
-
-  @Post('contacts/:contactId/memberships')
-  @UseGuards(CoreAdminAuthGuard)
-  addMembership(@Param('contactId') contactId: string, @Body() dto: AddMembershipDto) {
-    return this.service.addMembership(contactId, dto);
-  }
-
-  @Patch('contacts/:contactId/srenies/:srenyId/metadata')
-  @UseGuards(CoreAdminAuthGuard)
-  upsertContactSrenyMetadata(
-    @Param('contactId') contactId: string,
-    @Param('srenyId') srenyId: string,
-    @Body() dto: UpsertContactSrenyMetadataDto,
-  ) {
-    return this.service.upsertContactSrenyMetadata(contactId, srenyId, dto);
-  }
-
-  @Delete('contacts/:contactId/memberships/:membershipId')
-  @UseGuards(CoreAdminAuthGuard)
-  removeMembership(
-    @Param('contactId') contactId: string,
-    @Param('membershipId') membershipId: string,
-  ) {
-    return this.service.removeMembership(contactId, membershipId);
-  }
-
-  @Post('imports/contacts')
-  @UseGuards(CoreAdminAuthGuard)
-  startImport(@Body() dto: StartImportDto) {
-    return this.service.startImport(dto);
-  }
-
-  @Get('imports')
-  @UseGuards(CoreAdminAuthGuard)
-  listImports(@Query('status') status?: string) {
-    return this.service.listImports(status);
-  }
-
-  @Get('imports/:importId')
-  @UseGuards(CoreAdminAuthGuard)
-  getImport(@Param('importId') importId: string) {
-    return this.service.getImport(importId);
-  }
-
-  @Get('imports/:importId/duplicates')
-  @UseGuards(CoreAdminAuthGuard)
-  getImportDuplicates(@Param('importId') importId: string) {
-    return this.service.listImportDuplicates(importId);
-  }
-
-  @Get('imports/:importId/reconciliation')
-  @UseGuards(CoreAdminAuthGuard)
-  getImportReconciliation(@Param('importId') importId: string) {
-    return this.service.getImportReconciliation(importId);
-  }
-
-  @Post('imports/:importId/duplicates/:duplicateId/merge')
-  @UseGuards(CoreAdminAuthGuard)
-  async mergeDuplicate(
-    @Param('importId') importId: string,
-    @Param('duplicateId') duplicateId: string,
-  ) {
-    return this.service.mergeDuplicate(importId, duplicateId);
-  }
-
-  @Post('imports/:importId/duplicates/:duplicateId/skip')
-  @UseGuards(CoreAdminAuthGuard)
-  skipDuplicate(
-    @Param('importId') importId: string,
-    @Param('duplicateId') duplicateId: string,
-  ) {
-    return this.service.skipDuplicate(importId, duplicateId);
-  }
-
-  @Post('imports/:importId/finalize')
-  @UseGuards(CoreAdminAuthGuard)
-  async finalizeImport(@Param('importId') importId: string) {
-    return this.service.finalizeImport(importId);
-  }
-
-  @Post('imports/:importId/fail')
-  @UseGuards(CoreAdminAuthGuard)
-  markImportFailed(@Param('importId') importId: string, @Body() dto: MarkImportFailedDto) {
-    return this.service.markImportFailed(importId, dto.reason);
-  }
-
-  @Get('programs')
-  @UseGuards(CoreAdminAuthGuard)
-  listPrograms() {
-    return this.service.listPrograms();
-  }
-
-  @Post('programs')
-  @UseGuards(CoreAdminAuthGuard)
-  createProgram(@Body() dto: CreateProgramDto) {
-    return this.service.createProgram(dto);
-  }
-
-  @Get('programs/:programId')
-  @UseGuards(CoreAdminAuthGuard)
-  getProgram(@Param('programId') programId: string) {
-    return this.service.getProgram(programId);
-  }
-
-  @Patch('programs/:programId')
-  @UseGuards(CoreAdminAuthGuard)
-  updateProgram(@Param('programId') programId: string, @Body() dto: UpdateProgramDto) {
-    return this.service.updateProgram(programId, dto);
-  }
-
-  @Post('programs/:programId/publish')
-  @UseGuards(CoreAdminAuthGuard)
-  publishProgram(@Param('programId') programId: string) {
-    return this.service.publishProgram(programId);
-  }
-
-  @Post('programs/:programId/archive')
-  @UseGuards(CoreAdminAuthGuard)
-  archiveProgram(@Param('programId') programId: string) {
-    return this.service.archiveProgram(programId);
-  }
-
-  @Post('programs/:programId/sessions')
-  @UseGuards(CoreAdminAuthGuard)
-  createSession(@Param('programId') programId: string, @Body() dto: CreateSessionDto) {
-    return this.service.createSession(programId, dto);
-  }
-
-  @Patch('programs/:programId/sessions/:sessionId')
-  @UseGuards(CoreAdminAuthGuard)
-  updateSession(
-    @Param('programId') programId: string,
-    @Param('sessionId') sessionId: string,
-    @Body() dto: UpdateSessionDto,
-  ) {
-    return this.service.updateSession(programId, sessionId, dto);
-  }
-
-  @Post('programs/:programId/registrations')
-  @UseGuards(CoreAdminAuthGuard)
-  createRegistration(@Param('programId') programId: string, @Body() dto: CreateRegistrationDto) {
-    return this.service.createRegistration(programId, dto);
-  }
-
-  @Delete('programs/:programId/registrations/:registrationId')
-  @UseGuards(CoreAdminAuthGuard)
-  cancelRegistration(
-    @Param('programId') programId: string,
-    @Param('registrationId') registrationId: string,
-  ) {
-    return this.service.cancelRegistration(programId, registrationId);
-  }
-
-  @Post('attendance/sessions/:sessionId/records')
-  @UseGuards(CoreAdminAuthGuard)
-  recordAttendance(
-    @Param('sessionId') sessionId: string,
-    @Body() dto: RecordAttendanceDto,
-    @CurrentUser() principal: AuthPrincipal,
-  ) {
-    return this.service.recordAttendance(sessionId, dto, principal);
-  }
-
-  @Post('attendance/sessions/:sessionId/bulk-upload')
-  @UseGuards(CoreAdminAuthGuard)
-  bulkUploadAttendance(
-    @Param('sessionId') sessionId: string,
-    @Body() dto: BulkAttendanceUploadDto,
-  ) {
-    return this.service.bulkUploadAttendance(sessionId, dto);
-  }
-
-  @Get('attendance/sessions/:sessionId')
-  @UseGuards(CoreAdminAuthGuard)
-  getSessionAttendance(@Param('sessionId') sessionId: string) {
-    return this.service.getSessionAttendance(sessionId);
-  }
-
-  @Get('attendance/reports')
-  @UseGuards(CoreAdminAuthGuard)
-  getAttendanceReport(@Query('sessionId') sessionId?: string) {
-    return this.service.getAttendanceReport(sessionId);
-  }
-
-  @Get('attendance/reports/export')
-  @UseGuards(CoreAdminAuthGuard)
-  exportAttendanceReport(@Query('sessionId') sessionId?: string) {
-    return this.service.exportAttendanceReport(sessionId);
-  }
-
-  @Post('helpdesk/tickets')
-  @UseGuards(CoreMemberAuthGuard)
-  createTicket(@Body() dto: CreateTicketDto, @CurrentUser() principal: AuthPrincipal) {
-    return this.service.createTicket(dto, principal);
-  }
-
-  @Get('helpdesk/tickets')
-  @UseGuards(CoreAdminAuthGuard)
-  listTickets(@Query('status') status?: string, @Query('search') search?: string) {
-    return this.service.listTickets(status, search);
-  }
-
-  @Get('helpdesk/tickets/metrics')
-  @UseGuards(CoreAdminAuthGuard)
-  getTicketMetrics() {
-    return this.service.getTicketMetrics();
-  }
-
-  @Get('helpdesk/tickets/my')
-  @UseGuards(CoreMemberAuthGuard)
-  listMyTickets(@CurrentUser() principal: AuthPrincipal) {
-    return this.service.listMyTickets(principal);
-  }
-
-  @Get('helpdesk/tickets/:ticketId')
-  @UseGuards(CoreAdminAuthGuard)
-  getTicket(@Param('ticketId') ticketId: string) {
-    return this.service.getTicket(ticketId);
-  }
-
-  @Get('helpdesk/tickets/:ticketId/activity')
-  @UseGuards(CoreAdminAuthGuard)
-  listTicketActivity(@Param('ticketId') ticketId: string) {
-    return this.service.listTicketActivity(ticketId);
-  }
-
-  @Patch('helpdesk/tickets/:ticketId/status')
-  @UseGuards(CoreAdminAuthGuard)
-  updateTicketStatus(
-    @Param('ticketId') ticketId: string,
-    @Body() dto: UpdateTicketStatusDto,
-  ) {
-    return this.service.updateTicketStatus(ticketId, dto);
-  }
-
-  @Patch('helpdesk/tickets/:ticketId/assignee')
-  @UseGuards(CoreAdminAuthGuard)
-  updateTicketAssignee(
-    @Param('ticketId') ticketId: string,
-    @Body() dto: UpdateTicketAssigneeDto,
-  ) {
-    return this.service.updateTicketAssignee(ticketId, dto);
-  }
-
-  @Post('helpdesk/tickets/:ticketId/comments')
-  @UseGuards(CoreAdminAuthGuard)
-  addTicketComment(
-    @Param('ticketId') ticketId: string,
-    @Body() dto: CreateTicketCommentDto,
-    @CurrentUser() principal: AuthPrincipal,
-  ) {
-    return this.service.addTicketComment(ticketId, dto, principal);
-  }
-
   @Get('documents/folders')
   @UseGuards(CoreAdminAuthGuard)
   listDocumentFolders(@Query('srenyId') srenyId?: string) {
@@ -833,36 +527,6 @@ export class CoreBusinessController {
     return this.service.reviewReportSubmission(submissionId, dto, principal);
   }
 
-  @Get('jobs/listings')
-  @UseGuards(CoreAdminAuthGuard)
-  listJobListings(@Query('status') status?: string) {
-    return this.service.listJobListings(status);
-  }
-
-  @Post('jobs/listings')
-  @UseGuards(CoreAdminAuthGuard)
-  createJobListing(@Body() dto: CreateJobListingDto, @CurrentUser() principal: AuthPrincipal) {
-    return this.service.createJobListing(dto, principal);
-  }
-
-  @Patch('jobs/listings/:jobId/status')
-  @UseGuards(CoreAdminAuthGuard)
-  updateJobListingStatus(@Param('jobId') jobId: string, @Body() dto: UpdateJobListingStatusDto) {
-    return this.service.updateJobListingStatus(jobId, dto);
-  }
-
-  @Get('jobs/resumes')
-  @UseGuards(CoreAdminAuthGuard)
-  listResumes(@Query('search') search: string | undefined, @CurrentUser() principal: AuthPrincipal) {
-    return this.service.listResumes(search, principal);
-  }
-
-  @Get('jobs/resume-access-logs')
-  @UseGuards(CoreAdminAuthGuard)
-  listResumeAccessAuditLogs(@Query('contactId') contactId?: string) {
-    return this.service.listResumeAccessAuditLogs(contactId);
-  }
-
   @Get('approvals/workflows')
   @UseGuards(CoreAdminAuthGuard)
   listApprovalWorkflows() {
@@ -923,93 +587,6 @@ export class CoreBusinessController {
     @CurrentUser() principal: AuthPrincipal,
   ) {
     return this.service.resubmitApprovalItem(itemId, dto, principal);
-  }
-
-  @Get('edit-requests')
-  @UseGuards(CoreAdminAuthGuard)
-  listEditRequests(@Query('status') status?: string) {
-    return this.service.listEditRequests(status);
-  }
-
-  @Post('edit-requests/:requestId/approve')
-  @UseGuards(CoreAdminAuthGuard)
-  approveEditRequest(
-    @Param('requestId') requestId: string,
-    @Body() dto: ReviewEditRequestDto,
-    @CurrentUser() principal: AuthPrincipal,
-  ) {
-    return this.service.approveEditRequest(requestId, principal, dto);
-  }
-
-  @Post('edit-requests/:requestId/reject')
-  @UseGuards(CoreAdminAuthGuard)
-  rejectEditRequest(
-    @Param('requestId') requestId: string,
-    @Body() dto: ReviewEditRequestDto,
-    @CurrentUser() principal: AuthPrincipal,
-  ) {
-    return this.service.rejectEditRequest(requestId, principal, dto);
-  }
-
-  @Get('members/me/profile')
-  @UseGuards(CoreMemberAuthGuard)
-  getMyProfile(@CurrentUser() principal: AuthPrincipal) {
-    return this.service.getMyProfile(principal);
-  }
-
-  @Post('members/me/edit-requests')
-  @UseGuards(CoreMemberAuthGuard)
-  createEditRequest(
-    @Body() dto: CreateEditRequestDto,
-    @CurrentUser() principal: AuthPrincipal,
-  ) {
-    return this.service.createEditRequest(dto, principal);
-  }
-
-  @Get('members/me/edit-requests')
-  @UseGuards(CoreMemberAuthGuard)
-  listMyEditRequests(@CurrentUser() principal: AuthPrincipal) {
-    return this.service.listMyEditRequests(principal);
-  }
-
-  @Get('members/me/programs')
-  @UseGuards(CoreMemberAuthGuard)
-  listMyPrograms(@CurrentUser() principal: AuthPrincipal) {
-    return this.service.listMyPrograms(principal);
-  }
-
-  @Get('members/me/helpdesk-tickets')
-  @UseGuards(CoreMemberAuthGuard)
-  listMyHelpdeskTickets(@CurrentUser() principal: AuthPrincipal) {
-    return this.service.listMyHelpdeskTickets(principal);
-  }
-
-  @Get('members/me/jobs')
-  @UseGuards(CoreMemberAuthGuard)
-  listMyVisibleJobs() {
-    return this.service.listPublicJobListings();
-  }
-
-  @Post('members/me/jobs/:jobId/interest')
-  @UseGuards(CoreMemberAuthGuard)
-  expressJobInterest(
-    @Param('jobId') jobId: string,
-    @Body() dto: ExpressJobInterestDto,
-    @CurrentUser() principal: AuthPrincipal,
-  ) {
-    return this.service.expressJobInterest(jobId, dto, principal);
-  }
-
-  @Get('members/me/resumes')
-  @UseGuards(CoreMemberAuthGuard)
-  listMyResumes(@CurrentUser() principal: AuthPrincipal) {
-    return this.service.listMyResumes(principal);
-  }
-
-  @Post('members/me/resumes')
-  @UseGuards(CoreMemberAuthGuard)
-  uploadResume(@Body() dto: UploadResumeDto, @CurrentUser() principal: AuthPrincipal) {
-    return this.service.uploadResume(dto, principal);
   }
 
   @Get('members/me/reports/templates')

@@ -37,37 +37,11 @@ const SEED_VALUES: Omit<EnumValue, 'id' | 'createdAt' | 'updatedAt'>[] = [
   // Approval target types
   { enumType: 'approval_target_type', value: 'document_submission',  label: 'Document Submission',  sortOrder: 10, active: true },
   { enumType: 'approval_target_type', value: 'report_submission',    label: 'Report Submission',    sortOrder: 20, active: true },
-  { enumType: 'approval_target_type', value: 'member_edit_request',  label: 'Member Edit Request',  sortOrder: 30, active: true },
-  { enumType: 'approval_target_type', value: 'job_listing',          label: 'Job Listing',          sortOrder: 40, active: true },
   // Approval item statuses
   { enumType: 'approval_item_status', value: 'submitted',  label: 'Submitted',  sortOrder: 10, active: true },
   { enumType: 'approval_item_status', value: 'in_review',  label: 'In Review',  sortOrder: 20, active: true },
   { enumType: 'approval_item_status', value: 'approved',   label: 'Approved',   sortOrder: 30, active: true },
   { enumType: 'approval_item_status', value: 'rejected',   label: 'Rejected',   sortOrder: 40, active: true },
-  // Program statuses
-  { enumType: 'program_status', value: 'draft',     label: 'Draft',     sortOrder: 10, active: true },
-  { enumType: 'program_status', value: 'published', label: 'Published', sortOrder: 20, active: true },
-  { enumType: 'program_status', value: 'archived',  label: 'Archived',  sortOrder: 30, active: true },
-  // Attendance states
-  { enumType: 'attendance_state', value: 'present', label: 'Present', sortOrder: 10, active: true },
-  { enumType: 'attendance_state', value: 'absent',  label: 'Absent',  sortOrder: 20, active: true },
-  { enumType: 'attendance_state', value: 'late',    label: 'Late',    sortOrder: 30, active: true },
-  { enumType: 'attendance_state', value: 'excused', label: 'Excused', sortOrder: 40, active: true },
-  // Ticket priorities
-  { enumType: 'ticket_priority', value: 'low',      label: 'Low',      sortOrder: 10, active: true },
-  { enumType: 'ticket_priority', value: 'medium',   label: 'Medium',   sortOrder: 20, active: true },
-  { enumType: 'ticket_priority', value: 'high',     label: 'High',     sortOrder: 30, active: true },
-  { enumType: 'ticket_priority', value: 'critical', label: 'Critical', sortOrder: 40, active: true },
-  // Ticket statuses
-  { enumType: 'ticket_status', value: 'new',         label: 'New',         sortOrder: 10, active: true },
-  { enumType: 'ticket_status', value: 'in_progress', label: 'In Progress', sortOrder: 20, active: true },
-  { enumType: 'ticket_status', value: 'resolved',    label: 'Resolved',    sortOrder: 30, active: true },
-  { enumType: 'ticket_status', value: 'closed',      label: 'Closed',      sortOrder: 40, active: true },
-  // Ticket activity actions
-  { enumType: 'ticket_activity_action', value: 'created',        label: 'Created',        sortOrder: 10, active: true },
-  { enumType: 'ticket_activity_action', value: 'assigned',       label: 'Assigned',       sortOrder: 20, active: true },
-  { enumType: 'ticket_activity_action', value: 'status_updated', label: 'Status Updated', sortOrder: 30, active: true },
-  { enumType: 'ticket_activity_action', value: 'comment_added',  label: 'Comment Added',  sortOrder: 40, active: true },
   // Document access levels
   { enumType: 'document_access_level', value: 'sreny',   label: 'Sreny',   sortOrder: 10, active: true },
   { enumType: 'document_access_level', value: 'zone',    label: 'Zone',    sortOrder: 20, active: true },
@@ -82,36 +56,25 @@ const SEED_VALUES: Omit<EnumValue, 'id' | 'createdAt' | 'updatedAt'>[] = [
   { enumType: 'report_submission_status', value: 'submitted', label: 'Submitted', sortOrder: 10, active: true },
   { enumType: 'report_submission_status', value: 'approved',  label: 'Approved',  sortOrder: 20, active: true },
   { enumType: 'report_submission_status', value: 'rejected',  label: 'Rejected',  sortOrder: 30, active: true },
-  // Job types
-  { enumType: 'job_type', value: 'full_time',  label: 'Full Time',  sortOrder: 10, active: true },
-  { enumType: 'job_type', value: 'part_time',  label: 'Part Time',  sortOrder: 20, active: true },
-  { enumType: 'job_type', value: 'contract',   label: 'Contract',   sortOrder: 30, active: true },
-  { enumType: 'job_type', value: 'volunteer',  label: 'Volunteer',  sortOrder: 40, active: true },
-  // Job listing statuses
-  { enumType: 'job_listing_status', value: 'draft',    label: 'Draft',    sortOrder: 10, active: true },
-  { enumType: 'job_listing_status', value: 'active',   label: 'Active',   sortOrder: 20, active: true },
-  { enumType: 'job_listing_status', value: 'archived', label: 'Archived', sortOrder: 30, active: true },
-  // Member edit request statuses
-  { enumType: 'member_edit_status', value: 'pending',  label: 'Pending',  sortOrder: 10, active: true },
-  { enumType: 'member_edit_status', value: 'approved', label: 'Approved', sortOrder: 20, active: true },
-  { enumType: 'member_edit_status', value: 'rejected', label: 'Rejected', sortOrder: 30, active: true },
-  // Import file types
-  { enumType: 'import_file_type', value: 'csv',  label: 'CSV',   sortOrder: 10, active: true },
-  { enumType: 'import_file_type', value: 'xlsx', label: 'Excel', sortOrder: 20, active: true },
-  // Import statuses
-  { enumType: 'import_status', value: 'processing',       label: 'Processing',       sortOrder: 10, active: true },
-  { enumType: 'import_status', value: 'ready_for_review', label: 'Ready for Review', sortOrder: 20, active: true },
-  { enumType: 'import_status', value: 'finalized',        label: 'Finalized',        sortOrder: 30, active: true },
-  { enumType: 'import_status', value: 'failed',           label: 'Failed',           sortOrder: 40, active: true },
-  // Dedup decisions
-  { enumType: 'dedup_decision', value: 'pending', label: 'Pending', sortOrder: 10, active: true },
-  { enumType: 'dedup_decision', value: 'merged',  label: 'Merged',  sortOrder: 20, active: true },
-  { enumType: 'dedup_decision', value: 'skipped', label: 'Skipped', sortOrder: 30, active: true },
   // Audit actor types
   { enumType: 'audit_actor_type', value: 'admin',  label: 'Admin',  sortOrder: 10, active: true },
   { enumType: 'audit_actor_type', value: 'member', label: 'Member', sortOrder: 20, active: true },
   { enumType: 'audit_actor_type', value: 'system', label: 'System', sortOrder: 30, active: true },
 ];
+
+const SUPPORTED_ENUM_TYPES = new Set<string>([
+  'admin_role',
+  'scope_type',
+  'role_level',
+  'location_level',
+  'approval_mode',
+  'approval_target_type',
+  'approval_item_status',
+  'document_access_level',
+  'report_field_type',
+  'report_submission_status',
+  'audit_actor_type',
+]);
 
 @Injectable()
 export class EnumValuesService {
@@ -154,7 +117,15 @@ export class EnumValuesService {
 
   async list(query: ListEnumValuesQueryDto): Promise<EnumValue[]> {
     if (this.useDb()) {
+      if (query.enumType && !SUPPORTED_ENUM_TYPES.has(query.enumType)) {
+        return [];
+      }
       const qb = this.repo!.createQueryBuilder('ev');
+      if (!query.enumType) {
+        qb.andWhere('ev.enum_type IN (:...supportedTypes)', {
+          supportedTypes: Array.from(SUPPORTED_ENUM_TYPES),
+        });
+      }
       if (query.enumType) qb.andWhere('ev.enum_type = :t', { t: query.enumType });
       if (query.activeOnly) qb.andWhere('ev.active = true');
       qb.orderBy('ev.enum_type').addOrderBy('ev.sort_order');
@@ -162,6 +133,7 @@ export class EnumValuesService {
       return rows.map(this.toModel);
     }
     let items = Array.from(this.mem.values());
+    items = items.filter((v) => SUPPORTED_ENUM_TYPES.has(v.enumType));
     if (query.enumType) items = items.filter((v) => v.enumType === query.enumType);
     if (query.activeOnly) items = items.filter((v) => v.active);
     return items.sort((a, b) => a.enumType.localeCompare(b.enumType) || a.sortOrder - b.sortOrder);
@@ -171,11 +143,18 @@ export class EnumValuesService {
     if (this.useDb()) {
       const rows = await this.repo!.createQueryBuilder('ev')
         .select('DISTINCT ev.enum_type', 'enumType')
+        .where('ev.enum_type IN (:...supportedTypes)', {
+          supportedTypes: Array.from(SUPPORTED_ENUM_TYPES),
+        })
         .orderBy('ev.enum_type')
         .getRawMany<{ enumType: string }>();
       return rows.map((r) => r.enumType);
     }
-    const types = new Set(Array.from(this.mem.values()).map((v) => v.enumType));
+    const types = new Set(
+      Array.from(this.mem.values())
+        .filter((v) => SUPPORTED_ENUM_TYPES.has(v.enumType))
+        .map((v) => v.enumType),
+    );
     return Array.from(types).sort();
   }
 

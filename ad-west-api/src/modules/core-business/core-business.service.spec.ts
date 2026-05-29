@@ -460,18 +460,6 @@ describe('CoreBusinessService validations', () => {
           return [];
         }
 
-        if (sql.includes('FROM adwest.job_listings ORDER BY created_at ASC')) {
-          return [];
-        }
-
-        if (sql.includes('FROM adwest.job_interests ORDER BY created_at ASC')) {
-          return [];
-        }
-
-        if (sql.includes('FROM adwest.resumes ORDER BY created_at ASC')) {
-          return [];
-        }
-
         if (sql.includes('FROM adwest.approval_workflows ORDER BY created_at ASC')) {
           return [];
         }
@@ -742,18 +730,6 @@ describe('CoreBusinessService validations', () => {
         }
 
         if (sql.includes('FROM adwest.report_submissions ORDER BY created_at ASC')) {
-          return [];
-        }
-
-        if (sql.includes('FROM adwest.job_listings ORDER BY created_at ASC')) {
-          return [];
-        }
-
-        if (sql.includes('FROM adwest.job_interests ORDER BY created_at ASC')) {
-          return [];
-        }
-
-        if (sql.includes('FROM adwest.resumes ORDER BY created_at ASC')) {
           return [];
         }
 
@@ -1101,18 +1077,6 @@ describe('CoreBusinessService validations', () => {
           return [];
         }
 
-        if (sql.includes('FROM adwest.job_listings ORDER BY created_at ASC')) {
-          return [];
-        }
-
-        if (sql.includes('FROM adwest.job_interests ORDER BY created_at ASC')) {
-          return [];
-        }
-
-        if (sql.includes('FROM adwest.resumes ORDER BY created_at ASC')) {
-          return [];
-        }
-
         if (sql.includes('FROM adwest.approval_workflows ORDER BY created_at ASC')) {
           return [];
         }
@@ -1308,9 +1272,6 @@ describe('CoreBusinessService validations', () => {
         if (sql.includes('FROM adwest.report_templates ORDER BY created_at ASC')) return [];
         if (sql.includes('FROM adwest.report_template_fields ORDER BY template_id ASC, display_order ASC')) return [];
         if (sql.includes('FROM adwest.report_submissions ORDER BY created_at ASC')) return [];
-        if (sql.includes('FROM adwest.job_listings ORDER BY created_at ASC')) return [];
-        if (sql.includes('FROM adwest.job_interests ORDER BY created_at ASC')) return [];
-        if (sql.includes('FROM adwest.resumes ORDER BY created_at ASC')) return [];
         if (sql.includes('FROM adwest.approval_workflows ORDER BY created_at ASC')) return [];
         if (sql.includes('FROM adwest.approval_workflow_steps ORDER BY workflow_id ASC, step_order ASC')) return [];
         if (sql.includes('FROM adwest.approval_items ORDER BY created_at ASC')) return [];
@@ -1543,9 +1504,6 @@ describe('CoreBusinessService validations', () => {
         if (sql.includes('FROM adwest.report_templates ORDER BY created_at ASC')) return [];
         if (sql.includes('FROM adwest.report_template_fields ORDER BY template_id ASC, display_order ASC')) return [];
         if (sql.includes('FROM adwest.report_submissions ORDER BY created_at ASC')) return [];
-        if (sql.includes('FROM adwest.job_listings ORDER BY created_at ASC')) return [];
-        if (sql.includes('FROM adwest.job_interests ORDER BY created_at ASC')) return [];
-        if (sql.includes('FROM adwest.resumes ORDER BY created_at ASC')) return [];
         if (sql.includes('FROM adwest.approval_workflows ORDER BY created_at ASC')) return [];
         if (sql.includes('FROM adwest.approval_workflow_steps ORDER BY workflow_id ASC, step_order ASC')) return [];
         if (sql.includes('FROM adwest.approval_items ORDER BY created_at ASC')) return [];
@@ -1724,9 +1682,6 @@ describe('CoreBusinessService validations', () => {
         if (sql.includes('FROM adwest.report_templates ORDER BY created_at ASC')) return [];
         if (sql.includes('FROM adwest.report_template_fields ORDER BY template_id ASC, display_order ASC')) return [];
         if (sql.includes('FROM adwest.report_submissions ORDER BY created_at ASC')) return [];
-        if (sql.includes('FROM adwest.job_listings ORDER BY created_at ASC')) return [];
-        if (sql.includes('FROM adwest.job_interests ORDER BY created_at ASC')) return [];
-        if (sql.includes('FROM adwest.resumes ORDER BY created_at ASC')) return [];
         if (sql.includes('FROM adwest.approval_workflows ORDER BY created_at ASC')) return [];
         if (sql.includes('FROM adwest.approval_workflow_steps ORDER BY workflow_id ASC, step_order ASC')) return [];
         if (sql.includes('FROM adwest.approval_items ORDER BY created_at ASC')) return [];
@@ -1872,7 +1827,7 @@ describe('CoreBusinessService validations', () => {
     }
   });
 
-  it('persists report, job, and approval writes through the DB path', async () => {
+  it('persists report and approval writes through the DB path', async () => {
     const previousEnableDb = process.env.ENABLE_DB_PERSISTENCE;
     process.env.ENABLE_DB_PERSISTENCE = 'true';
 
@@ -1923,9 +1878,6 @@ describe('CoreBusinessService validations', () => {
     const reportTemplates: Array<any> = [];
     const reportTemplateFields: Array<any> = [];
     const reportSubmissions: Array<any> = [];
-    const jobListings: Array<any> = [];
-    const jobInterests: Array<any> = [];
-    const resumes: Array<any> = [];
     const approvalWorkflows: Array<any> = [];
     const approvalWorkflowSteps: Array<any> = [];
     const approvalItems: Array<any> = [];
@@ -1950,9 +1902,6 @@ describe('CoreBusinessService validations', () => {
         if (sql.includes('FROM adwest.report_templates ORDER BY created_at ASC')) return reportTemplates;
         if (sql.includes('FROM adwest.report_template_fields ORDER BY template_id ASC, display_order ASC')) return reportTemplateFields;
         if (sql.includes('FROM adwest.report_submissions ORDER BY created_at ASC')) return reportSubmissions;
-        if (sql.includes('FROM adwest.job_listings ORDER BY created_at ASC')) return jobListings;
-        if (sql.includes('FROM adwest.job_interests ORDER BY created_at ASC')) return jobInterests;
-        if (sql.includes('FROM adwest.resumes ORDER BY created_at ASC')) return resumes;
         if (sql.includes('FROM adwest.approval_workflows ORDER BY created_at ASC')) return approvalWorkflows;
         if (sql.includes('FROM adwest.approval_workflow_steps ORDER BY workflow_id ASC, step_order ASC')) return approvalWorkflowSteps;
         if (sql.includes('FROM adwest.approval_items ORDER BY created_at ASC')) return approvalItems;
@@ -2033,85 +1982,6 @@ describe('CoreBusinessService validations', () => {
           const existing = reportSubmissions.find((item) => item.id === id);
           if (existing) Object.assign(existing, row);
           else reportSubmissions.push(row);
-          return [row];
-        }
-
-        if (sql.includes('INSERT INTO adwest.job_listings')) {
-          const [id, srenyId, title, organization, location, jobType, description, skillsJson, experienceLevel, applicationDeadline, applyEmail, status, createdBy, createdOn, updatedOn] = params as [
-            string,
-            string,
-            string,
-            string,
-            string,
-            string,
-            string,
-            string,
-            string | null,
-            string,
-            string,
-            string,
-            string,
-            string,
-            string,
-          ];
-          const row = {
-            id,
-            sreny_id: srenyId,
-            title,
-            organization,
-            location,
-            job_type: jobType,
-            description,
-            skills: JSON.parse(skillsJson) as string[],
-            experience_level: experienceLevel,
-            application_deadline: applicationDeadline,
-            apply_email: applyEmail,
-            status,
-            created_by: createdBy,
-            created_at: createdOn,
-            updated_at: updatedOn,
-          };
-          const existing = jobListings.find((item) => item.id === id);
-          if (existing) Object.assign(existing, row);
-          else jobListings.push(row);
-          return [row];
-        }
-
-        if (sql.includes('INSERT INTO adwest.job_interests')) {
-          const [id, jobId, contactId, note, createdOn] = params as [string, string, string, string | null, string];
-          const row = { id, job_id: jobId, contact_id: contactId, note, created_at: createdOn };
-          const existing = jobInterests.find((item) => item.id === id);
-          if (existing) Object.assign(existing, row);
-          else jobInterests.push(row);
-          return [row];
-        }
-
-        if (sql.includes('INSERT INTO adwest.resumes')) {
-          const [id, contactId, fileName, fileType, summary, skillsJson, active, createdOn, updatedOn] = params as [
-            string,
-            string,
-            string,
-            string,
-            string | null,
-            string,
-            boolean,
-            string,
-            string,
-          ];
-          const row = {
-            id,
-            contact_id: contactId,
-            file_name: fileName,
-            file_type: fileType,
-            summary,
-            skills: JSON.parse(skillsJson) as string[],
-            active,
-            created_at: createdOn,
-            updated_at: updatedOn,
-          };
-          const existing = resumes.find((item) => item.id === id);
-          if (existing) Object.assign(existing, row);
-          else resumes.push(row);
           return [row];
         }
 
@@ -2273,60 +2143,9 @@ describe('CoreBusinessService validations', () => {
         },
       );
 
-      const listing = dbService.createJobListing(
-        {
-          srenyId: 'sreny-live-1',
-          title: 'Coordinator',
-          organization: 'ADWest',
-          location: 'Dubai',
-          jobType: 'contract',
-          description: 'Coordinate operations',
-          skills: ['communication'],
-          experienceLevel: 'mid',
-          applicationDeadline: '2026-09-01T00:00:00.000Z',
-          applyEmail: 'jobs@adwest.local',
-        },
-        {
-          userId: 'admin_operator_13',
-          type: 'admin',
-          email: 'operator13@adwest.local',
-          roles: [],
-          sessionId: 'sess_operator_13',
-        },
-      );
-
-      dbService.updateJobListingStatus(listing.id, { status: 'active' });
-      dbService.expressJobInterest(
-        listing.id,
-        { note: 'Interested' },
-        {
-          userId: 'ct_job_1',
-          type: 'member',
-          email: 'job.applicant@adwest.local',
-          roles: [],
-          sessionId: 'sess_job_member_1',
-        },
-      );
-
-      dbService.uploadResume(
-        {
-          fileName: 'resume.pdf',
-          fileType: 'PDF',
-          summary: 'Profile',
-          skills: ['coordination'],
-        },
-        {
-          userId: 'ct_job_1',
-          type: 'member',
-          email: 'job.applicant@adwest.local',
-          roles: [],
-          sessionId: 'sess_job_member_1',
-        },
-      );
-
       const workflow = dbService.createApprovalWorkflow({
-        name: 'Job Approval',
-        targetType: 'job_listing',
+        name: 'Report Approval',
+        targetType: 'report_submission',
         mode: 'single',
         steps: ['Zone Admin'],
         escalationHours: 12,
@@ -2335,8 +2154,8 @@ describe('CoreBusinessService validations', () => {
       const approvalItem = dbService.submitApprovalItem(
         {
           workflowId: workflow.id,
-          targetId: listing.id,
-          summary: 'Approve listing',
+          targetId: submission.id,
+          summary: 'Approve submitted report',
         },
         {
           userId: 'admin_operator_13',
@@ -2368,11 +2187,6 @@ describe('CoreBusinessService validations', () => {
       expect(reportTemplateFields).toHaveLength(1);
       expect(reportSubmissions).toHaveLength(1);
       expect(reportSubmissions[0].status).toBe('approved');
-      expect(jobListings).toHaveLength(1);
-      expect(jobListings[0].status).toBe('active');
-      expect(jobInterests).toHaveLength(1);
-      expect(resumes).toHaveLength(1);
-      expect(resumes[0].active).toBe(true);
       expect(approvalWorkflows).toHaveLength(1);
       expect(approvalWorkflowSteps).toHaveLength(1);
       expect(approvalItems).toHaveLength(1);
@@ -2508,4 +2322,5 @@ describe('CoreBusinessService validations', () => {
     await new Promise((resolve) => setImmediate(resolve));
   }
 });
+
 

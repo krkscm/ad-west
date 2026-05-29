@@ -1,17 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ApprovalItemApi, backendApi } from '../../utils/backendApi'
+import { ApprovalWorkflowRuntimeItemApi, backendApi } from '../../utils/backendApi'
 import { useToast } from '../common/Toast'
 
 const statusLabel: Record<string, string> = {
   pending: 'Pending Review',
   approved: 'Approved',
   rejected: 'Rejected',
-  need_more_information: 'Need More Information',
 }
 
 export const ApprovalActionsPanel: React.FC = () => {
   const { addToast } = useToast()
-  const [items, setItems] = useState<ApprovalItemApi[]>([])
+  const [items, setItems] = useState<ApprovalWorkflowRuntimeItemApi[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [notes, setNotes] = useState<Record<string, string>>({})
@@ -39,34 +38,25 @@ export const ApprovalActionsPanel: React.FC = () => {
   )
 
   const handleReview = async (
-    itemId: string,
-    decision: 'approved' | 'rejected' | 'need_more_information',
+    item: ApprovalWorkflowRuntimeItemApi,
+    decision: 'approved' | 'rejected',
   ) => {
-    setBusyId(itemId)
+    const stageId = item.currentStageIds[0]
+    if (!stageId) {
+      addToast('No active stage found for this item.', 'error')
+      return
+    }
+    setBusyId(item.id)
     try {
-      await backendApi.reviewApprovalItem(itemId, {
+      await backendApi.reviewApprovalWorkflowRuntimeItem(item.id, {
+        stageId,
         decision,
-        note: notes[itemId]?.trim() || undefined,
+        note: notes[item.id]?.trim() || undefined,
       })
-      addToast(`Decision recorded: ${decision.replace(/_/g, ' ')}`, 'success')
+      addToast(`Decision recorded: ${decision}`, 'success')
       await load()
     } catch (error) {
       addToast(error instanceof Error ? error.message : 'Failed to submit decision.', 'error')
-    } finally {
-      setBusyId(null)
-    }
-  }
-
-  const handleResubmit = async (itemId: string) => {
-    setBusyId(itemId)
-    try {
-      await backendApi.resubmitApprovalItem(itemId, {
-        note: notes[itemId]?.trim() || undefined,
-      })
-      addToast('Information submitted and approval flow restarted.', 'success')
-      await load()
-    } catch (error) {
-      addToast(error instanceof Error ? error.message : 'Failed to resubmit item.', 'error')
     } finally {
       setBusyId(null)
     }
@@ -77,7 +67,7 @@ export const ApprovalActionsPanel: React.FC = () => {
       <div style={{ marginBottom: '24px' }}>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '4px' }}>Actions</h2>
         <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem' }}>
-          Review event/report approval lines assigned to you and respond to requests for more information.
+          Review approval items assigned to you and submit your decision.
         </p>
         <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <span className="badge badge-warning">Pending: {pendingCount}</span>
@@ -99,55 +89,47 @@ export const ApprovalActionsPanel: React.FC = () => {
             <thead>
               <tr>
                 <th style={{ minWidth: '200px' }}>Summary</th>
-                <th>Type</th>
                 <th>Status</th>
                 <th>Updated</th>
                 <th style={{ minWidth: '280px' }}>Note</th>
-                <th style={{ minWidth: '320px' }}>Actions</th>
+                <th style={{ minWidth: '240px' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {items.map((item) => {
                 const busy = busyId === item.id
                 const isPending = item.status === 'pending'
-                const needsInfo = item.status === 'need_more_information'
                 return (
                   <tr key={item.id}>
                     <td style={{ fontWeight: 600 }}>{item.summary || item.targetId}</td>
-                    <td>{item.targetType === 'calendar_event' ? 'Event' : 'Report'}</td>
                     <td>{statusLabel[item.status] ?? item.status}</td>
                     <td>{new Date(item.updatedAt).toLocaleString()}</td>
                     <td>
-                      <textarea
-                        className="form-input"
-                        rows={2}
-                        value={notes[item.id] ?? ''}
-                        onChange={(e) => {
-                          const value = e.target.value
-                          setNotes((prev) => ({ ...prev, [item.id]: value }))
-                        }}
-                        placeholder={isPending ? 'Add review note (optional)' : 'Add more information (optional)'}
-                        disabled={busy}
-                        style={{ resize: 'vertical', minWidth: '250px' }}
-                      />
+                      {isPending && (
+                        <textarea
+                          className="form-input"
+                          rows={2}
+                          value={notes[item.id] ?? ''}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            setNotes((prev) => ({ ...prev, [item.id]: value }))
+                          }}
+                          placeholder="Add review note (optional)"
+                          disabled={busy}
+                          style={{ resize: 'vertical', minWidth: '250px' }}
+                        />
+                      )}
                     </td>
                     <td>
                       {isPending ? (
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                          <button className="btn btn-primary" disabled={busy} onClick={() => void handleReview(item.id, 'approved')}>
+                          <button className="btn btn-primary" disabled={busy} onClick={() => void handleReview(item, 'approved')}>
                             Approve
                           </button>
-                          <button className="btn btn-secondary" disabled={busy} onClick={() => void handleReview(item.id, 'rejected')}>
+                          <button className="btn btn-secondary" disabled={busy} onClick={() => void handleReview(item, 'rejected')}>
                             Reject
                           </button>
-                          <button className="btn btn-secondary" disabled={busy} onClick={() => void handleReview(item.id, 'need_more_information')}>
-                            Need More Information
-                          </button>
                         </div>
-                      ) : needsInfo ? (
-                        <button className="btn btn-primary" disabled={busy} onClick={() => void handleResubmit(item.id)}>
-                          Submit More Information
-                        </button>
                       ) : (
                         <span style={{ color: 'var(--text-secondary-dark)', fontSize: '0.82rem' }}>Completed</span>
                       )}

@@ -36,6 +36,14 @@ This folder contains executable PostgreSQL scripts for ADWest.
 26. 031_sreni_menu_backfill_normalization.sql (DB-level normalization/backfill for Sreni parent/calendar/contacts menus)
 27. 032_sreni_calendar_events.sql (Per-Sreni calendar event persistence with zone/sthan scope support)
 28. 033_sreni_attendance_metrics_and_captures.sql (Attendance metric definitions, per-event captures, and attendance menu backfill; API also self-heals missing Sreni attendance child menu rows on menu list)
+29. 034_remove_deprecated_contacts_import_runtime.sql (Decommissions deprecated contacts-import reconciliation and merge persistence objects)
+30. 035_remove_deprecated_program_session_registration_legacy_attendance.sql (Decommissions deprecated program/session/registration and legacy attendance persistence)
+31. 036_remove_deprecated_helpdesk_profile_edit_request_runtime.sql (Decommissions deprecated helpdesk/tickets and profile/edit-request persistence)
+32. 037_remove_deprecated_jobs_resumes_and_enum_values.sql (Decommissions deprecated jobs/resumes persistence and removes deprecated enum values)
+
+## Enum Visibility Note
+- API now serves only supported active enum domains to the UI, even if legacy rows still exist in `adwest.enum_values`.
+- Run `037_remove_deprecated_jobs_resumes_and_enum_values.sql` to physically remove deprecated enum rows from DB.
 
 ## Why This Standard Exists
 - Deterministic setup for new environments.
@@ -83,5 +91,9 @@ psql "$env:DATABASE_URL" -f "ad-docs/database-script/030_sreni_contacts.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/031_sreni_menu_backfill_normalization.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/032_sreni_calendar_events.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/033_sreni_attendance_metrics_and_captures.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/034_remove_deprecated_contacts_import_runtime.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/035_remove_deprecated_program_session_registration_legacy_attendance.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/036_remove_deprecated_helpdesk_profile_edit_request_runtime.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/037_remove_deprecated_jobs_resumes_and_enum_values.sql"
 ```
 

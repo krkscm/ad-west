@@ -1,5 +1,9 @@
 # Module 03 Acceptance Baseline: Contact Import and Deduplication
 
+## Status
+- Deprecated and removed from active API/UI runtime in the current phase.
+- DB decommission migration added: `034_remove_deprecated_contacts_import_runtime.sql`.
+
 ## In-Scope Capabilities
 - CSV and XLSX import.
 - Mapping wizard with reusable mapping profiles.

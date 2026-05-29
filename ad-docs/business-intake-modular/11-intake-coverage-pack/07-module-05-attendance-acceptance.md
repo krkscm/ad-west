@@ -1,5 +1,9 @@
 ﻿# Module 05 Acceptance Baseline: Attendance
 
+## Status
+- Deprecated and removed from active API/UI runtime in the current phase for legacy session attendance/report endpoints.
+- Sreni calendar attendance capture remains active under the new runtime model.
+
 ## In-Scope Capabilities
 - Session-level attendance marking.
 - Attendance statuses: Present, Absent, Late, Excused.

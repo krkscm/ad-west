@@ -1,5 +1,8 @@
 ﻿# Module 07 Acceptance Baseline: Member Self-Service Portal
 
+## Status
+- Deprecated and removed from active API/UI runtime in the current phase for profile/edit-request and helpdesk history flows.
+
 ## In-Scope Capabilities
 - Public verification using name and phone or email.
 - Password + captcha login.

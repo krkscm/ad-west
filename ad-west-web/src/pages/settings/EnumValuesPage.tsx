@@ -17,20 +17,9 @@ const TYPE_LABELS: Record<string, string> = {
   approval_mode: 'Approval Mode',
   approval_target_type: 'Approval Target Type',
   approval_item_status: 'Approval Item Status',
-  program_status: 'Program Status',
-  attendance_state: 'Attendance State',
-  ticket_priority: 'Ticket Priority',
-  ticket_status: 'Ticket Status',
-  ticket_activity_action: 'Ticket Activity Action',
   document_access_level: 'Document Access Level',
   report_field_type: 'Report Field Type',
   report_submission_status: 'Report Submission Status',
-  job_type: 'Job Type',
-  job_listing_status: 'Job Listing Status',
-  member_edit_status: 'Member Edit Status',
-  import_file_type: 'Import File Type',
-  import_status: 'Import Status',
-  dedup_decision: 'Dedup Decision',
   audit_actor_type: 'Audit Actor Type',
 }
 
@@ -269,7 +258,7 @@ export const EnumValuesPage: React.FC = () => {
                         className="form-input"
                         value={newEnumType}
                         onChange={(e) => setNewEnumType(e.target.value)}
-                        placeholder="e.g. ticket_status"
+                        placeholder="e.g. approval_mode"
                         list="existing-types"
                       />
                       <datalist id="existing-types">

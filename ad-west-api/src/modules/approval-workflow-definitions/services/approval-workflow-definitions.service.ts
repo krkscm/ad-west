@@ -315,6 +315,26 @@ export class ApprovalWorkflowDefinitionsService {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
+  listMyRuntimeItems(principal: AuthPrincipal, status?: ApprovalWorkflowRuntimeItem['status']): ApprovalWorkflowRuntimeItem[] {
+    const isSuperAdmin = principal.roles.includes(AdminRole.SUPER_ADMIN);
+    const effectiveStatus = status ?? 'pending';
+    const rows = Array.from(this.runtimeItems.values()).filter(
+      (row) => row.status === effectiveStatus,
+    );
+    if (isSuperAdmin) {
+      return rows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    }
+    // For non-super-admins, exclude stages they've already voted on
+    return rows
+      .filter((item) =>
+        item.currentStageIds.length > 0 &&
+        item.stageStates.some(
+          (s) => s.status === 'pending' && !s.approvals.includes(principal.userId),
+        ),
+      )
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
   getRuntimeItem(itemId: string): ApprovalWorkflowRuntimeItem {
     const item = this.runtimeItems.get(itemId);
     if (!item) throw new NotFoundException('Approval runtime item not found');

@@ -593,26 +593,6 @@ export class CreateTicketCommentDto {
   body!: string;
 }
 
-export class CreateEditRequestDto {
-  @IsString()
-  @IsNotEmpty()
-  field!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  currentValue!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  requestedValue!: string;
-}
-
-export class ReviewEditRequestDto {
-  @IsOptional()
-  @IsString()
-  note?: string;
-}
-
 export class CreateDocumentFolderDto {
   @IsString()
   @IsNotEmpty()
@@ -708,86 +688,14 @@ export class ReviewReportSubmissionDto {
   note?: string;
 }
 
-export class CreateJobListingDto {
-  @IsString()
-  @IsNotEmpty()
-  srenyId!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  title!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  organization!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  location!: string;
-
-  @IsString()
-  @IsIn(['full_time', 'part_time', 'contract', 'volunteer'])
-  jobType!: 'full_time' | 'part_time' | 'contract' | 'volunteer';
-
-  @IsString()
-  @IsNotEmpty()
-  description!: string;
-
-  @IsArray()
-  @IsString({ each: true })
-  skills!: string[];
-
-  @IsOptional()
-  @IsString()
-  experienceLevel?: string;
-
-  @IsDateString()
-  applicationDeadline!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  applyEmail!: string;
-}
-
-export class UpdateJobListingStatusDto {
-  @IsString()
-  @IsIn(['draft', 'active', 'archived'])
-  status!: 'draft' | 'active' | 'archived';
-}
-
-export class ExpressJobInterestDto {
-  @IsOptional()
-  @IsString()
-  note?: string;
-}
-
-export class UploadResumeDto {
-  @IsString()
-  @IsNotEmpty()
-  fileName!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  fileType!: string;
-
-  @IsOptional()
-  @IsString()
-  summary?: string;
-
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  skills?: string[];
-}
-
 export class CreateApprovalWorkflowDto {
   @IsString()
   @IsNotEmpty()
   name!: string;
 
   @IsString()
-  @IsIn(['document_submission', 'report_submission', 'member_edit_request', 'job_listing'])
-  targetType!: 'document_submission' | 'report_submission' | 'member_edit_request' | 'job_listing';
+  @IsIn(['document_submission', 'report_submission'])
+  targetType!: 'document_submission' | 'report_submission';
 
   @IsArray()
   @IsString({ each: true })

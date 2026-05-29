@@ -1,5 +1,9 @@
 # Module 06 Acceptance Baseline: Helpdesk
 
+## Status
+- Deprecated and removed from active API/UI runtime in the current phase.
+- DB decommission migration added: `036_remove_deprecated_helpdesk_profile_edit_request_runtime.sql`.
+
 ## In-Scope Capabilities
 - Verified-member ticket submission.
 - Ticket fields, lifecycle, assignment, and comment thread.
