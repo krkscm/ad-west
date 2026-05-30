@@ -1,5 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { Repository } from 'typeorm';
 import { USER_STORE } from '../constants';
 import { AdminMenuGrantEntity } from '../entities/admin-menu-grant.entity';
@@ -14,7 +15,10 @@ import { UserStore } from '../interfaces/user-store.interface';
 
 const DEFAULT_MENUS: Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>[] = [
   { key: 'dashboard',                    label: 'Dashboard',           parentKey: null,       icon: '📊', sortOrder: 10, active: true },
-  { key: 'insights',                     label: 'Insights',            parentKey: null,       icon: '📈', sortOrder: 15, active: true },
+  { key: 'governance',                   label: 'Governance',          parentKey: null,       icon: '🧭', sortOrder: 15, active: true },
+  { key: 'insights',                     label: 'Insights',            parentKey: 'governance', icon: null, sortOrder: 10, active: true },
+  { key: 'my-approvals',                 label: 'My Approvals',        parentKey: 'governance', icon: null, sortOrder: 20, active: true },
+  { key: 'ai-chatbot',                   label: 'AI Chatbot',          parentKey: 'governance', icon: null, sortOrder: 25, active: true },
   { key: 'settings',                     label: 'Settings',            parentKey: null,       icon: '⚙️', sortOrder: 20, active: true },
   { key: 'settings-roles-definition',    label: 'Roles Definition',    parentKey: 'settings', icon: null, sortOrder: 10, active: true },
   { key: 'settings-location-definition', label: 'Location Definition', parentKey: 'settings', icon: null, sortOrder: 20, active: true },
@@ -25,7 +29,7 @@ const DEFAULT_MENUS: Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>[] = [
   { key: 'settings-admins',              label: 'Admin Management',    parentKey: 'settings', icon: null, sortOrder: 60, active: true },
   { key: 'settings-approval-workflows',  label: 'Approval Workflows',  parentKey: 'settings', icon: null, sortOrder: 70, active: true },
   { key: 'settings-users',               label: 'Users',               parentKey: 'settings', icon: null, sortOrder: 80, active: true },
-  { key: 'settings-responsibility-chart', label: 'Responsibility Chart', parentKey: 'settings', icon: null, sortOrder: 90, active: true },
+  { key: 'settings-responsibility-chart', label: 'Responsibility Chart', parentKey: 'governance', icon: null, sortOrder: 30, active: true },
   { key: 'settings-google-integration',  label: 'Google Integration',  parentKey: 'settings', icon: null, sortOrder: 95, active: true },
   { key: 'helpdesk',                         label: 'Helpdesk',              parentKey: null,                icon: '🛠️', sortOrder: 25, active: true },
   { key: 'helpdesk-tickets',                 label: 'Helpdesk Tickets',      parentKey: 'helpdesk',          icon: null, sortOrder: 10, active: true },
@@ -43,9 +47,23 @@ export class MenuManagementService {
   private readonly memMenus = new Map<string, MenuItem>();
   private readonly memGrants = new Map<string, AdminMenuGrant[]>();
 
+  private normalizeRoleKey(value: unknown): string {
+    return String(value ?? '')
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '');
+  }
+
+  private principalIsSuperAdmin(principal: AuthPrincipal): boolean {
+    const principalRoles = (principal.roles ?? []).map((role) => this.normalizeRoleKey(role));
+    const assignmentRoles = (principal.roleAssignments ?? []).map((assignment) => this.normalizeRoleKey(assignment.role));
+    return [...principalRoles, ...assignmentRoles].includes('SUPERADMIN');
+  }
+
   constructor(
     private readonly cryptoService: CryptoService,
     @Inject(USER_STORE) private readonly userStore: UserStore,
+    @Optional() @Inject(DataSource) private readonly dataSource?: DataSource,
     @Optional() @InjectRepository(MenuItemEntity)
     private readonly menuRepo?: Repository<MenuItemEntity>,
     @Optional() @InjectRepository(AdminMenuGrantEntity)
@@ -70,20 +88,94 @@ export class MenuManagementService {
 
   // ── Menu Items ──────────────────────────────────────────────────────────────
 
-  async listMenuItems(activeOnly = false): Promise<MenuItem[]> {
+  async listMenuItems(activeOnly = false, principal?: AuthPrincipal, includeAll = false): Promise<MenuItem[]> {
     if (this.useDb()) {
-      await this.ensureSettingsResponsibilityChartMenu();
+      await this.ensureGovernanceMenus();
       await this.ensureSettingsGoogleIntegrationMenu();
       await this.ensurePublicGatewayMenus();
       await this.ensureMemberServicesMenus();
       await this.ensureSreniAttendanceChildMenus();
+      await this.ensureSthanChildMenus();
       const rows = activeOnly
         ? await this.menuRepo!.find({ where: { active: true } })
         : await this.menuRepo!.find();
-      return rows.map(this.toMenuItem);
+      const items = rows.map(this.toMenuItem);
+
+      if (!principal) {
+        return items;
+      }
+
+      const isCoreSuperAdmin = await this.principalIsCoreUserSuperAdmin(principal.userId);
+      if (isCoreSuperAdmin) {
+        return items;
+      }
+
+      if (includeAll && this.principalIsSuperAdmin(principal)) {
+        return items;
+      }
+
+      if (this.principalIsSuperAdmin(principal)) {
+        return items;
+      }
+
+      const grants = await this.grantRepo!.find({ where: { adminUserId: principal.userId } });
+      const grantedKeys = new Set(grants.map((grant) => grant.menuKey));
+      if (grantedKeys.has('governance')) {
+        grantedKeys.add('ai-chatbot');
+      }
+      if (grantedKeys.size === 0) {
+        return [];
+      }
+
+      const byKey = new Map(items.map((item) => [item.key, item]));
+      const visibleKeys = new Set<string>();
+      for (const key of grantedKeys) {
+        let cursor = byKey.get(key);
+        while (cursor) {
+          if (visibleKeys.has(cursor.key)) break;
+          visibleKeys.add(cursor.key);
+          cursor = cursor.parentKey ? byKey.get(cursor.parentKey) : undefined;
+        }
+      }
+
+      return items.filter((item) => visibleKeys.has(item.key));
     }
     const items = Array.from(this.memMenus.values());
-    return activeOnly ? items.filter((m) => m.active) : items;
+    const scopedItems = activeOnly ? items.filter((m) => m.active) : items;
+
+    if (!principal) {
+      return scopedItems;
+    }
+
+    if (includeAll && this.principalIsSuperAdmin(principal)) {
+      return scopedItems;
+    }
+
+    if (this.principalIsSuperAdmin(principal)) {
+      return scopedItems;
+    }
+
+    const grants = this.memGrants.get(principal.userId) ?? [];
+    const grantedKeys = new Set(grants.map((grant) => grant.menuKey));
+    if (grantedKeys.has('governance')) {
+      grantedKeys.add('ai-chatbot');
+    }
+    if (grantedKeys.size === 0) {
+      return [];
+    }
+
+    const byKey = new Map(scopedItems.map((item) => [item.key, item]));
+    const visibleKeys = new Set<string>();
+    for (const key of grantedKeys) {
+      let cursor = byKey.get(key);
+      while (cursor) {
+        if (visibleKeys.has(cursor.key)) break;
+        visibleKeys.add(cursor.key);
+        cursor = cursor.parentKey ? byKey.get(cursor.parentKey) : undefined;
+      }
+    }
+
+    return scopedItems.filter((item) => visibleKeys.has(item.key));
   }
 
   async getMenuItemById(id: string): Promise<MenuItem> {
@@ -229,6 +321,24 @@ export class MenuManagementService {
     return Array.from(this.memMenus.values()).find((m) => m.key === key) ?? null;
   }
 
+  private async principalIsCoreUserSuperAdmin(userId: string): Promise<boolean> {
+    if (!this.dataSource) {
+      return false;
+    }
+
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT is_super_admin, active FROM adwest.users WHERE id = $1 LIMIT 1`,
+        [userId],
+      ) as Array<{ is_super_admin: boolean | null; active: boolean | null }>;
+
+      const row = rows[0];
+      return !!row && row.is_super_admin === true && row.active !== false;
+    } catch {
+      return false;
+    }
+  }
+
   private toMenuItem(entity: MenuItemEntity): MenuItem {
     return {
       id: entity.id,
@@ -258,7 +368,7 @@ export class MenuManagementService {
   }
 
   private isSuperAdmin(admin: AdminUser): boolean {
-    return admin.roles.some((role) => role.role === 'SUPER_ADMIN');
+    return admin.roles.some((role) => this.normalizeRoleKey(role.role) === 'SUPERADMIN');
   }
 
   private async ensureSreniAttendanceChildMenus(): Promise<void> {
@@ -301,33 +411,82 @@ export class MenuManagementService {
     }
   }
 
-  private async ensureSettingsResponsibilityChartMenu(): Promise<void> {
+  private async ensureGovernanceMenus(): Promise<void> {
     if (!this.useDb()) {
       return;
     }
 
-    const existing = await this.menuRepo!.findOne({ where: { key: 'settings-responsibility-chart' } });
-    if (existing) {
-      return;
-    }
-
-    const settingsMenu = await this.menuRepo!.findOne({ where: { key: 'settings' } });
-    if (!settingsMenu) {
-      return;
-    }
-
     const now = new Date().toISOString();
-    const entity = new MenuItemEntity();
-    entity.id = this.cryptoService.randomId('menu');
-    entity.key = 'settings-responsibility-chart';
-    entity.label = 'Responsibility Chart';
-    entity.parentKey = 'settings';
-    entity.icon = '🧭';
-    entity.sortOrder = 90;
-    entity.active = settingsMenu.active;
-    entity.createdAt = now;
-    entity.updatedAt = now;
-    await this.menuRepo!.insert(entity);
+    const allMenus = await this.menuRepo!.find();
+    const byKey = new Map(allMenus.map((item) => [item.key, item]));
+
+    const governanceParent = byKey.get('governance');
+    if (!governanceParent) {
+      const entity = new MenuItemEntity();
+      entity.id = this.cryptoService.randomId('menu');
+      entity.key = 'governance';
+      entity.label = 'Governance';
+      entity.parentKey = null;
+      entity.icon = '🧭';
+      entity.sortOrder = 15;
+      entity.active = true;
+      entity.createdAt = now;
+      entity.updatedAt = now;
+      await this.menuRepo!.insert(entity);
+      byKey.set(entity.key, entity);
+    } else if (
+      governanceParent.parentKey !== null
+      || governanceParent.sortOrder !== 15
+      || governanceParent.active !== true
+      || governanceParent.label !== 'Governance'
+    ) {
+      governanceParent.parentKey = null;
+      governanceParent.sortOrder = 15;
+      governanceParent.active = true;
+      governanceParent.label = 'Governance';
+      governanceParent.icon = governanceParent.icon ?? '🧭';
+      governanceParent.updatedAt = now;
+      await this.menuRepo!.save(governanceParent);
+    }
+
+    const childDefinitions: Array<{ key: string; label: string; sortOrder: number }> = [
+      { key: 'insights', label: 'Insights', sortOrder: 10 },
+      { key: 'my-approvals', label: 'My Approvals', sortOrder: 20 },
+      { key: 'ai-chatbot', label: 'AI Chatbot', sortOrder: 25 },
+      { key: 'settings-responsibility-chart', label: 'Responsibility Chart', sortOrder: 30 },
+    ];
+
+    for (const definition of childDefinitions) {
+      const existing = byKey.get(definition.key);
+      if (!existing) {
+        const entity = new MenuItemEntity();
+        entity.id = this.cryptoService.randomId('menu');
+        entity.key = definition.key;
+        entity.label = definition.label;
+        entity.parentKey = 'governance';
+        entity.icon = null;
+        entity.sortOrder = definition.sortOrder;
+        entity.active = true;
+        entity.createdAt = now;
+        entity.updatedAt = now;
+        await this.menuRepo!.insert(entity);
+        continue;
+      }
+
+      if (
+        existing.parentKey !== 'governance'
+        || existing.sortOrder !== definition.sortOrder
+        || existing.active !== true
+        || existing.label !== definition.label
+      ) {
+        existing.label = definition.label;
+        existing.parentKey = 'governance';
+        existing.sortOrder = definition.sortOrder;
+        existing.active = true;
+        existing.updatedAt = now;
+        await this.menuRepo!.save(existing);
+      }
+    }
   }
 
   private async ensureSettingsGoogleIntegrationMenu(): Promise<void> {
@@ -407,6 +566,48 @@ export class MenuManagementService {
 
     if (missing.length > 0) {
       await this.menuRepo!.insert(missing);
+    }
+  }
+
+  private async ensureSthanChildMenus(): Promise<void> {
+    if (!this.useDb()) return;
+
+    // Query active STHAN locations — source of truth for what menus should exist.
+    let sthanLocations: Array<{ id: string; name: string }> = [];
+    try {
+      sthanLocations = await this.menuRepo!.manager.query(
+        `SELECT id::text AS id, name FROM adwest.locations WHERE level = 'sthan' AND active = true ORDER BY name`,
+      ) as Array<{ id: string; name: string }>;
+    } catch {
+      return; // locations table not yet present — skip silently
+    }
+
+    const now = new Date().toISOString();
+
+    // Remove stale sub-item menu entries created by old code (reports/expenses/contacts as sidebar items).
+    await this.menuRepo!.manager.query(
+      `DELETE FROM adwest.menu_items
+       WHERE (key LIKE 'sthan-%-reports' OR key LIKE 'sthan-%-expenses' OR key LIKE 'sthan-%-contacts')`,
+    );
+
+    // Ensure the single "Sthans" root parent exists.
+    await this.menuRepo!.manager.query(
+      `INSERT INTO adwest.menu_items (id, key, label, parent_key, icon, sort_order, active, created_at, updated_at)
+       VALUES ($1, 'sthans', 'Sthans', null, '📍', 1500, true, $2, $2)
+       ON CONFLICT (key) DO UPDATE SET label = 'Sthans', parent_key = NULL, icon = '📍', sort_order = 1500, active = true`,
+      [this.cryptoService.randomId('menu'), now],
+    );
+
+    // Upsert each sthan location as a child of 'sthans'.
+    // ON CONFLICT DO UPDATE ensures old entries with wrong parentKey are corrected.
+    for (const loc of sthanLocations) {
+      const key = `sthan-${loc.id}`;
+      await this.menuRepo!.manager.query(
+        `INSERT INTO adwest.menu_items (id, key, label, parent_key, icon, sort_order, active, created_at, updated_at)
+         VALUES ($1, $2, $3, 'sthans', NULL, 0, true, $4, $4)
+         ON CONFLICT (key) DO UPDATE SET label = $3, parent_key = 'sthans', active = true`,
+        [this.cryptoService.randomId('menu'), key, loc.name, now],
+      );
     }
   }
 

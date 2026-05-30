@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomBytes, randomUUID } from 'crypto';
 import { mkdir, writeFile } from 'fs/promises';
@@ -63,6 +63,19 @@ export interface JobApplication {
   updatedAt: string;
 }
 
+export interface PublicSreniOption {
+  id: string;
+  name: string;
+  code?: string;
+}
+
+export interface PublicSreniContactSubmissionResult {
+  id: string;
+  sreniId: string;
+  rowIndex: number;
+  createdAt: string;
+}
+
 interface ResumeUploadMetadata {
   url: string;
   storagePath: string;
@@ -79,6 +92,8 @@ interface ResumeDownloadDescriptor {
 
 const MAX_RESUME_SIZE_BYTES = 1024 * 1024;
 const ALLOWED_RESUME_EXTENSIONS = new Set(['.pdf', '.doc', '.docx']);
+const EMAIL_FORMAT_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_PERMISSIVE_REGEX = /^\+?[\d\s()\-]{7,20}$/;
 
 @Injectable()
 export class PublicGatewayService {
@@ -106,6 +121,174 @@ export class PublicGatewayService {
 
   private getResumeUrl(applicationId: string): string {
     return `/api/v1/gateway/jobs/applications/${applicationId}/resume`;
+  }
+
+  private parseDateRange(fromDate?: string, toDate?: string): { from?: Date; to?: Date } {
+    const from = fromDate ? new Date(fromDate) : undefined;
+    const to = toDate ? new Date(toDate) : undefined;
+
+    if (fromDate && Number.isNaN(from?.getTime())) {
+      throw new BadRequestException('fromDate must be a valid date string');
+    }
+
+    if (toDate && Number.isNaN(to?.getTime())) {
+      throw new BadRequestException('toDate must be a valid date string');
+    }
+
+    if (from && to && from.getTime() > to.getTime()) {
+      throw new BadRequestException('fromDate must be before or equal to toDate');
+    }
+
+    return { from, to };
+  }
+
+  private normalizePhoneForMatch(phone: string): string {
+    return phone.replace(/\D/g, '');
+  }
+
+  async listPublicSreniOptions(): Promise<PublicSreniOption[]> {
+    if (!this.useDb()) {
+      return [];
+    }
+
+    const rows = await this.ticketRepo!.manager.query(
+      `SELECT id::text AS id, name, code
+       FROM adwest.srenies
+       WHERE active = true
+         AND join_us_visible = true
+       ORDER BY name ASC`,
+    ) as Array<{ id: string; name: string; code: string | null }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      code: row.code ?? undefined,
+    }));
+  }
+
+  async submitPublicSreniContact(data: {
+    sreniId: string;
+    fullName: string;
+    phone: string;
+    email?: string;
+    city?: string;
+    country?: string;
+    notes?: string;
+    personalNumber?: string;
+    familyOrBachelor?: string;
+    family?: string;
+    bachelor?: string;
+    addressInUae?: string;
+    company?: string;
+    profession?: string;
+    wifeName?: string;
+    landLine?: string;
+    zoneOrLandMark?: string;
+    district?: string;
+    submittedFrom?: string;
+  }): Promise<PublicSreniContactSubmissionResult> {
+    if (!this.useDb()) {
+      throw new ServiceUnavailableException('Public contact registration is available only when DB persistence is enabled.');
+    }
+
+    const trimmedName = data.fullName.trim();
+    const trimmedPhone = data.phone.trim();
+    const trimmedEmail = data.email?.trim() || null;
+    const normalizedPhone = this.normalizePhoneForMatch(trimmedPhone);
+
+    if (!PHONE_PERMISSIVE_REGEX.test(trimmedPhone) || normalizedPhone.length < 7 || normalizedPhone.length > 15) {
+      throw new BadRequestException('Phone number format is invalid. Please use a valid phone number with country code if available.');
+    }
+
+    if (trimmedEmail && !EMAIL_FORMAT_REGEX.test(trimmedEmail)) {
+      throw new BadRequestException('Email address format is invalid.');
+    }
+
+    const sreniRows = await this.ticketRepo!.manager.query(
+      `SELECT id::text AS id
+       FROM adwest.srenies
+       WHERE id::text = $1 AND active = true
+       LIMIT 1`,
+      [data.sreniId],
+    ) as Array<{ id: string }>;
+
+    if (!sreniRows.length) {
+      throw new BadRequestException('Selected sreni is not available.');
+    }
+
+    const duplicateRows = await this.ticketRepo!.manager.query(
+      `SELECT id::text AS id
+       FROM adwest.sreni_contacts
+       WHERE sreni_id = $1
+         AND (
+           regexp_replace(COALESCE(data->>'phone', ''), '[^0-9]', '', 'g') = $2
+           OR ($3::text IS NOT NULL AND lower(COALESCE(data->>'email', '')) = lower($3::text))
+         )
+       LIMIT 1`,
+      [data.sreniId, normalizedPhone, trimmedEmail],
+    ) as Array<{ id: string }>;
+
+    if (duplicateRows.length > 0) {
+      throw new ConflictException('A contact with the same phone or email already exists for this sreni.');
+    }
+
+    const contactPayload = {
+      full_name: trimmedName,
+      phone: trimmedPhone,
+      email: trimmedEmail,
+      city: data.city?.trim() || null,
+      country: data.country?.trim() || null,
+      notes: data.notes?.trim() || null,
+      personal_number: data.personalNumber?.trim() || null,
+      family_or_bachelor: data.familyOrBachelor?.trim() || null,
+      family: data.family?.trim() || null,
+      bachelor: data.bachelor?.trim() || null,
+      address_in_uae: data.addressInUae?.trim() || null,
+      company: data.company?.trim() || null,
+      profession: data.profession?.trim() || null,
+      wife_name: data.wifeName?.trim() || null,
+      land_line: data.landLine?.trim() || null,
+      zone_or_land_mark: data.zoneOrLandMark?.trim() || null,
+      district: data.district?.trim() || null,
+      template_fields: {
+        Name: trimmedName,
+        'Personal Number': data.personalNumber?.trim() || null,
+        'Family / Bachelor': data.familyOrBachelor?.trim() || null,
+        Family: data.family?.trim() || null,
+        Bachelor: data.bachelor?.trim() || null,
+        'Address in UAE': data.addressInUae?.trim() || null,
+        Company: data.company?.trim() || null,
+        Profession: data.profession?.trim() || null,
+        WifeName: data.wifeName?.trim() || null,
+        'Land Line': data.landLine?.trim() || null,
+        'Zone / Land mark': data.zoneOrLandMark?.trim() || null,
+        District: data.district?.trim() || null,
+      },
+      source: 'public_join_form',
+      submitted_from: data.submittedFrom ?? null,
+      submitted_at: new Date().toISOString(),
+    };
+
+    const result = await this.ticketRepo!.manager.query(
+      `WITH next_row AS (
+         SELECT COALESCE(MAX(row_index), 0) + 1 AS row_index
+         FROM adwest.sreni_contacts
+         WHERE sreni_id = $1
+       )
+       INSERT INTO adwest.sreni_contacts (sreni_id, row_index, data, source_file, uploaded_by)
+       SELECT $1, next_row.row_index, $2::jsonb, 'public-join-us-form', 'public'
+       FROM next_row
+       RETURNING id::text AS id, sreni_id::text AS sreni_id, row_index, created_at`,
+      [data.sreniId, JSON.stringify(contactPayload)],
+    ) as Array<{ id: string; sreni_id: string; row_index: number; created_at: string | Date }>;
+
+    const row = result[0];
+    return {
+      id: row.id,
+      sreniId: row.sreni_id,
+      rowIndex: row.row_index,
+      createdAt: new Date(row.created_at).toISOString(),
+    };
   }
 
   private toHelpdeskTicket(entity: HelpdeskTicketEntity): HelpdeskTicket {
@@ -280,16 +463,30 @@ export class PublicGatewayService {
     return ticket;
   }
 
-  async listTickets(status?: string): Promise<HelpdeskTicket[]> {
+  async listTickets(status?: string, fromDate?: string, toDate?: string): Promise<HelpdeskTicket[]> {
+    const { from, to } = this.parseDateRange(fromDate, toDate);
+
     if (this.useDb()) {
-      const rows = status
-        ? await this.ticketRepo!.find({ where: { status }, order: { createdAt: 'DESC' } })
-        : await this.ticketRepo!.find({ order: { createdAt: 'DESC' } });
+      const qb = this.ticketRepo!.createQueryBuilder('ticket');
+      if (status) qb.andWhere('ticket.status = :status', { status });
+      if (from) qb.andWhere('ticket.created_at >= :from', { from });
+      if (to) qb.andWhere('ticket.created_at <= :to', { to });
+
+      const rows = await qb.orderBy('ticket.created_at', 'DESC').getMany();
       return rows.map((row) => this.toHelpdeskTicket(row));
     }
 
-    const all = [...this.tickets.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    return status ? all.filter((ticket) => ticket.status === status) : all;
+    const all = [...this.tickets.values()]
+      .filter((ticket) => {
+        if (status && ticket.status !== status) return false;
+        const createdAtMs = Date.parse(ticket.createdAt);
+        if (from && Number.isFinite(createdAtMs) && createdAtMs < from.getTime()) return false;
+        if (to && Number.isFinite(createdAtMs) && createdAtMs > to.getTime()) return false;
+        return true;
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+    return all;
   }
 
   async getTicket(id: string): Promise<HelpdeskTicket | undefined> {
@@ -340,12 +537,26 @@ export class PublicGatewayService {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
-  async listAllJobPostings(): Promise<JobPosting[]> {
+  async listAllJobPostings(fromDate?: string, toDate?: string): Promise<JobPosting[]> {
+    const { from, to } = this.parseDateRange(fromDate, toDate);
+
     if (this.useDb()) {
-      const rows = await this.jobPostingRepo!.find({ order: { createdAt: 'DESC' } });
+      const qb = this.jobPostingRepo!.createQueryBuilder('job');
+      if (from) qb.andWhere('job.created_at >= :from', { from });
+      if (to) qb.andWhere('job.created_at <= :to', { to });
+
+      const rows = await qb.orderBy('job.created_at', 'DESC').getMany();
       return rows.map((row) => this.toJobPosting(row));
     }
-    return [...this.jobPostings.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+    return [...this.jobPostings.values()]
+      .filter((job) => {
+        const createdAtMs = Date.parse(job.createdAt);
+        if (from && Number.isFinite(createdAtMs) && createdAtMs < from.getTime()) return false;
+        if (to && Number.isFinite(createdAtMs) && createdAtMs > to.getTime()) return false;
+        return true;
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
   async getJobPosting(id: string): Promise<JobPosting | undefined> {
@@ -581,9 +792,15 @@ export class PublicGatewayService {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
-  async listAllApplications(): Promise<JobApplication[]> {
+  async listAllApplications(fromDate?: string, toDate?: string): Promise<JobApplication[]> {
+    const { from, to } = this.parseDateRange(fromDate, toDate);
+
     if (this.useDb()) {
-      const applications = await this.jobApplicationRepo!.find({ order: { createdAt: 'DESC' } });
+      const qb = this.jobApplicationRepo!.createQueryBuilder('application');
+      if (from) qb.andWhere('application.created_at >= :from', { from });
+      if (to) qb.andWhere('application.created_at <= :to', { to });
+
+      const applications = await qb.orderBy('application.created_at', 'DESC').getMany();
       if (applications.length === 0) {
         return [];
       }
@@ -596,7 +813,14 @@ export class PublicGatewayService {
       );
     }
 
-    return [...this.jobApplications.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return [...this.jobApplications.values()]
+      .filter((application) => {
+        const createdAtMs = Date.parse(application.createdAt);
+        if (from && Number.isFinite(createdAtMs) && createdAtMs < from.getTime()) return false;
+        if (to && Number.isFinite(createdAtMs) && createdAtMs > to.getTime()) return false;
+        return true;
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
   async updateApplication(

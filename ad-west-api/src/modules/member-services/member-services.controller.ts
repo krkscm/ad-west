@@ -124,8 +124,8 @@ export class SpecialEventsAdminController {
   constructor(private readonly svc: MemberServicesService) {}
 
   @Get()
-  async list() {
-    return { items: await this.svc.listEvents() };
+  async list(@Query('fromDate') fromDate?: string, @Query('toDate') toDate?: string) {
+    return { items: await this.svc.listEvents(fromDate, toDate) };
   }
 
   @Get(':id')

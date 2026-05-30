@@ -1,6 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { CreateReportMetricDefinitionDto, CreateSreniReportParameterDto, SubmitSreniMonthlyReportDto, UpdateReportMetricDefinitionDto, UpdateSreniReportParameterDto } from '../dto/core-business.dto';
+import { CreateLocationReportMetricDto, CreateReportMetricDefinitionDto, CreateSreniReportParameterDto, SubmitSreniMonthlyReportDto, UpdateLocationReportMetricDto, UpdateReportMetricDefinitionDto, UpdateSreniReportParameterDto } from '../dto/core-business.dto';
 import type { ReportMetricDefinitionRecord, SreniContactRecord, SreniMonthlyReportRecord, SreniReportParameterRecord } from '../core-business.service';
 
 type SreniContactCellValue = string | number | boolean | null;
@@ -69,6 +69,15 @@ export interface SreniAdminRuntimeContext {
 
 export class SreniAdminRuntimeService {
   constructor(private readonly ctx: SreniAdminRuntimeContext) {}
+
+  private toMonthKey(dateInput: string, label: string): number {
+    const parsed = new Date(dateInput);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException(`${label} must be a valid date string`);
+    }
+
+    return parsed.getUTCFullYear() * 100 + (parsed.getUTCMonth() + 1);
+  }
 
   listSreniContacts(
     sreniId: string,
@@ -207,37 +216,87 @@ export class SreniAdminRuntimeService {
     return { deleted, sreniId };
   }
 
+  private mapMetricRow(r: { id: string; name: string; description: string | null; unit: string | null; input_type: string; is_required: boolean; sort_order: number; target?: string | null; active: boolean; scope?: string; created_at: string | Date; updated_at: string | Date }): ReportMetricDefinitionRecord {
+    return {
+      id: r.id, name: r.name, description: r.description ?? undefined, unit: r.unit ?? undefined,
+      inputType: r.input_type as 'number' | 'text', isRequired: r.is_required, sortOrder: r.sort_order,
+      target: r.target != null ? Number(r.target) : undefined,
+      active: r.active, scope: (r.scope ?? 'sreni') as 'sreni' | 'location',
+      createdAt: this.ctx.toIsoTimestamp(r.created_at), updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+    };
+  }
+
+  // Cached check: does the scope column exist yet (migration 047 may not have run)?
+  private scopeColumnReady: boolean | null = null;
+
+  private async hasScopeColumn(): Promise<boolean> {
+    if (this.scopeColumnReady !== null) return this.scopeColumnReady;
+    if (!this.ctx.dataSource) return false;
+    try {
+      const rows = await this.ctx.dataSource.query(
+        `SELECT 1 FROM information_schema.columns
+         WHERE table_schema='adwest' AND table_name='report_metric_definitions' AND column_name='scope'`,
+      ) as unknown[];
+      this.scopeColumnReady = rows.length > 0;
+    } catch {
+      this.scopeColumnReady = false;
+    }
+    return this.scopeColumnReady;
+  }
+
   async listReportMetricDefinitions(): Promise<ReportMetricDefinitionRecord[]> {
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const hasScope = await this.hasScopeColumn();
+      const whereClause = hasScope ? `WHERE COALESCE(scope, 'sreni') = 'sreni'` : '';
+      const scopeSelect = hasScope ? `COALESCE(scope, 'sreni') AS scope,` : `'sreni' AS scope,`;
       const rows = await this.ctx.dataSource.query(
-        `SELECT id, name, description, unit, input_type, is_required, sort_order, target, active, created_at, updated_at
-         FROM adwest.report_metric_definitions ORDER BY sort_order ASC, created_at ASC`,
-      ) as Array<{ id: string; name: string; description: string | null; unit: string | null; input_type: string; is_required: boolean; sort_order: number; target: string | null; active: boolean; created_at: string | Date; updated_at: string | Date }>;
-      return rows.map((r) => ({
-        id: r.id, name: r.name, description: r.description ?? undefined, unit: r.unit ?? undefined,
-        inputType: r.input_type as 'number' | 'text', isRequired: r.is_required, sortOrder: r.sort_order,
-        target: r.target != null ? Number(r.target) : undefined,
-        active: r.active, createdAt: this.ctx.toIsoTimestamp(r.created_at), updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
-      }));
+        `SELECT id, name, description, unit, input_type, is_required, sort_order, target, active,
+                ${scopeSelect} created_at, updated_at
+         FROM adwest.report_metric_definitions ${whereClause}
+         ORDER BY sort_order ASC, created_at ASC`,
+      ) as Array<{ id: string; name: string; description: string | null; unit: string | null; input_type: string; is_required: boolean; sort_order: number; target: string | null; active: boolean; scope: string; created_at: string | Date; updated_at: string | Date }>;
+      return rows.map((r) => this.mapMetricRow(r));
     }
-    return Array.from(this.ctx.reportMetricDefinitions.values()).sort((a, b) => a.sortOrder - b.sortOrder);
+    return Array.from(this.ctx.reportMetricDefinitions.values())
+      .filter((m) => !('scope' in m) || (m as ReportMetricDefinitionRecord).scope === 'sreni')
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+
+  async listLocationReportMetrics(): Promise<ReportMetricDefinitionRecord[]> {
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const hasScope = await this.hasScopeColumn();
+      if (!hasScope) return []; // migration 047 not yet applied — no location metrics exist
+      const rows = await this.ctx.dataSource.query(
+        `SELECT id, name, description, unit, input_type, is_required, sort_order, target, active,
+                scope, created_at, updated_at
+         FROM adwest.report_metric_definitions WHERE scope = 'location'
+         ORDER BY sort_order ASC, created_at ASC`,
+      ) as Array<{ id: string; name: string; description: string | null; unit: string | null; input_type: string; is_required: boolean; sort_order: number; target: string | null; active: boolean; scope: string; created_at: string | Date; updated_at: string | Date }>;
+      return rows.map((r) => this.mapMetricRow(r));
+    }
+    return [];
   }
 
   async createReportMetricDefinition(dto: CreateReportMetricDefinitionDto): Promise<ReportMetricDefinitionRecord> {
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const hasScope = await this.hasScopeColumn();
+      const sql = hasScope
+        ? `INSERT INTO adwest.report_metric_definitions (name, description, unit, input_type, is_required, sort_order, target, scope)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'sreni')
+           RETURNING id, name, description, unit, input_type, is_required, sort_order, target, active, 'sreni' AS scope, created_at, updated_at`
+        : `INSERT INTO adwest.report_metric_definitions (name, description, unit, input_type, is_required, sort_order, target)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING id, name, description, unit, input_type, is_required, sort_order, target, active, 'sreni' AS scope, created_at, updated_at`;
       const rows = await this.ctx.dataSource.query(
-        `INSERT INTO adwest.report_metric_definitions (name, description, unit, input_type, is_required, sort_order, target)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING id, name, description, unit, input_type, is_required, sort_order, target, active, created_at, updated_at`,
+        sql,
         [dto.name, dto.description ?? null, dto.unit ?? null, dto.inputType, dto.isRequired ?? false, dto.sortOrder ?? 0, dto.target ?? null],
-      ) as Array<{ id: string; name: string; description: string | null; unit: string | null; input_type: string; is_required: boolean; sort_order: number; target: string | null; active: boolean; created_at: string | Date; updated_at: string | Date }>;
-      const r = rows[0];
-      return { id: r.id, name: r.name, description: r.description ?? undefined, unit: r.unit ?? undefined, inputType: r.input_type as 'number' | 'text', isRequired: r.is_required, sortOrder: r.sort_order, target: r.target != null ? Number(r.target) : undefined, active: r.active, createdAt: this.ctx.toIsoTimestamp(r.created_at), updatedAt: this.ctx.toIsoTimestamp(r.updated_at) };
+      ) as Array<{ id: string; name: string; description: string | null; unit: string | null; input_type: string; is_required: boolean; sort_order: number; target: string | null; active: boolean; scope: string; created_at: string | Date; updated_at: string | Date }>;
+      return this.mapMetricRow(rows[0]);
     }
     const record: ReportMetricDefinitionRecord = {
       id: this.ctx.newId('rmd'), name: dto.name, description: dto.description, unit: dto.unit,
       inputType: dto.inputType, isRequired: dto.isRequired ?? false, sortOrder: dto.sortOrder ?? 0,
-      active: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      active: true, scope: 'sreni', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
     this.ctx.reportMetricDefinitions.set(record.id, record);
     return record;
@@ -245,10 +304,12 @@ export class SreniAdminRuntimeService {
 
   async updateReportMetricDefinition(metricId: string, dto: UpdateReportMetricDefinitionDto): Promise<ReportMetricDefinitionRecord> {
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const hasScope = await this.hasScopeColumn();
       const existing = await this.ctx.dataSource.query(
         `SELECT id FROM adwest.report_metric_definitions WHERE id=$1`, [metricId],
       ) as Array<{ id: string }>;
       if (!existing.length) throw new NotFoundException('Report metric not found');
+      const scopeReturn = hasScope ? `COALESCE(scope, 'sreni') AS scope,` : `'sreni' AS scope,`;
       const rows = await this.ctx.dataSource.query(
         `UPDATE adwest.report_metric_definitions
          SET name=COALESCE($2, name), description=COALESCE($3, description), unit=COALESCE($4, unit),
@@ -256,18 +317,65 @@ export class SreniAdminRuntimeService {
              sort_order=COALESCE($7, sort_order), target=COALESCE($8, target),
              active=COALESCE($9, active), updated_at=now()
          WHERE id=$1
-         RETURNING id, name, description, unit, input_type, is_required, sort_order, target, active, created_at, updated_at`,
+         RETURNING id, name, description, unit, input_type, is_required, sort_order, target, active,
+                   ${scopeReturn} created_at, updated_at`,
         [metricId, dto.name ?? null, dto.description ?? null, dto.unit ?? null,
          dto.inputType ?? null, dto.isRequired ?? null, dto.sortOrder ?? null, dto.target ?? null, dto.active ?? null],
-      ) as Array<{ id: string; name: string; description: string | null; unit: string | null; input_type: string; is_required: boolean; sort_order: number; target: string | null; active: boolean; created_at: string | Date; updated_at: string | Date }>;
-      const r = rows[0];
-      return { id: r.id, name: r.name, description: r.description ?? undefined, unit: r.unit ?? undefined, inputType: r.input_type as 'number' | 'text', isRequired: r.is_required, sortOrder: r.sort_order, target: r.target != null ? Number(r.target) : undefined, active: r.active, createdAt: this.ctx.toIsoTimestamp(r.created_at), updatedAt: this.ctx.toIsoTimestamp(r.updated_at) };
+      ) as Array<{ id: string; name: string; description: string | null; unit: string | null; input_type: string; is_required: boolean; sort_order: number; target: string | null; active: boolean; scope: string; created_at: string | Date; updated_at: string | Date }>;
+      return this.mapMetricRow(rows[0]);
     }
     const current = this.ctx.reportMetricDefinitions.get(metricId);
     if (!current) throw new NotFoundException('Report metric not found');
     const updated = { ...current, ...dto, updatedAt: new Date().toISOString() };
     this.ctx.reportMetricDefinitions.set(metricId, updated);
     return updated;
+  }
+
+  async createLocationReportMetric(dto: CreateLocationReportMetricDto): Promise<ReportMetricDefinitionRecord> {
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const hasScope = await this.hasScopeColumn();
+      if (!hasScope) {
+        // Migration 047 not yet applied — apply it now on-demand
+        await this.ctx.dataSource.query(
+          `ALTER TABLE adwest.report_metric_definitions
+           ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'sreni'
+             CHECK (scope IN ('sreni', 'location'))`,
+        );
+        this.scopeColumnReady = true;
+      }
+      const rows = await this.ctx.dataSource.query(
+        `INSERT INTO adwest.report_metric_definitions (name, description, unit, input_type, is_required, sort_order, scope)
+         VALUES ($1, $2, $3, $4, $5, $6, 'location')
+         RETURNING id, name, description, unit, input_type, is_required, sort_order, target, active, scope, created_at, updated_at`,
+        [dto.name, dto.description ?? null, dto.unit ?? null, dto.inputType, dto.isRequired ?? false, dto.sortOrder ?? 0],
+      ) as Array<{ id: string; name: string; description: string | null; unit: string | null; input_type: string; is_required: boolean; sort_order: number; target: string | null; active: boolean; scope: string; created_at: string | Date; updated_at: string | Date }>;
+      return this.mapMetricRow(rows[0]);
+    }
+    const now = new Date().toISOString();
+    return { id: this.ctx.newId('lrm'), name: dto.name, description: dto.description, unit: dto.unit, inputType: dto.inputType, isRequired: dto.isRequired ?? false, sortOrder: dto.sortOrder ?? 0, active: true, scope: 'location', createdAt: now, updatedAt: now };
+  }
+
+  async updateLocationReportMetric(metricId: string, dto: UpdateLocationReportMetricDto): Promise<ReportMetricDefinitionRecord> {
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const hasScope = await this.hasScopeColumn();
+      if (!hasScope) throw new NotFoundException('Location report metric not found — run migration 047 first');
+      const existing = await this.ctx.dataSource.query(
+        `SELECT id FROM adwest.report_metric_definitions WHERE id=$1 AND scope='location'`, [metricId],
+      ) as Array<{ id: string }>;
+      if (!existing.length) throw new NotFoundException('Location report metric not found');
+      const rows = await this.ctx.dataSource.query(
+        `UPDATE adwest.report_metric_definitions
+         SET name=COALESCE($2, name), description=COALESCE($3, description), unit=COALESCE($4, unit),
+             input_type=COALESCE($5, input_type), is_required=COALESCE($6, is_required),
+             sort_order=COALESCE($7, sort_order), updated_at=now()
+         WHERE id=$1 AND scope='location'
+         RETURNING id, name, description, unit, input_type, is_required, sort_order, target, active, scope, created_at, updated_at`,
+        [metricId, dto.name ?? null, dto.description ?? null, dto.unit ?? null,
+         dto.inputType ?? null, dto.isRequired ?? null, dto.sortOrder ?? null],
+      ) as Array<{ id: string; name: string; description: string | null; unit: string | null; input_type: string; is_required: boolean; sort_order: number; target: string | null; active: boolean; scope: string; created_at: string | Date; updated_at: string | Date }>;
+      return this.mapMetricRow(rows[0]);
+    }
+    throw new NotFoundException('Location report metric not found');
   }
 
   async deleteReportMetricDefinition(metricId: string): Promise<void> {
@@ -296,11 +404,33 @@ export class SreniAdminRuntimeService {
     return Array.from(this.ctx.sreniMonthlyReports.values()).filter((r) => r.sreniId === sreniId).sort((a, b) => b.year - a.year || b.month - a.month);
   }
 
-  async listAllMonthlyReports(): Promise<SreniMonthlyReportRecord[]> {
+  async listAllMonthlyReports(fromDate?: string, toDate?: string): Promise<SreniMonthlyReportRecord[]> {
+    const fromMonthKey = fromDate ? this.toMonthKey(fromDate, 'fromDate') : undefined;
+    const toMonthKey = toDate ? this.toMonthKey(toDate, 'toDate') : undefined;
+
+    if (fromMonthKey !== undefined && toMonthKey !== undefined && fromMonthKey > toMonthKey) {
+      throw new BadRequestException('fromDate must be before or equal to toDate');
+    }
+
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const clauses: string[] = [];
+      const params: Array<number> = [];
+
+      if (fromMonthKey !== undefined) {
+        params.push(fromMonthKey);
+        clauses.push(`(report_year * 100 + report_month) >= $${params.length}`);
+      }
+
+      if (toMonthKey !== undefined) {
+        params.push(toMonthKey);
+        clauses.push(`(report_year * 100 + report_month) <= $${params.length}`);
+      }
+
+      const whereClause = clauses.length > 0 ? ` WHERE ${clauses.join(' AND ')}` : '';
       const rows = await this.ctx.dataSource.query(
         `SELECT id, sreni_id, report_year, report_month, status, submitted_by, submitted_at, notes, entries, created_at, updated_at
-         FROM adwest.sreni_monthly_reports ORDER BY report_year DESC, report_month DESC, sreni_id`,
+         FROM adwest.sreni_monthly_reports${whereClause} ORDER BY report_year DESC, report_month DESC, sreni_id`,
+        params,
       ) as Array<{ id: string; sreni_id: string; report_year: number; report_month: number; status: string; submitted_by: string | null; submitted_at: string | Date | null; notes: string | null; entries: Record<string, string>; created_at: string | Date; updated_at: string | Date }>;
       return rows.map((r) => ({
         id: r.id, sreniId: r.sreni_id, year: r.report_year, month: r.report_month,
@@ -310,7 +440,15 @@ export class SreniAdminRuntimeService {
         createdAt: this.ctx.toIsoTimestamp(r.created_at), updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
       }));
     }
-    return Array.from(this.ctx.sreniMonthlyReports.values()).sort((a, b) => b.year - a.year || b.month - a.month);
+
+    return Array.from(this.ctx.sreniMonthlyReports.values())
+      .filter((report) => {
+        const monthKey = report.year * 100 + report.month;
+        if (fromMonthKey !== undefined && monthKey < fromMonthKey) return false;
+        if (toMonthKey !== undefined && monthKey > toMonthKey) return false;
+        return true;
+      })
+      .sort((a, b) => b.year - a.year || b.month - a.month);
   }
 
   async upsertSreniMonthlyReport(sreniId: string, dto: SubmitSreniMonthlyReportDto, submittedBy?: string): Promise<SreniMonthlyReportRecord> {

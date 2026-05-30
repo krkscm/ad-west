@@ -40,6 +40,11 @@ export interface PaginatedResponse<T> {
   totalPages: number
 }
 
+export interface DateRangeQuery {
+  fromDate?: string
+  toDate?: string
+}
+
 export interface AuditLogApi {
   id: string
   actorId: string
@@ -124,12 +129,19 @@ export interface AdminMenuGrantsApi {
   menuKeys: string[]
 }
 
+export interface AiChatResponseApi {
+  answer: string
+  provider: 'openai' | 'ollama'
+  model: string
+}
+
 export interface SreniDefinitionApi {
   id: string
   code?: string
   name: string
   description?: string
   active: boolean
+  joinUsVisible: boolean
   createdBy?: string
   updatedBy?: string
   createdAt: string
@@ -651,6 +663,96 @@ export interface JobApplicationApi {
   updatedAt: string
 }
 
+export interface PublicSreniOptionApi {
+  id: string
+  name: string
+  code?: string
+}
+
+export interface PublicSreniContactRegistrationApi {
+  id: string
+  sreniId: string
+  rowIndex: number
+  createdAt: string
+}
+
+// ─── Sthan types ─────────────────────────────────────────────────────────────
+
+export interface SthanReportMetricApi {
+  id: string
+  locationId: string
+  name: string
+  description?: string
+  unit?: string
+  inputType: 'number' | 'text'
+  isRequired: boolean
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SthanReportApi {
+  id: string
+  locationId: string
+  periodYear: number
+  periodMonth: number
+  entries: Record<string, string>
+  notes?: string
+  submittedBy?: string
+  submittedAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type SthanExpenseCategory = 'travel' | 'food' | 'accommodation' | 'event_supplies' | 'printing' | 'other'
+export type SthanExpenseStatus = 'draft' | 'submitted' | 'pending_review' | 'approved' | 'rejected'
+
+export interface SthanExpenseApi {
+  id: string
+  locationId: string
+  submittedBy?: string
+  category: SthanExpenseCategory
+  description: string
+  amount: number
+  currency: string
+  receiptUrl?: string
+  receiptOriginalName?: string
+  status: SthanExpenseStatus
+  reviewerNotes?: string
+  reviewedBy?: string
+  reviewedAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SthanContactRowApi {
+  id: string
+  locationId: string
+  rowIndex: number
+  data: Record<string, string | number | boolean | null>
+  sourceFile?: string
+  uploadedBy?: string
+  createdAt: string
+  updatedAt: string
+}
+
+const withDateRangeQuery = (basePath: string, range?: DateRangeQuery, extra?: Record<string, string | undefined>) => {
+  const query = new URLSearchParams()
+  if (range?.fromDate) query.set('fromDate', range.fromDate)
+  if (range?.toDate) query.set('toDate', range.toDate)
+
+  if (extra) {
+    Object.entries(extra).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        query.set(key, value)
+      }
+    })
+  }
+
+  const queryString = query.toString()
+  return `${basePath}${queryString ? `?${queryString}` : ''}`
+}
+
 export const backendApi = {
   captchaChallenge: () => api.get<CaptchaChallengeResponse>('/auth/captcha'),
 
@@ -812,10 +914,10 @@ export const backendApi = {
     return api.get<PaginatedResponse<SreniDefinitionApi>>(`/org/sreni-definitions?${qs.toString()}`)
   },
 
-  createSreniDefinition: (payload: { name: string; code?: string; description?: string }) =>
+  createSreniDefinition: (payload: { name: string; code?: string; description?: string; joinUsVisible?: boolean }) =>
     api.post<SreniDefinitionApi>('/org/sreni-definitions', payload),
 
-  updateSreniDefinition: (id: string, payload: { name?: string; code?: string; description?: string; active?: boolean }) =>
+  updateSreniDefinition: (id: string, payload: { name?: string; code?: string; description?: string; active?: boolean; joinUsVisible?: boolean }) =>
     api.patch<SreniDefinitionApi>(`/org/sreni-definitions/${id}`, payload),
 
   deleteSreniDefinition: (id: string) => api.delete<void>(`/org/sreni-definitions/${id}`),
@@ -987,8 +1089,13 @@ export const backendApi = {
     api.post<ReportSubmissionApi>('/members/me/reports/submissions', payload, { token }),
 
   // Menu Management
-  listMenuItems: (activeOnly?: boolean) =>
-    api.get<MenuItemApi[]>(`/menu-items${activeOnly ? '?activeOnly=true' : ''}`),
+  listMenuItems: (activeOnly?: boolean, scope?: 'all') => {
+    const query = new URLSearchParams()
+    if (activeOnly) query.set('activeOnly', 'true')
+    if (scope) query.set('scope', scope)
+    const queryString = query.toString()
+    return api.get<MenuItemApi[]>(`/menu-items${queryString ? `?${queryString}` : ''}`)
+  },
 
   createMenuItem: (payload: { key: string; label: string; parentKey?: string; icon?: string; sortOrder?: number; active?: boolean }) =>
     api.post<MenuItemApi>('/menu-items', payload),
@@ -1003,6 +1110,9 @@ export const backendApi = {
 
   setAdminMenuGrants: (adminUserId: string, menuKeys: string[]) =>
     api.put<AdminMenuGrantsApi>(`/menu-items/grants/${adminUserId}`, { menuKeys }),
+
+  chatWithAi: (payload: { message: string; context?: string }) =>
+    api.post<AiChatResponseApi>('/ai-chat/query', payload),
 
   // Approval Workflow Definitions (Settings)
   listApprovalWorkflowDefinitions: (params?: {
@@ -1242,8 +1352,8 @@ export const backendApi = {
   // Sreni Monthly Reports (legacy)
   listSreniMonthlyReports: (sreniId: string) =>
     api.get<SreniMonthlyReportApi[]>(`/org/sreni-definitions/${encodeURIComponent(sreniId)}/reports`),
-  listAllMonthlyReports: () =>
-    api.get<SreniMonthlyReportApi[]>('/org/reports'),
+  listAllMonthlyReports: (range?: DateRangeQuery) =>
+    api.get<SreniMonthlyReportApi[]>(withDateRangeQuery('/org/reports', range)),
   upsertSreniMonthlyReport: (sreniId: string, payload: { year: number; month: number; entries: Record<string, string>; notes?: string }) =>
     api.post<SreniMonthlyReportApi>(`/org/sreni-definitions/${encodeURIComponent(sreniId)}/reports`, payload),
 
@@ -1264,9 +1374,9 @@ export const backendApi = {
     api.post<SreniReportApi>(`/org/sreni-definitions/${encodeURIComponent(sreniId)}/reports-v2`, payload),
 
   // ─── Public Gateway — Helpdesk (admin) ───────────────────────────────────
-  listHelpdeskTickets: (status?: string) => {
-    const qs = status ? `?status=${encodeURIComponent(status)}` : ''
-    return api.get<{ items: HelpdeskTicketApi[] }>(`/gateway/helpdesk/tickets${qs}`)
+  listHelpdeskTickets: (status?: string, range?: DateRangeQuery) => {
+    const path = withDateRangeQuery('/gateway/helpdesk/tickets', range, { status })
+    return api.get<{ items: HelpdeskTicketApi[] }>(path)
   },
   getHelpdeskTicket: (id: string) =>
     api.get<HelpdeskTicketApi>(`/gateway/helpdesk/tickets/${id}`),
@@ -1274,16 +1384,16 @@ export const backendApi = {
     api.patch<HelpdeskTicketApi>(`/gateway/helpdesk/tickets/${id}`, payload),
 
   // ─── Public Gateway — Jobs (admin) ───────────────────────────────────────
-  listJobPostings: () =>
-    api.get<{ items: JobPostingApi[] }>('/gateway/jobs'),
+  listJobPostings: (range?: DateRangeQuery) =>
+    api.get<{ items: JobPostingApi[] }>(withDateRangeQuery('/gateway/jobs', range)),
   createJobPosting: (payload: { title: string; description: string; requirements?: string; location?: string; type?: JobType; expiresAt?: string }) =>
     api.post<JobPostingApi>('/gateway/jobs', payload),
   updateJobPosting: (id: string, payload: { title?: string; description?: string; requirements?: string; location?: string; type?: JobType; isActive?: boolean; expiresAt?: string }) =>
     api.patch<JobPostingApi>(`/gateway/jobs/${id}`, payload),
   deleteJobPosting: (id: string) =>
     api.delete<{ success: boolean }>(`/gateway/jobs/${id}`),
-  listAllJobApplications: () =>
-    api.get<{ items: JobApplicationApi[] }>('/gateway/jobs/applications'),
+  listAllJobApplications: (range?: DateRangeQuery) =>
+    api.get<{ items: JobApplicationApi[] }>(withDateRangeQuery('/gateway/jobs/applications', range)),
   listJobApplicationsForPosting: (jobId: string) =>
     api.get<{ items: JobApplicationApi[] }>(`/gateway/jobs/${jobId}/applications`),
   downloadJobApplicationResume: (id: string) =>
@@ -1298,6 +1408,32 @@ export const backendApi = {
     api.post<HelpdeskTicketApi>('/public/helpdesk/tickets', payload),
   publicSubmitJobPosting: (payload: { contactName: string; contactPhone: string; contactEmail?: string; title: string; description: string; requirements?: string; location?: string; type?: JobType }) =>
     api.post<JobPostingApi>('/public/jobs', payload),
+  publicListSreniContactOptions: () =>
+    api.get<{ items: PublicSreniOptionApi[] }>('/public/sreni-contacts/srenies'),
+  publicRegisterSreniContact: (payload: {
+    sreniId: string
+    fullName: string
+    phone: string
+    email?: string
+    city?: string
+    country?: string
+    notes?: string
+    personalNumber?: string
+    familyOrBachelor?: string
+    family?: string
+    bachelor?: string
+    addressInUae?: string
+    company?: string
+    profession?: string
+    wifeName?: string
+    landLine?: string
+    zoneOrLandMark?: string
+    district?: string
+    captchaToken: string
+    captchaAnswer: string
+    website?: string
+  }) =>
+    api.post<PublicSreniContactRegistrationApi>('/public/sreni-contacts/register', payload),
 
   // ─── Member Services — Reimbursements ────────────────────────────────────
   listReimbursements: (params?: { submittedBy?: string; status?: string }) => {
@@ -1321,7 +1457,8 @@ export const backendApi = {
   deleteReimbursement: (id: string) => api.delete<{ success: boolean }>(`/member-services/reimbursements/${id}`),
 
   // ─── Member Services — Special Events ────────────────────────────────────
-  listSpecialEvents: () => api.get<{ items: SpecialEventApi[] }>('/member-services/events'),
+  listSpecialEvents: (range?: DateRangeQuery) =>
+    api.get<{ items: SpecialEventApi[] }>(withDateRangeQuery('/member-services/events', range)),
   getSpecialEvent: (id: string) => api.get<SpecialEventApi>(`/member-services/events/${id}`),
   createSpecialEvent: (payload: Omit<SpecialEventApi, 'id' | 'createdBy' | 'createdAt' | 'updatedAt'>) =>
     api.post<SpecialEventApi>('/member-services/events', payload),
@@ -1354,11 +1491,57 @@ export const backendApi = {
     if (payload.resumeFile) form.append('resume', payload.resumeFile)
     return api.postForm<JobApplicationApi>(`/public/jobs/${jobId}/apply`, form)
   },
+
+  // ─── Location Report Metrics (shared across all sthans, in Report Config) ──
+  listLocationReportMetrics: () =>
+    api.get<ReportMetricDefinitionApi[]>('/settings/location-report-metrics'),
+  createLocationReportMetric: (payload: { name: string; inputType: 'number' | 'text'; isRequired: boolean; sortOrder: number; description?: string; unit?: string }) =>
+    api.post<ReportMetricDefinitionApi>('/settings/location-report-metrics', payload),
+  updateLocationReportMetric: (metricId: string, payload: { name?: string; description?: string; unit?: string; inputType?: 'number' | 'text'; isRequired?: boolean; sortOrder?: number }) =>
+    api.patch<ReportMetricDefinitionApi>(`/settings/location-report-metrics/${encodeURIComponent(metricId)}`, payload),
+
+  // ─── Sthan — Reports ─────────────────────────────────────────────────────
+  listSthanReports: (locationId: string) =>
+    api.get<SthanReportApi[]>(`/org/locations/${encodeURIComponent(locationId)}/sthan-reports`),
+  upsertSthanReport: (locationId: string, payload: { periodYear: number; periodMonth: number; entries: Record<string, string>; notes?: string }) =>
+    api.post<SthanReportApi>(`/org/locations/${encodeURIComponent(locationId)}/sthan-reports`, payload),
+
+  // ─── Sthan — Expenses ────────────────────────────────────────────────────
+  listSthanExpenses: (locationId: string, status?: string) => {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : ''
+    return api.get<SthanExpenseApi[]>(`/org/locations/${encodeURIComponent(locationId)}/expenses${qs}`)
+  },
+  createSthanExpense: (locationId: string, payload: { category: SthanExpenseCategory; description: string; amount: number; currency?: string; asDraft?: boolean }) =>
+    api.post<SthanExpenseApi>(`/org/locations/${encodeURIComponent(locationId)}/expenses`, payload),
+  reviewSthanExpense: (locationId: string, expenseId: string, payload: { status: 'approved' | 'rejected' | 'pending_review'; reviewerNotes?: string }) =>
+    api.patch<SthanExpenseApi>(`/org/locations/${encodeURIComponent(locationId)}/expenses/${encodeURIComponent(expenseId)}/review`, payload),
+  deleteSthanExpense: (locationId: string, expenseId: string) =>
+    api.delete<void>(`/org/locations/${encodeURIComponent(locationId)}/expenses/${encodeURIComponent(expenseId)}`),
+
+  // ─── Sthan — Contacts ────────────────────────────────────────────────────
+  listSthanContacts: (locationId: string, page = 1, pageSize = 50) =>
+    api.get<{ items: SthanContactRowApi[]; total: number; totalPages: number }>(
+      `/org/locations/${encodeURIComponent(locationId)}/contacts?page=${page}&pageSize=${pageSize}`,
+    ),
+  uploadSthanContacts: (locationId: string, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.postForm<{ inserted: number; locationId: string }>(
+      `/org/locations/${encodeURIComponent(locationId)}/contacts/upload`,
+      form,
+    )
+  },
+  clearSthanContacts: (locationId: string) =>
+    api.delete<{ deleted: number }>(`/org/locations/${encodeURIComponent(locationId)}/contacts`),
 }
 
 export function toUiRole(role: AdminRoleAssignment['role']): 'Super Admin' | 'Zone Admin' | 'Sreny Admin' {
-  if (role === 'SUPER_ADMIN') return 'Super Admin'
-  if (role === 'ZONE_ADMIN') return 'Zone Admin'
+  const normalized = String(role ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+  if (normalized === 'SUPERADMIN') return 'Super Admin'
+  if (normalized === 'ZONEADMIN') return 'Zone Admin'
   return 'Sreny Admin'
 }
 

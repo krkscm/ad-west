@@ -2,10 +2,25 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   backendApi,
   type ResponsibilityChartApi,
+  type ResponsibilityChartEdgeApi,
   type ResponsibilityChartNodeApi,
   type RoleDefinitionApi,
+  type UserApi,
+  type LocationDefinitionApi,
 } from '../../utils/backendApi'
 import { useToast } from '../../components/common/Toast'
+import {
+  Background,
+  Controls,
+  MarkerType,
+  MiniMap,
+  type Edge,
+  type Node,
+  type NodeProps,
+  Position,
+  ReactFlow,
+} from '@xyflow/react'
+import '@xyflow/react/dist/style.css'
 
 const toUiError = (error: unknown, fallback: string): string => {
   if (!(error instanceof Error)) return fallback
@@ -18,18 +33,77 @@ export const ResponsibilityChartPage: React.FC = () => {
   const { addToast } = useToast()
   const [chart, setChart] = useState<ResponsibilityChartApi | null>(null)
   const [roles, setRoles] = useState<RoleDefinitionApi[]>([])
+  const [usersById, setUsersById] = useState<Map<string, UserApi>>(new Map())
+  const [locationsById, setLocationsById] = useState<Map<string, LocationDefinitionApi>>(new Map())
   const [selectedYear, setSelectedYear] = useState<number | undefined>(undefined)
   const [isLoading, setIsLoading] = useState(false)
+
+  type OrgNodeData = {
+    name: string
+    roleName: string
+    sthanName: string
+    contactNumber: string
+    reportingLine: string
+    active: boolean
+  }
+
+  const OrgNodeCard: React.FC<NodeProps<Node<OrgNodeData>>> = ({ data }) => {
+    return (
+      <div style={{
+        width: '260px',
+        border: '1px solid var(--border-dark)',
+        borderRadius: '12px',
+        background: 'var(--panel-soft-bg)',
+        boxShadow: '0 6px 20px rgba(15, 23, 42, 0.1)',
+        padding: '12px',
+        display: 'grid',
+        gap: '8px',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+          <div style={{ fontSize: '0.94rem', fontWeight: 800, color: 'var(--text-primary-dark)', lineHeight: 1.2 }}>
+            {data.name}
+          </div>
+          <span className={`badge ${data.active ? 'badge-success' : 'badge-error'}`} style={{ fontSize: '0.64rem' }}>
+            {data.active ? 'Active' : 'Inactive'}
+          </span>
+        </div>
+
+        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>
+          <strong style={{ color: 'var(--text-primary-dark)' }}>Role:</strong> {data.roleName}
+        </div>
+        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>
+          <strong style={{ color: 'var(--text-primary-dark)' }}>Sthan:</strong> {data.sthanName}
+        </div>
+        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>
+          <strong style={{ color: 'var(--text-primary-dark)' }}>Contact:</strong> {data.contactNumber}
+        </div>
+        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>
+          <strong style={{ color: 'var(--text-primary-dark)' }}>Reports To:</strong> {data.reportingLine}
+        </div>
+      </div>
+    )
+  }
 
   const load = useCallback(async (year?: number) => {
     setIsLoading(true)
     try {
-      const [chartData, rolesData] = await Promise.all([
+      const [chartData, rolesData, usersData, locationsData] = await Promise.all([
         backendApi.getResponsibilityChart(year),
         backendApi.listRoleDefinitions({ page: 1, pageSize: 1000, active: true }),
+        backendApi.listUsers({ page: 1, pageSize: 5000 }),
+        backendApi.listLocationDefinitions(),
       ])
+
+      const usersMap = new Map<string, UserApi>()
+      usersData.items.forEach((user) => usersMap.set(user.id, user))
+
+      const locationsMap = new Map<string, LocationDefinitionApi>()
+      locationsData.forEach((location) => locationsMap.set(location.id, location))
+
       setChart(chartData)
       setRoles(rolesData.items)
+      setUsersById(usersMap)
+      setLocationsById(locationsMap)
       setSelectedYear(chartData.year)
     } catch (error) {
       addToast(toUiError(error, 'Failed to load responsibility chart.'), 'error')
@@ -54,16 +128,6 @@ export const ResponsibilityChartPage: React.FC = () => {
     return map
   }, [chart])
 
-  const edgesByChild = useMemo(() => {
-    const map = new Map<string, string[]>()
-    chart?.edges.forEach((edge) => {
-      const rows = map.get(edge.fromUserId) ?? []
-      rows.push(edge.toUserId)
-      map.set(edge.fromUserId, rows)
-    })
-    return map
-  }, [chart])
-
   const managerToChildren = useMemo(() => {
     const map = new Map<string, string[]>()
     chart?.edges.forEach((edge) => {
@@ -74,39 +138,161 @@ export const ResponsibilityChartPage: React.FC = () => {
     return map
   }, [chart])
 
-  const nodesByLevel = useMemo(() => {
-    if (!chart) return new Map<number, ResponsibilityChartNodeApi[]>()
-
-    const levels = new Map<string, number>()
-    chart.nodes.forEach((node) => levels.set(node.userId, 0))
-
-    for (let i = 0; i < chart.nodes.length; i += 1) {
-      let changed = false
-      chart.edges.forEach((edge) => {
-        const managerLevel = levels.get(edge.toUserId) ?? 0
-        const childLevel = levels.get(edge.fromUserId) ?? 0
-        const nextLevel = managerLevel + 1
-        if (nextLevel > childLevel) {
-          levels.set(edge.fromUserId, nextLevel)
-          changed = true
-        }
-      })
-      if (!changed) break
+  const hierarchyLayout = useMemo(() => {
+    if (!chart) {
+      return { levels: new Map<number, ResponsibilityChartNodeApi[]>(), levelByNode: new Map<string, number>() }
     }
 
-    const grouped = new Map<number, ResponsibilityChartNodeApi[]>()
+    const incomingCount = new Map<string, number>()
+    const levelByNode = new Map<string, number>()
+
     chart.nodes.forEach((node) => {
-      const level = levels.get(node.userId) ?? 0
-      const bucket = grouped.get(level) ?? []
-      bucket.push(node)
-      grouped.set(level, bucket)
+      incomingCount.set(node.userId, 0)
+      levelByNode.set(node.userId, 0)
     })
 
-    grouped.forEach((bucket) => bucket.sort((a, b) => a.name.localeCompare(b.name)))
-    return grouped
+    chart.edges.forEach((edge) => {
+      incomingCount.set(edge.fromUserId, (incomingCount.get(edge.fromUserId) ?? 0) + 1)
+    })
+
+    const roots = chart.nodes
+      .filter((node) => (incomingCount.get(node.userId) ?? 0) === 0)
+      .map((node) => node.userId)
+
+    const queue = [...roots]
+    const seen = new Set<string>(roots)
+
+    while (queue.length > 0) {
+      const managerId = queue.shift()!
+      const managerLevel = levelByNode.get(managerId) ?? 0
+      const children = managerToChildren.get(managerId) ?? []
+
+      children.forEach((childId) => {
+        const currentLevel = levelByNode.get(childId) ?? 0
+        const nextLevel = Math.max(currentLevel, managerLevel + 1)
+        levelByNode.set(childId, nextLevel)
+        if (!seen.has(childId)) {
+          seen.add(childId)
+          queue.push(childId)
+        }
+      })
+    }
+
+    const levels = new Map<number, ResponsibilityChartNodeApi[]>()
+    chart.nodes.forEach((node) => {
+      const level = levelByNode.get(node.userId) ?? 0
+      const row = levels.get(level) ?? []
+      row.push(node)
+      levels.set(level, row)
+    })
+
+    levels.forEach((row) => row.sort((a, b) => a.name.localeCompare(b.name)))
+
+    return { levels, levelByNode }
+  }, [chart, managerToChildren])
+
+  const sortedLevels = useMemo(
+    () => Array.from(hierarchyLayout.levels.keys()).sort((a, b) => a - b),
+    [hierarchyLayout.levels],
+  )
+
+  const managerByChildId = useMemo(() => {
+    const map = new Map<string, ResponsibilityChartEdgeApi[]>()
+    chart?.edges.forEach((edge) => {
+      const rows = map.get(edge.fromUserId) ?? []
+      rows.push(edge)
+      map.set(edge.fromUserId, rows)
+    })
+    return map
   }, [chart])
 
-  const sortedLevels = useMemo(() => Array.from(nodesByLevel.keys()).sort((a, b) => a - b), [nodesByLevel])
+  const flowNodes = useMemo<Array<Node<OrgNodeData>>>(() => {
+    if (!chart) return []
+
+    const NODE_W = 280
+    const GAP_X = 60
+    const GAP_Y = 170
+
+    const nodes: Array<Node<OrgNodeData>> = []
+
+    sortedLevels.forEach((level) => {
+      const row = hierarchyLayout.levels.get(level) ?? []
+      const rowWidth = row.length * NODE_W + Math.max(0, row.length - 1) * GAP_X
+      const startX = -rowWidth / 2
+
+      row.forEach((node, index) => {
+        const user = usersById.get(node.userId)
+        const roleName = node.roleId ? (roleNameById.get(node.roleId) ?? node.roleId) : 'No role assigned'
+        const sthanName = user?.sthanId ? (locationsById.get(user.sthanId)?.name ?? user.sthanId) : 'Not assigned'
+        const contactNumber = user?.phone?.trim() ? user.phone : 'Not available'
+        const reportingEdges = managerByChildId.get(node.userId) ?? []
+        const reportingLine = reportingEdges.length
+          ? reportingEdges
+              .map((edge) => {
+                const managerNode = nodesById.get(edge.toUserId)
+                const viaRole = roleNameById.get(edge.viaRoleId) ?? edge.viaRoleId
+                const managerName = managerNode?.name ?? edge.toUserId
+                return `${managerName} (${viaRole})`
+              })
+              .join(', ')
+          : 'Top-level'
+
+        nodes.push({
+          id: node.userId,
+          type: 'orgNode',
+          position: {
+            x: startX + index * (NODE_W + GAP_X),
+            y: level * GAP_Y,
+          },
+          sourcePosition: Position.Bottom,
+          targetPosition: Position.Top,
+          draggable: false,
+          selectable: true,
+          data: {
+            name: node.name,
+            roleName,
+            sthanName,
+            contactNumber,
+            reportingLine,
+            active: node.active,
+          },
+        })
+      })
+    })
+
+    return nodes
+  }, [chart, hierarchyLayout.levels, locationsById, managerByChildId, nodesById, roleNameById, sortedLevels, usersById])
+
+  const flowEdges = useMemo<Array<Edge>>(() => {
+    if (!chart) return []
+
+    return chart.edges.map((edge) => ({
+      id: `${edge.toUserId}-${edge.fromUserId}-${edge.viaRoleId}`,
+      source: edge.toUserId,
+      target: edge.fromUserId,
+      type: 'smoothstep',
+      animated: false,
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        color: '#6b7a93',
+      },
+      style: {
+        stroke: '#6b7a93',
+        strokeWidth: 1.5,
+      },
+      label: edge.viaRoleId ? (roleNameById.get(edge.viaRoleId) ?? edge.viaRoleId) : undefined,
+      labelStyle: {
+        fontSize: 10,
+        fill: '#64748b',
+      },
+      labelBgPadding: [4, 2],
+      labelBgBorderRadius: 6,
+      labelBgStyle: {
+        fill: 'rgba(241,245,249,0.9)',
+        stroke: '#cbd5e1',
+      },
+    }))
+  }, [chart, roleNameById])
 
   const handleYearChange = async (value: string) => {
     const year = parseInt(value, 10)
@@ -138,83 +324,71 @@ export const ResponsibilityChartPage: React.FC = () => {
 
       {isLoading ? (
         <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary-dark)' }}>Loading responsibility chart…</div>
-      ) : !chart || chart.nodes.length === 0 ? (
+      ) : (!chart || chart.nodes.length === 0) ? (
         <div className="glass-panel" style={{ padding: '24px', color: 'var(--text-secondary-dark)' }}>
           No organization chart data available for this year.
         </div>
       ) : (
         <div style={{ display: 'grid', gap: '16px' }}>
           <div className="glass-panel" style={{ padding: '14px 16px', display: 'flex', gap: '18px', flexWrap: 'wrap', fontSize: '0.85rem' }}>
-            <span><strong>{chart.nodes.length}</strong> users</span>
-            <span><strong>{chart.edges.length}</strong> reporting links</span>
+            <span><strong>{flowNodes.length}</strong> users</span>
+            <span><strong>{flowEdges.length}</strong> reporting links</span>
             <span><strong>{sortedLevels.length}</strong> hierarchy levels</span>
           </div>
 
-          <div className="glass-panel" style={{ padding: '18px', overflowX: 'auto' }}>
-            <div style={{ display: 'grid', gap: '18px', minWidth: '920px' }}>
-              {sortedLevels.map((level) => {
-                const levelNodes = nodesByLevel.get(level) ?? []
+          <div className="glass-panel" style={{ padding: '12px', height: 'calc(100vh - 290px)', minHeight: '560px' }}>
+            <ReactFlow
+              nodes={flowNodes}
+              edges={flowEdges}
+              nodeTypes={{ orgNode: OrgNodeCard }}
+              fitView
+              fitViewOptions={{ padding: 0.18 }}
+              nodesDraggable={false}
+              nodesConnectable={false}
+              elementsSelectable
+              zoomOnScroll
+              panOnDrag
+            >
+              <MiniMap
+                pannable
+                zoomable
+                nodeColor={(node) => {
+                  const data = node.data as OrgNodeData | undefined
+                  return data?.active ? '#3b82f6' : '#ef4444'
+                }}
+                style={{ background: 'rgba(241,245,249,0.9)', border: '1px solid #cbd5e1' }}
+              />
+              <Controls />
+              <Background color="#dbe5f3" gap={18} />
+            </ReactFlow>
+          </div>
+
+          <div className="glass-panel" style={{ padding: '10px 12px', fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>
+            Org chart nodes show person name, role, sthan, contact number, and reporting line. Use mouse wheel to zoom and drag to pan.
+          </div>
+
+          <div className="glass-panel" style={{ padding: '14px 16px', display: 'grid', gap: '8px' }}>
+            <div style={{ fontSize: '0.82rem', fontWeight: 700 }}>Reporting References</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {flowEdges.slice(0, 20).map((edge) => {
+                const child = flowNodes.find((node) => node.id === edge.target)
+                const manager = flowNodes.find((node) => node.id === edge.source)
                 return (
-                  <div key={level} style={{ display: 'grid', gap: '10px' }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-secondary-dark)', textTransform: 'uppercase' }}>
-                      Level {level + 1}
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '10px' }}>
-                      {levelNodes.map((node) => {
-                        const managerIds = edgesByChild.get(node.userId) ?? []
-                        const childIds = managerToChildren.get(node.userId) ?? []
-
-                        return (
-                          <div key={node.userId} style={{
-                            border: '1px solid var(--border-dark)',
-                            borderRadius: '10px',
-                            background: 'var(--panel-soft-bg)',
-                            padding: '10px',
-                            display: 'grid',
-                            gap: '8px',
-                          }}>
-                            <div>
-                              <div style={{ fontSize: '0.92rem', fontWeight: 700 }}>{node.name}</div>
-                              <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary-dark)' }}>
-                                {node.roleId ? (roleNameById.get(node.roleId) ?? node.roleId) : 'No role assigned'}
-                              </div>
-                            </div>
-
-                            <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary-dark)' }}>
-                              Reports to: {managerIds.length || node.reportingToRoleIds.length}
-                              {' · '}
-                              Direct reports: {childIds.length}
-                            </div>
-
-                            {managerIds.length > 0 && (
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                {managerIds.map((managerId) => {
-                                  const manager = nodesById.get(managerId)
-                                  if (!manager) return null
-                                  return (
-                                    <span key={`${node.userId}-${managerId}`} style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      background: 'rgba(59,130,246,0.12)',
-                                      color: '#60a5fa',
-                                      borderRadius: '999px',
-                                      padding: '3px 8px',
-                                      fontSize: '0.72rem',
-                                      fontWeight: 600,
-                                    }}>
-                                      ↑ {manager.name}
-                                    </span>
-                                  )
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
+                  <span
+                    key={edge.id}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '4px 8px',
+                      borderRadius: '999px',
+                      border: '1px solid var(--border-dark)',
+                      background: 'var(--panel-soft-bg)',
+                      fontSize: '0.72rem',
+                    }}
+                  >
+                    {(child?.data as OrgNodeData | undefined)?.name ?? edge.target} {'->'} {(manager?.data as OrgNodeData | undefined)?.name ?? edge.source}
+                  </span>
                 )
               })}
             </div>

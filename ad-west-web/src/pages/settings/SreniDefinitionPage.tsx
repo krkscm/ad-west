@@ -33,9 +33,10 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [joinUsVisible, setJoinUsVisible] = useState(false);
 
   const resetForm = () => {
-    setEditingId(null); setCode(''); setName(''); setDescription(''); setFormOpen(false);
+    setEditingId(null); setCode(''); setName(''); setDescription(''); setJoinUsVisible(false); setFormOpen(false);
   };
 
   const load = (p: number, ps: number, q: string) => {
@@ -65,6 +66,17 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
     }
   };
 
+  const handleToggleJoinUsVisibility = async (sreni: SreniDefinitionApi) => {
+    try {
+      await backendApi.updateSreniDefinition(sreni.id, { joinUsVisible: !sreni.joinUsVisible });
+      addToast(`Join Us visibility ${sreni.joinUsVisible ? 'disabled' : 'enabled'} for ${sreni.name}.`, 'success');
+      onSreniChange?.();
+      load(page, pageSize, search);
+    } catch (error) {
+      addToast(toUiError(error, 'Failed to update Join Us visibility.'), 'error');
+    }
+  };
+
   const handleDelete = async (sreni: SreniDefinitionApi) => {
     const ok = await confirm({ title: 'Delete Sreni', message: `Delete "${sreni.name}"? This cannot be undone.`, confirmLabel: 'Delete', danger: true });
     if (!ok) return;
@@ -90,10 +102,10 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
     setIsSaving(true);
     try {
       if (editingId) {
-        await backendApi.updateSreniDefinition(editingId, { name: cleanName, code: cleanCode, description: cleanDescription });
+        await backendApi.updateSreniDefinition(editingId, { name: cleanName, code: cleanCode, description: cleanDescription, joinUsVisible });
         addToast('Sreni updated successfully.', 'success');
       } else {
-        await backendApi.createSreniDefinition({ name: cleanName, code: cleanCode, description: cleanDescription });
+        await backendApi.createSreniDefinition({ name: cleanName, code: cleanCode, description: cleanDescription, joinUsVisible });
         addToast('Sreni created successfully.', 'success');
       }
       resetForm();
@@ -111,6 +123,7 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
     setCode(sreni.code ?? '');
     setName(sreni.name);
     setDescription(sreni.description ?? '');
+    setJoinUsVisible(sreni.joinUsVisible);
     setFormOpen(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -181,6 +194,45 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
               <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-secondary-dark)', marginBottom: '6px' }}>Description</label>
               <textarea className="form-input" style={{ minHeight: '80px', resize: 'vertical', fontSize: '0.875rem' }} placeholder="Brief description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} />
             </div>
+            <div style={{ marginBottom: '20px' }}>
+              <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-secondary-dark)', marginBottom: '6px' }}>
+                Join Us Visibility
+              </label>
+              <button
+                type="button"
+                aria-pressed={joinUsVisible}
+                onClick={() => setJoinUsVisible((prev) => !prev)}
+                style={{
+                  width: '100%',
+                  height: '40px',
+                  borderRadius: '8px',
+                  padding: '0 12px',
+                  border: `1px solid ${joinUsVisible ? 'rgba(16,185,129,0.35)' : 'var(--border-dark)'}`,
+                  background: joinUsVisible ? 'rgba(16,185,129,0.08)' : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '10px',
+                  cursor: 'pointer',
+                }}
+              >
+                <span style={{ fontSize: '0.84rem', fontWeight: 600, color: joinUsVisible ? '#10b981' : 'var(--text-secondary-dark)' }}>
+                  {joinUsVisible ? 'Visible in Join Us form' : 'Hidden from Join Us form'}
+                </span>
+                <span style={{
+                  position: 'relative', width: '36px', height: '20px', borderRadius: '999px', flexShrink: 0,
+                  background: joinUsVisible ? 'var(--success)' : 'rgba(148,163,184,0.45)',
+                  transition: 'background 0.2s',
+                }}>
+                  <span style={{
+                    position: 'absolute', top: '2px', left: joinUsVisible ? '16px' : '2px',
+                    width: '16px', height: '16px', borderRadius: '50%',
+                    background: '#fff', boxShadow: '0 1px 3px rgba(15,23,42,0.22)',
+                    transition: 'left 0.2s',
+                  }} />
+                </span>
+              </button>
+            </div>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button type="button" className="btn btn-secondary" onClick={resetForm} style={{ fontSize: '0.875rem' }}>Cancel</button>
               <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ fontSize: '0.875rem' }}>{isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Sreni'}</button>
@@ -216,7 +268,7 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
         <table className="custom-table">
           <thead>
             <tr>
-              {['Code', 'Name', 'Description', 'Status', 'Created By', 'Actions'].map((col) => (
+              {['Code', 'Name', 'Description', 'Join Us', 'Status', 'Created By', 'Actions'].map((col) => (
                 <th key={col} style={{ textAlign: 'left' }}>
                   {col}
                 </th>
@@ -226,7 +278,7 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
           <tbody>
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
-                <tr key={i}>{Array.from({ length: 6 }).map((__, j) => (
+                <tr key={i}>{Array.from({ length: 7 }).map((__, j) => (
                   <td key={j} style={{ padding: '14px 20px' }}>
                     <div style={{ height: '14px', borderRadius: '6px', background: 'var(--border-dark)', width: j === 1 ? '60%' : j === 2 ? '80%' : '40%', animation: 'pulse 1.4s ease-in-out infinite' }} />
                   </td>
@@ -234,7 +286,7 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
               ))
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary-dark)' }}>
+                <td colSpan={7} style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary-dark)' }}>
                   {search ? 'No srenies match your search.' : 'No srenies defined yet. Click "New Sreni" to add one.'}
                 </td>
               </tr>
@@ -251,6 +303,28 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
                   <td style={{ padding: '14px 20px', fontWeight: 600 }}>{sreni.name}</td>
                   <td style={{ padding: '14px 20px', color: 'var(--text-secondary-dark)', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={sreni.description}>
                     {sreni.description ?? <span style={{ opacity: 0.45 }}>—</span>}
+                  </td>
+                  <td style={{ padding: '14px 20px', whiteSpace: 'nowrap' }}>
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      color: sreni.joinUsVisible ? 'var(--success)' : 'var(--text-secondary-dark)'
+                    }}>
+                      <span
+                        style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: sreni.joinUsVisible ? 'var(--success)' : 'var(--text-secondary-dark)',
+                          boxShadow: sreni.joinUsVisible ? '0 0 8px var(--success)' : 'none',
+                          display: 'inline-block',
+                        }}
+                      />
+                      {sreni.joinUsVisible ? 'Visible' : 'Hidden'}
+                    </span>
                   </td>
                   <td style={{ padding: '14px 20px', whiteSpace: 'nowrap' }}>
                     <span style={{ 
@@ -284,6 +358,18 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
                       <button type="button" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }} onClick={() => startEdit(sreni)}>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
                         Edit
+                      </button>
+                      <button type="button" className="btn btn-secondary" style={{
+                        padding: '6px 12px',
+                        fontSize: '0.8rem',
+                        color: sreni.joinUsVisible ? 'var(--error)' : 'var(--success)',
+                        borderColor: sreni.joinUsVisible ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                        background: sreni.joinUsVisible ? 'rgba(239, 68, 68, 0.02)' : 'rgba(16, 185, 129, 0.02)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }} onClick={() => void handleToggleJoinUsVisibility(sreni)}>
+                        {sreni.joinUsVisible ? 'Hide from Join Us' : 'Show in Join Us'}
                       </button>
                       <button type="button" className="btn btn-secondary" style={{ 
                         padding: '6px 12px', 

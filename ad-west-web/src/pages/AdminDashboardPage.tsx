@@ -24,6 +24,7 @@ import { SreniAttendancePage } from './SreniAttendancePage';
 import { SreniDocumentsPage } from './SreniDocumentsPage';
 import { SreniReportsPage } from './SreniReportsPage';
 import { SreniAnalyticsStudioPage } from './SreniAnalyticsStudioPage';
+import { SthanDetailPage } from './SthanDetailPage';
 import { AttendanceMetricsPage } from './settings/AttendanceMetricsPage';
 import { ReportConfigSettingsPage } from './settings/ReportConfigSettingsPage';
 import { ResponsibilityChartPage } from './settings/ResponsibilityChartPage';
@@ -37,6 +38,7 @@ import { NotificationsAdminPage } from './member-services/NotificationsAdminPage
 import { NotificationCarouselModal } from '../components/common/NotificationCarouselModal';
 import { GmailWorkspacePanel } from '../components/features/GmailWorkspacePanel';
 import { InsightsPage } from './InsightsPage';
+import { AiChatbotPage } from './governance/AiChatbotPage';
 import {
   ApprovalWorkflowDefinitionApi,
   backendApi,
@@ -63,6 +65,32 @@ interface UiProgram {
   subtitle: string;
 }
 
+const parseNumericValue = (value: unknown): number => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value !== 'string') return 0;
+  const cleaned = value.replace(/[^\d.-]/g, '');
+  if (!cleaned) return 0;
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const eventInDateRange = (dateValue: string | undefined, fromDate?: string, toDate?: string): boolean => {
+  if (!dateValue) return false;
+  const eventDate = Date.parse(dateValue);
+  if (!Number.isFinite(eventDate)) return false;
+  const fromMs = fromDate ? Date.parse(fromDate) : undefined;
+  const toMs = toDate ? Date.parse(toDate) : undefined;
+  if (fromMs && eventDate < fromMs) return false;
+  if (toMs && eventDate > toMs) return false;
+  return true;
+};
+
+const normalizeRoleKey = (value: unknown): string =>
+  String(value ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+
 type ActiveTab =
   | 'dashboard'
   | 'logs'
@@ -84,6 +112,7 @@ type ActiveTab =
   | 'settings-report-config'
   | 'settings-google-integration'
   | 'insights'
+  | 'ai-chatbot'
   | 'helpdesk-tickets'
   | 'job-postings'
   | 'job-applications'
@@ -97,6 +126,7 @@ type ActiveTab =
   | `sreni-documents-${string}`
   | `sreni-reports-${string}`
   | `sreni-analytics-${string}`
+  | `sthan-${string}`
   | 'my-approvals';
 
 const SETTINGS_ROOT_TAB: ActiveTab = 'settings-admins';
@@ -108,7 +138,7 @@ const ALL_TABS: ActiveTab[] = [
   'settings-users', 'settings-approval-workflows', 'settings-approval-workflows-form', 'settings-attendance-metrics',
   'settings-responsibility-chart', 'settings-report-config',
   'settings-google-integration',
-  'insights',
+  'insights', 'ai-chatbot',
   'helpdesk-tickets', 'job-postings', 'job-applications',
   'member-services-reimbursements', 'member-services-events', 'member-services-notifications', 'member-services-gmail',
 ];
@@ -129,6 +159,7 @@ const resolveTabFromHash = (hash: string): ActiveTab | null => {
   if (normalizedHash.startsWith('sreni-documents-')) return normalizedHash as ActiveTab;
   if (normalizedHash.startsWith('sreni-reports-')) return normalizedHash as ActiveTab;
   if (normalizedHash.startsWith('sreni-analytics-')) return normalizedHash as ActiveTab;
+  if (normalizedHash.startsWith('sthan-')) return normalizedHash as ActiveTab;
   return null;
 };
 
@@ -137,11 +168,11 @@ const getInitialTab = (): ActiveTab => {
   return resolveTabFromHash(hash) ?? 'dashboard';
 };
 
-const TAB_METADATA: { [key: string]: { label: string; parent?: 'settings' } } = {
+const TAB_METADATA: { [key: string]: { label: string; parent?: 'settings' | 'governance' } } = {
   dashboard: { label: 'Dashboard' },
   logs: { label: 'Audit Logs' },
   ops: { label: 'Ops Coverage' },
-  'my-approvals': { label: 'My Approvals' },
+  'my-approvals': { label: 'My Approvals', parent: 'governance' },
   'settings-permission-sets': { label: 'Permission Sets', parent: 'settings' },
   'settings-enum-values': { label: 'Reference Data', parent: 'settings' },
   'settings-users': { label: 'Users', parent: 'settings' },
@@ -155,10 +186,11 @@ const TAB_METADATA: { [key: string]: { label: string; parent?: 'settings' } } = 
   'settings-permissions': { label: 'Permissions', parent: 'settings' },
   'settings-approval-workflows': { label: 'Approval Workflows', parent: 'settings' },
   'settings-attendance-metrics': { label: 'Attendance Metrics', parent: 'settings' },
-  'settings-responsibility-chart': { label: 'Responsibility Chart', parent: 'settings' },
+  'settings-responsibility-chart': { label: 'Responsibility Chart', parent: 'governance' },
   'settings-report-config': { label: 'Report Config', parent: 'settings' },
   'settings-google-integration': { label: 'Google Integration', parent: 'settings' },
-  'insights': { label: 'Insights' },
+  'insights': { label: 'Insights', parent: 'governance' },
+  'ai-chatbot': { label: 'AI Chatbot', parent: 'governance' },
   'helpdesk-tickets': { label: 'Helpdesk Tickets' },
   'job-postings': { label: 'Job Postings' },
   'job-applications': { label: 'Job Applications' },
@@ -172,9 +204,13 @@ const SETTINGS_TABS: ActiveTab[] = Object.entries(TAB_METADATA)
   .filter(([tab, meta]) => meta.parent === 'settings' && tab !== 'settings-admins-form' && tab !== 'settings-users-form' && tab !== 'settings-approval-workflows-form')
   .map(([tab]) => tab as ActiveTab);
 
+const GOVERNANCE_TABS: ActiveTab[] = Object.entries(TAB_METADATA)
+  .filter(([, meta]) => meta.parent === 'governance')
+  .map(([tab]) => tab as ActiveTab);
+
 const buildBreadcrumbItems = (
   activeTab: ActiveTab,
-  options?: { formLabel?: string; usersFormLabel?: string; approvalWorkflowFormLabel?: string; sreniName?: string },
+  options?: { formLabel?: string; usersFormLabel?: string; approvalWorkflowFormLabel?: string; sreniName?: string; sthanName?: string },
 ): Array<{ label: string; targetTab?: ActiveTab }> => {
   const items: Array<{ label: string; targetTab?: ActiveTab }> = [{ label: 'Home', targetTab: 'dashboard' }];
   const tabStr = activeTab as string;
@@ -194,6 +230,9 @@ const buildBreadcrumbItems = (
   } else if (SETTINGS_TABS.includes(activeTab)) {
     items.push({ label: 'Settings', targetTab: SETTINGS_ROOT_TAB });
     items.push({ label: TAB_METADATA[activeTab]?.label ?? activeTab, targetTab: activeTab });
+  } else if (GOVERNANCE_TABS.includes(activeTab)) {
+    items.push({ label: 'Governance' });
+    items.push({ label: TAB_METADATA[activeTab]?.label ?? activeTab, targetTab: activeTab });
   } else if (tabStr.startsWith('sreni-calendar-')) {
     items.push({ label: options?.sreniName ?? 'Sreni' });
     items.push({ label: 'Calendar' });
@@ -212,6 +251,9 @@ const buildBreadcrumbItems = (
   } else if (tabStr.startsWith('sreni-analytics-')) {
     items.push({ label: options?.sreniName ?? 'Sreni' });
     items.push({ label: 'Analytics Studio' });
+  } else if (tabStr.startsWith('sthan-')) {
+    items.push({ label: 'Sthans' });
+    items.push({ label: options?.sthanName ?? 'Sthan' });
   } else {
     items.push({ label: 'Dashboard', targetTab: 'dashboard' });
     if (activeTab !== 'dashboard') {
@@ -227,9 +269,10 @@ const buildBreadcrumbItems = (
 
 export const AdminDashboardPage: React.FC = () => {
   const [activeTab, setActiveTabState] = useState<ActiveTab>(getInitialTab);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(true);
-  const [isGatewayOpen, setIsGatewayOpen] = useState(true);
-  const [isMemberServicesOpen, setIsMemberServicesOpen] = useState(true);
+  const [isGovernanceOpen, setIsGovernanceOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isGatewayOpen, setIsGatewayOpen] = useState(false);
+  const [isMemberServicesOpen, setIsMemberServicesOpen] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isVerySmallDevice, setIsVerySmallDevice] = useState(() => window.innerWidth <= 480);
@@ -239,6 +282,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [approvalWorkflowFormEdit, setApprovalWorkflowFormEdit] = useState<ApprovalWorkflowDefinitionApi | null>(null);
   const [sidebarMenuItems, setSidebarMenuItems] = useState<MenuItemApi[]>([]);
   const [openSreniKeys, setOpenSreniKeys] = useState<Set<string>>(new Set());
+  const [openSthanKeys, setOpenSthanKeys] = useState<Set<string>>(new Set());
   const { adminUser, logout } = useAuth();
   const { addToast } = useToast();
 
@@ -333,6 +377,14 @@ export const AdminDashboardPage: React.FC = () => {
     });
   }, []);
 
+  const toggleSthanOpen = useCallback((key: string) => {
+    setOpenSthanKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, []);
+
   // Metrics state
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const [programs, setPrograms] = useState<UiProgram[]>([]);
@@ -352,16 +404,32 @@ export const AdminDashboardPage: React.FC = () => {
   const [approvalResult, setApprovalResult] = useState('');
   const [latestWorkflowId, setLatestWorkflowId] = useState('');
   const [persistenceReadinessSummary, setPersistenceReadinessSummary] = useState('Not loaded yet');
+  const [sreniContactTotal, setSreniContactTotal] = useState(0);
+  const [sthanContactTotal, setSthanContactTotal] = useState(0);
+  const [sreniAttendanceTotal, setSreniAttendanceTotal] = useState(0);
+  const [sthanAttendanceTotal, setSthanAttendanceTotal] = useState(0);
+  const [sreniReportingTotal, setSreniReportingTotal] = useState(0);
+  const [sthanReportingTotal, setSthanReportingTotal] = useState(0);
 
   useEffect(() => {
     const loadDashboard = async () => {
       try {
-        const [pendingApprovalsResult, sreniesResult, ticketsResult, jobPostingsResult, jobApplicationsResult] = await Promise.allSettled([
+        const [
+          pendingApprovalsResult,
+          sreniesResult,
+          locationsResult,
+          ticketsResult,
+          jobPostingsResult,
+          jobApplicationsResult,
+          monthlyReportsResult,
+        ] = await Promise.allSettled([
           backendApi.listMyApprovalActions('pending'),
-          backendApi.listSrenies(),
+          backendApi.listSreniDefinitions(),
+          backendApi.listLocationDefinitions(),
           backendApi.listHelpdeskTickets(),
           backendApi.listJobPostings(),
           backendApi.listAllJobApplications(),
+          backendApi.listAllMonthlyReports(),
         ]);
 
         if (pendingApprovalsResult.status === 'fulfilled') {
@@ -370,18 +438,98 @@ export const AdminDashboardPage: React.FC = () => {
           setPendingApprovalsCount(0);
         }
 
-        if (sreniesResult.status === 'fulfilled') {
-          setSrenyId((prev) => prev || sreniesResult.value[0]?.id || '');
+        const sreniItems = sreniesResult.status === 'fulfilled' ? sreniesResult.value : [];
+        const locationItems = locationsResult.status === 'fulfilled'
+          ? locationsResult.value.filter((location) => location.level === 'STHAN' && location.active)
+          : [];
+
+        if (sreniItems.length > 0) {
+          setSrenyId((prev) => prev || sreniItems[0]?.id || '');
           setPrograms(
-            sreniesResult.value.map((sreni) => ({
+            sreniItems.map((sreni) => ({
               id: sreni.id,
               title: sreni.name,
-              subtitle: sreni.zoneId,
+              subtitle: sreni.code ?? '',
             })),
           );
         } else {
           setPrograms([]);
         }
+
+        if (monthlyReportsResult.status === 'fulfilled') {
+          setSreniReportingTotal(monthlyReportsResult.value.length);
+        } else {
+          setSreniReportingTotal(0);
+        }
+
+        const fromDate = new Date();
+        fromDate.setMonth(fromDate.getMonth() - 1);
+        const toDate = new Date();
+        const fromIso = fromDate.toISOString().slice(0, 10);
+        const toIso = toDate.toISOString().slice(0, 10);
+
+        const [
+          sreniContactsResults,
+          sthanContactsResults,
+          sreniAttendanceResults,
+          sthanReportsResults,
+        ] = await Promise.all([
+          Promise.allSettled(sreniItems.map((sreni) => backendApi.listSreniContacts(sreni.id, 1, 1))),
+          Promise.allSettled(locationItems.map((location) => backendApi.listSthanContacts(location.id, 1, 1))),
+          Promise.allSettled(sreniItems.map((sreni) => backendApi.listSreniAttendanceListing(sreni.id))),
+          Promise.allSettled(locationItems.map((location) => backendApi.listSthanReports(location.id))),
+        ]);
+
+        const totalSreniContacts = sreniContactsResults.reduce((sum, result) => {
+          if (result.status !== 'fulfilled') return sum;
+          return sum + (result.value.total ?? result.value.items.length ?? 0);
+        }, 0);
+        setSreniContactTotal(totalSreniContacts);
+
+        const totalSthanContacts = sthanContactsResults.reduce((sum, result) => {
+          if (result.status !== 'fulfilled') return sum;
+          return sum + (result.value.total ?? result.value.items.length ?? 0);
+        }, 0);
+        setSthanContactTotal(totalSthanContacts);
+
+        const totalSreniAttendance = sreniAttendanceResults.reduce((sum, result) => {
+          if (result.status !== 'fulfilled') return sum;
+          const listingItems = Array.isArray(result.value) ? result.value : [];
+          const score = listingItems.reduce((innerSum, item) => {
+            if (!eventInDateRange(item.event?.date, fromIso, toIso)) return innerSum;
+            const eventScore = item.metrics.reduce((eventTotal, metricItem) => {
+              const values = metricItem.capture?.values ?? {};
+              const numericTotal = Object.values(values).reduce((acc, value) => acc + parseNumericValue(value), 0);
+              return eventTotal + (numericTotal > 0 ? numericTotal : metricItem.capture ? 1 : 0);
+            }, 0);
+            return innerSum + eventScore;
+          }, 0);
+          return sum + score;
+        }, 0);
+        setSreniAttendanceTotal(totalSreniAttendance);
+
+        const totalSthanAttendance = sreniAttendanceResults.reduce((sum, result) => {
+          if (result.status !== 'fulfilled') return sum;
+          const listingItems = Array.isArray(result.value) ? result.value : [];
+          const score = listingItems.reduce((innerSum, item) => {
+            if (!eventInDateRange(item.event?.date, fromIso, toIso)) return innerSum;
+            return innerSum + (item.event?.sthanIds?.length ?? 0);
+          }, 0);
+          return sum + score;
+        }, 0);
+        setSthanAttendanceTotal(totalSthanAttendance);
+
+        const totalSthanReports = sthanReportsResults.reduce((sum, result) => {
+          if (result.status !== 'fulfilled') return sum;
+          const reports = Array.isArray(result.value) ? result.value : [];
+          const filteredCount = reports.filter((report) => {
+            const periodDate = new Date(report.periodYear, report.periodMonth - 1, 1);
+            const iso = `${periodDate.getFullYear()}-${String(periodDate.getMonth() + 1).padStart(2, '0')}-01`;
+            return eventInDateRange(iso, fromIso, toIso);
+          }).length;
+          return sum + filteredCount;
+        }, 0);
+        setSthanReportingTotal(totalSthanReports);
 
         if (ticketsResult.status === 'fulfilled') {
           const tickets = ticketsResult.value.items;
@@ -425,6 +573,12 @@ export const AdminDashboardPage: React.FC = () => {
         setUnderReviewApplicationsCount(0);
         setActiveJobPostingsCount(0);
         setExpiringJobPostingsCount(0);
+        setSreniContactTotal(0);
+        setSthanContactTotal(0);
+        setSreniAttendanceTotal(0);
+        setSthanAttendanceTotal(0);
+        setSreniReportingTotal(0);
+        setSthanReportingTotal(0);
       }
     };
 
@@ -434,12 +588,10 @@ export const AdminDashboardPage: React.FC = () => {
   if (!adminUser) return null;
 
   // Normalize role values so both UI labels and API enum values are supported.
-  const normalizedRoles = adminUser.roles.map((assignment) =>
-    String(assignment.role).trim().toUpperCase().replace(/\s+/g, '_'),
-  );
+  const normalizedRoles = adminUser.roles.map((assignment) => normalizeRoleKey(assignment.role));
 
-  const isSuperAdmin = normalizedRoles.includes('SUPER_ADMIN');
-  const isZoneAdmin = normalizedRoles.includes('ZONE_ADMIN');
+  const isSuperAdmin = normalizedRoles.includes('SUPERADMIN');
+  const isZoneAdmin = normalizedRoles.includes('ZONEADMIN');
   const userRole = adminUser.roles[0]?.role ?? (isSuperAdmin ? 'Super Admin' : isZoneAdmin ? 'Zone Admin' : 'Sreny Admin');
   const showOpsTab = isSuperAdmin || isZoneAdmin;
 
@@ -450,25 +602,52 @@ export const AdminDashboardPage: React.FC = () => {
   const showAdminsTab = isSuperAdmin;
   const showLogsTab = isSuperAdmin || isZoneAdmin;
   const isSettingsTabActive = SETTINGS_TABS.includes(activeTab) || activeTab === 'settings-admins-form' || activeTab === 'settings-users-form' || activeTab === 'settings-approval-workflows-form';
-  const hasGatewayMenu = (key: string) => sidebarMenuItems.some((item) => item.active && item.key === key);
-  const showGatewaySection = isSuperAdmin || hasGatewayMenu('helpdesk') || hasGatewayMenu('helpdesk-tickets') || hasGatewayMenu('job-postings') || hasGatewayMenu('job-applications');
-  const showHelpdeskTicketsTab = isSuperAdmin || hasGatewayMenu('helpdesk-tickets');
-  const showJobPostingsTab = isSuperAdmin || hasGatewayMenu('job-postings');
-  const showJobApplicationsTab = isSuperAdmin || hasGatewayMenu('job-applications');
+  const hasMenuKey = (key: string) => sidebarMenuItems.some((item) => item.active && item.key === key);
+
+  const showInsightsTab = isSuperAdmin || hasMenuKey('insights');
+  const showAiChatbotTab = isSuperAdmin || hasMenuKey('ai-chatbot');
+  const showMyApprovalsTab = isSuperAdmin || hasMenuKey('my-approvals');
+  const showResponsibilityChartTab = isSuperAdmin || hasMenuKey('settings-responsibility-chart');
+  const showGovernanceSection =
+    isSuperAdmin ||
+    hasMenuKey('governance') ||
+    showInsightsTab ||
+    showAiChatbotTab ||
+    showMyApprovalsTab ||
+    showResponsibilityChartTab;
+
+  const showGatewaySection = isSuperAdmin || hasMenuKey('helpdesk') || hasMenuKey('helpdesk-tickets') || hasMenuKey('job-postings') || hasMenuKey('job-applications');
+  const showHelpdeskTicketsTab = isSuperAdmin || hasMenuKey('helpdesk-tickets');
+  const showJobPostingsTab = isSuperAdmin || hasMenuKey('job-postings');
+  const showJobApplicationsTab = isSuperAdmin || hasMenuKey('job-applications');
   const isGatewayTabActive = activeTab === 'helpdesk-tickets' || activeTab === 'job-postings' || activeTab === 'job-applications';
   const isGatewaySectionOpen = isGatewayOpen || isGatewayTabActive;
 
-  const showMemberServicesSection = isSuperAdmin || hasGatewayMenu('member-services') || hasGatewayMenu('member-services-reimbursements') || hasGatewayMenu('member-services-events') || hasGatewayMenu('member-services-notifications') || hasGatewayMenu('member-services-gmail');
-  const showReimbursementsTab = isSuperAdmin || hasGatewayMenu('member-services-reimbursements');
-  const showEventsTab = isSuperAdmin || hasGatewayMenu('member-services-events');
-  const showNotificationsTab = isSuperAdmin || hasGatewayMenu('member-services-notifications');
-  const showGmailTab = isSuperAdmin || hasGatewayMenu('member-services-gmail');
+  const isGovernanceTabActive = activeTab === 'insights' || activeTab === 'ai-chatbot' || activeTab === 'my-approvals' || activeTab === 'settings-responsibility-chart';
+  const isGovernanceSectionOpen = isGovernanceOpen || isGovernanceTabActive;
+
+  const showMemberServicesSection = isSuperAdmin || hasMenuKey('member-services') || hasMenuKey('member-services-reimbursements') || hasMenuKey('member-services-events') || hasMenuKey('member-services-notifications') || hasMenuKey('member-services-gmail');
+  const showReimbursementsTab = isSuperAdmin || hasMenuKey('member-services-reimbursements');
+  const showEventsTab = isSuperAdmin || hasMenuKey('member-services-events');
+  const showNotificationsTab = isSuperAdmin || hasMenuKey('member-services-notifications');
+  const showGmailTab = isSuperAdmin || hasMenuKey('member-services-gmail');
   const isMemberServicesTabActive = activeTab === 'member-services-reimbursements' || activeTab === 'member-services-events' || activeTab === 'member-services-notifications' || activeTab === 'member-services-gmail';
   const isMemberServicesSectionOpen = isMemberServicesOpen || isMemberServicesTabActive;
 
   // Sreni sidebar menu structure — only items whose keys start with 'sreni-'
   const sreniParentMenus = sidebarMenuItems.filter(m => m.active && m.key.startsWith('sreni-') && !m.parentKey);
   const sreniChildMenus = sidebarMenuItems.filter(m => m.active && m.parentKey?.startsWith('sreni-'));
+
+  // Sthans sidebar — one "sthans" root parent, each sthan location is a child
+  const sthansRootMenu = sidebarMenuItems.find(m => m.active && m.key === 'sthans');
+  const sthanChildMenus = sidebarMenuItems.filter(m => m.active && m.parentKey === 'sthans');
+
+  // Active sthan key is everything after "sthan-" in the tab string
+  const activeSthanKey = (activeTab as string).startsWith('sthan-')
+    ? (activeTab as string).slice('sthan-'.length) : null;
+  const activeSthanMenuLabel = activeSthanKey
+    ? sthanChildMenus.find(m => m.key === `sthan-${activeSthanKey}`)?.label
+    : undefined;
 
   const activeSreniCalendarKey = (activeTab as string).startsWith('sreni-calendar-')
     ? (activeTab as string).slice('sreni-calendar-'.length)
@@ -498,6 +677,7 @@ export const AdminDashboardPage: React.FC = () => {
     usersFormLabel: activeTab === 'settings-users-form' ? (usersFormEdit ? 'Edit User' : 'New User') : undefined,
     approvalWorkflowFormLabel: activeTab === 'settings-approval-workflows-form' ? (approvalWorkflowFormEdit ? 'Edit Approval Workflow' : 'New Approval Workflow') : undefined,
     sreniName: activeSreniMenuLabel,
+    sthanName: activeSthanMenuLabel ?? activeSthanKey ?? undefined,
   });
   const sidebarWidth = isSidebarCollapsed ? '84px' : '260px';
   const currentYear = new Date().getFullYear();
@@ -553,86 +733,59 @@ export const AdminDashboardPage: React.FC = () => {
     ? 'Zone Operations Dashboard'
     : 'Sreni Operations Dashboard';
   const dashboardSubtitle = isSuperAdmin
-    ? 'Cross-platform governance, intake, and approval posture across the organization.'
+    ? 'Contacts, attendance, and reporting pulse across Sthan and Sreni units.'
     : isZoneAdmin
-    ? 'Zone-level workload, sreni coverage quality, and execution readiness.'
-    : 'Day-to-day sreni execution health, service requests, and pending approvals.';
+    ? 'Zone-level coverage for contacts, attendance, and reporting outcomes.'
+    : 'Sreni execution pulse based on contacts, attendance, and reporting cadence.';
 
-  const dashboardMetrics = isSuperAdmin
-    ? [
-        { label: 'Approval Queue', value: pendingApprovalsCount, signal: approvalsSignal, icon: '📝', hint: 'Awaiting decision' },
-        { label: 'Intake Backlog', value: intakeBacklogCount, signal: intakeSignal, icon: '📥', hint: 'Tickets + applications' },
-        { label: 'Mapping Coverage', value: `${coverageRate}%`, signal: coverageSignal, icon: '🧭', hint: `${mappedSreniesCount}/${programs.length} mapped across ${uniqueZoneCount} zones` },
-        { label: 'Backlog Density', value: backlogPerSreni, signal: backlogDensitySignal, icon: '⚖️', hint: 'Avg backlog per sreni' },
-        { label: 'Review Load', value: `${reviewLoadRate}%`, signal: reviewLoadSignal, icon: '🔎', hint: 'Share in under-review' },
-        { label: 'Expiring Posts (14d)', value: expiringJobPostingsCount, signal: expiringSignal, icon: '⏳', hint: `${activeJobPostingsCount} active job posts` },
-      ]
-    : isZoneAdmin
-    ? [
-        { label: 'Zone Approval Queue', value: pendingApprovalsCount, signal: approvalsSignal, icon: '📝', hint: 'Awaiting decision' },
-        { label: 'Zone Intake Backlog', value: intakeBacklogCount, signal: intakeSignal, icon: '📥', hint: 'Tickets + applications' },
-        { label: 'Coverage Rate', value: `${coverageRate}%`, signal: coverageSignal, icon: '🧭', hint: `${mappedSreniesCount}/${programs.length} mapped across ${uniqueZoneCount} zones` },
-        { label: 'Mapping Gaps', value: unmappedSreniesCount, signal: unmappedSignal, icon: '⚠️', hint: 'Srenies without zones' },
-        { label: 'Review Load', value: `${reviewLoadRate}%`, signal: reviewLoadSignal, icon: '🔎', hint: 'Under-review pressure' },
-        { label: 'Expiring Posts (14d)', value: expiringJobPostingsCount, signal: expiringSignal, icon: '⏳', hint: `${activeJobPostingsCount} active job posts` },
-      ]
-    : [
-        { label: 'My Pending Approvals', value: pendingApprovalsCount, signal: approvalsSignal, icon: '📝', hint: 'Awaiting your action' },
-        { label: 'Open Service Tickets', value: openTicketsCount, signal: intakeSignal, icon: '🎫', hint: 'Needs response' },
-        { label: 'Candidate Intake', value: newApplicationsCount, signal: intakeSignal, icon: '📄', hint: 'New applicants' },
-        { label: 'Review Queue', value: underReviewApplicationsCount, signal: reviewLoadSignal, icon: '🔎', hint: 'In progress reviews' },
-        { label: 'Active Job Posts', value: activeJobPostingsCount, signal: expiringSignal, icon: '📌', hint: 'Currently open opportunities' },
-        { label: 'Expiry Risk (14d)', value: expiringJobPostingsCount, signal: expiringSignal, icon: '⏳', hint: `${activeJobPostingsCount} active job posts` },
-      ];
+  const contactCoverageTotal = sreniContactTotal + sthanContactTotal;
+  const attendanceCoverageTotal = sreniAttendanceTotal + sthanAttendanceTotal;
+  const reportingCoverageTotal = sreniReportingTotal + sthanReportingTotal;
+  const contactsSignal: 'healthy' | 'watch' | 'critical' = contactCoverageTotal > 0 ? 'healthy' : 'watch';
+  const attendanceSignal: 'healthy' | 'watch' | 'critical' = attendanceCoverageTotal > 0 ? 'healthy' : 'watch';
+  const reportingSignal: 'healthy' | 'watch' | 'critical' = reportingCoverageTotal > 0 ? 'healthy' : 'watch';
 
-  const dashboardPipelineRows = isSuperAdmin
-    ? [
-        { label: 'Service Intake Backlog', value: intakeBacklogCount, signal: intakeSignal },
-        { label: 'Pending Approvals', value: pendingApprovalsCount, signal: approvalsSignal },
-        { label: 'Unmapped Srenies', value: unmappedSreniesCount, signal: unmappedSignal },
-        { label: 'Expiring Job Posts (14d)', value: expiringJobPostingsCount, signal: expiringSignal },
-      ]
-    : isZoneAdmin
-    ? [
-        { label: 'Zone Intake Backlog', value: intakeBacklogCount, signal: intakeSignal },
-        { label: 'Zone Approval Queue', value: pendingApprovalsCount, signal: approvalsSignal },
-        { label: 'Sreni Mapping Gaps', value: unmappedSreniesCount, signal: unmappedSignal },
-        { label: 'Applications Under Review', value: underReviewApplicationsCount, signal: intakeSignal },
-      ]
-    : [
-        { label: 'My Pending Approvals', value: pendingApprovalsCount, signal: approvalsSignal },
-        { label: 'Open Tickets Requiring Action', value: openTicketsCount, signal: intakeSignal },
-        { label: 'New Candidate Applications', value: newApplicationsCount, signal: intakeSignal },
-        { label: 'Applications in Review', value: underReviewApplicationsCount, signal: intakeSignal },
-      ];
+  const dashboardMetrics = [
+    { label: 'Sreni Contacts', value: sreniContactTotal, signal: contactsSignal, icon: '👥', hint: 'Total uploaded contacts' },
+    { label: 'Sthan Contacts', value: sthanContactTotal, signal: contactsSignal, icon: '🏘️', hint: 'Total uploaded contacts' },
+    { label: 'Sreni Attendance', value: sreniAttendanceTotal, signal: attendanceSignal, icon: '✅', hint: 'Attendance activity score (last month)' },
+    { label: 'Sthan Attendance', value: sthanAttendanceTotal, signal: attendanceSignal, icon: '📍', hint: 'Sthan-scoped attendance sessions (last month)' },
+    { label: 'Sreni Reporting', value: sreniReportingTotal, signal: reportingSignal, icon: '🧾', hint: 'Submitted monthly reports (last month)' },
+    { label: 'Sthan Reporting', value: sthanReportingTotal, signal: reportingSignal, icon: '📊', hint: 'Submitted sthan reports (last month)' },
+  ];
+
+  const dashboardPipelineRows = [
+    { label: 'Contacts Coverage (Sreni + Sthan)', value: contactCoverageTotal, signal: contactsSignal },
+    { label: 'Attendance Pulse (Sreni + Sthan)', value: attendanceCoverageTotal, signal: attendanceSignal },
+    { label: 'Reporting Output (Sreni + Sthan)', value: reportingCoverageTotal, signal: reportingSignal },
+    { label: 'Pending Approvals', value: pendingApprovalsCount, signal: approvalsSignal },
+  ];
 
   const dashboardPriorities = [
     {
-      id: 'pending-approvals',
-      title: isSreniAdmin ? 'My pending approvals' : 'Pending approvals',
-      value: pendingApprovalsCount,
-      note: pendingApprovalsCount > 0 ? 'Prioritize approvals to avoid downstream workflow delay.' : 'Approval queue is clear.',
-      targetTab: 'my-approvals' as ActiveTab,
-      tone: signalStyles[approvalsSignal].accent,
+      id: 'contacts-governance',
+      title: 'Strengthen contact coverage',
+      value: contactCoverageTotal,
+      note: contactCoverageTotal > 0 ? 'Validate stale Sthan and Sreni contact uploads and close remaining gaps.' : 'Start by uploading Sthan and Sreni contacts to establish baseline coverage.',
+      targetTab: 'settings-location-definition' as ActiveTab,
+      tone: signalStyles[contactsSignal].accent,
     },
     {
-      id: 'intake-backlog',
-      title: 'Service intake backlog',
-      value: intakeBacklogCount,
-      note: intakeBacklogCount > 0 ? 'Open support and hiring requests are waiting for action.' : 'No intake backlog at the moment.',
-      targetTab: showHelpdeskTicketsTab ? 'helpdesk-tickets' as ActiveTab : showJobApplicationsTab ? 'job-applications' as ActiveTab : 'dashboard' as ActiveTab,
-      tone: signalStyles[intakeSignal].accent,
+      id: 'attendance-quality',
+      title: 'Improve attendance capture quality',
+      value: attendanceCoverageTotal,
+      note: attendanceCoverageTotal > 0 ? 'Review low-activity Sthans/Srenis in Insights and enforce timely capture.' : 'Attendance activity is missing. Encourage event-level attendance capture across all units.',
+      targetTab: 'insights' as ActiveTab,
+      tone: signalStyles[attendanceSignal].accent,
     },
-    ...((isSuperAdmin || isZoneAdmin)
-      ? [{
-          id: 'mapping-gaps',
-          title: 'Sreni mapping gaps',
-          value: unmappedSreniesCount,
-          note: unmappedSreniesCount > 0 ? 'Some srenies are missing zone mapping and should be normalized.' : 'All srenies are mapped to zones.',
-          targetTab: 'settings-sreni-definition' as ActiveTab,
-          tone: signalStyles[unmappedSignal].accent,
-        }]
-      : []),
+    {
+      id: 'reporting-compliance',
+      title: 'Lift reporting compliance',
+      value: reportingCoverageTotal,
+      note: reportingCoverageTotal > 0 ? 'Track Sreni and Sthan units with no monthly submissions and follow up.' : 'No reporting submissions were captured in the last month.',
+      targetTab: 'settings-report-config' as ActiveTab,
+      tone: signalStyles[reportingSignal].accent,
+    },
   ];
 
   const runDocumentFlow = async () => {
@@ -836,71 +989,136 @@ export const AdminDashboardPage: React.FC = () => {
             <span>📊</span>{!isSidebarCollapsed && <span style={{ marginLeft: '8px' }}>Dashboard</span>}
           </button>
 
-          <button
-            onClick={() => setActiveTab('insights')}
-            className={`btn ${activeTab === 'insights' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{
-              justifyContent: isSidebarCollapsed ? 'center' : 'flex-start',
-              padding: '10px 16px', fontSize: '0.9rem',
-              background: activeTab === 'insights' ? '' : 'transparent', border: 'none',
-              color: activeTab === 'insights' ? '#fff' : 'var(--text-secondary-dark)',
-            }}
-            title="Insights"
-          >
-            <span>📈</span>{!isSidebarCollapsed && <span style={{ marginLeft: '8px' }}>Insights</span>}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('my-approvals')}
-            className={`btn ${activeTab === 'my-approvals' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{
-              justifyContent: isSidebarCollapsed ? 'center' : 'flex-start',
-              padding: '10px 16px',
-              fontSize: '0.9rem',
-              background: activeTab === 'my-approvals' ? '' : 'transparent',
-              border: 'none',
-              color: activeTab === 'my-approvals' ? '#fff' : 'var(--text-secondary-dark)',
-              position: 'relative',
-            }}
-            title="My Approvals"
-          >
-            <span>📝</span>
-            {!isSidebarCollapsed && <span style={{ marginLeft: '8px' }}>My Approvals</span>}
-            {pendingApprovalsCount > 0 && (
-              <span
+          {showGovernanceSection && (
+            <div>
+              <button
+                className={`btn ${isGovernanceTabActive ? 'btn-primary' : 'btn-secondary'}`}
                 style={{
-                  marginLeft: isSidebarCollapsed ? '0' : '8px',
-                  background: 'var(--warning)',
-                  color: '#fff',
-                  borderRadius: '10px',
-                  padding: '1px 7px',
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  position: isSidebarCollapsed ? 'absolute' : 'static',
-                  top: isSidebarCollapsed ? '6px' : undefined,
-                  right: isSidebarCollapsed ? '6px' : undefined,
+                  justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
+                  padding: '10px 16px',
+                  fontSize: '0.9rem',
+                  background: isGovernanceTabActive ? '' : 'transparent',
+                  border: 'none',
+                  color: isGovernanceTabActive ? '#fff' : 'var(--text-secondary-dark)',
+                  width: '100%',
+                }}
+                title="Governance"
+                onClick={() => {
+                  if (isSidebarCollapsed) {
+                    if (showInsightsTab) {
+                      setActiveTab('insights');
+                      return;
+                    }
+                    if (showMyApprovalsTab) {
+                      setActiveTab('my-approvals');
+                      return;
+                    }
+                    if (showAiChatbotTab) {
+                      setActiveTab('ai-chatbot');
+                      return;
+                    }
+                    if (showResponsibilityChartTab) {
+                      setActiveTab('settings-responsibility-chart');
+                    }
+                    return;
+                  }
+                  setIsGovernanceOpen((prev) => !prev);
                 }}
               >
-                {pendingApprovalsCount}
-              </span>
-            )}
-          </button>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <span>🧭</span>
+                  {!isSidebarCollapsed && <span>Governance</span>}
+                </span>
+                {!isSidebarCollapsed && <span style={{ fontSize: '0.8rem' }}>{isGovernanceSectionOpen ? '▾' : '▸'}</span>}
+              </button>
 
-          <button
-            onClick={() => setActiveTab('settings-responsibility-chart')}
-            className={`btn ${activeTab === 'settings-responsibility-chart' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{
-              justifyContent: isSidebarCollapsed ? 'center' : 'flex-start',
-              padding: '10px 16px',
-              fontSize: '0.9rem',
-              background: activeTab === 'settings-responsibility-chart' ? '' : 'transparent',
-              border: 'none',
-              color: activeTab === 'settings-responsibility-chart' ? '#fff' : 'var(--text-secondary-dark)',
-            }}
-            title="Responsibility Chart"
-          >
-            <span>🧭</span>{!isSidebarCollapsed && <span style={{ marginLeft: '8px' }}>Responsibility Chart</span>}
-          </button>
+              {isGovernanceSectionOpen && !isSidebarCollapsed && (
+                <div style={{ display: 'grid', gap: '4px', paddingLeft: '14px' }}>
+                  {showInsightsTab && (
+                    <button
+                      onClick={() => setActiveTab('insights')}
+                      className={`btn ${activeTab === 'insights' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{
+                        justifyContent: 'flex-start',
+                        padding: '8px 14px',
+                        fontSize: '0.84rem',
+                        background: activeTab === 'insights' ? '' : 'transparent',
+                        border: 'none',
+                        color: activeTab === 'insights' ? '#fff' : 'var(--text-secondary-dark)',
+                      }}
+                    >
+                      📈 Insights
+                    </button>
+                  )}
+
+                  {showMyApprovalsTab && (
+                    <button
+                      onClick={() => setActiveTab('my-approvals')}
+                      className={`btn ${activeTab === 'my-approvals' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{
+                        justifyContent: 'space-between',
+                        padding: '8px 14px',
+                        fontSize: '0.84rem',
+                        background: activeTab === 'my-approvals' ? '' : 'transparent',
+                        border: 'none',
+                        color: activeTab === 'my-approvals' ? '#fff' : 'var(--text-secondary-dark)',
+                      }}
+                    >
+                      <span>📝 My Approvals</span>
+                      {pendingApprovalsCount > 0 && (
+                        <span
+                          style={{
+                            background: 'var(--warning)',
+                            color: '#fff',
+                            borderRadius: '10px',
+                            padding: '1px 7px',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {pendingApprovalsCount}
+                        </span>
+                      )}
+                    </button>
+                  )}
+
+                  {showAiChatbotTab && (
+                    <button
+                      onClick={() => setActiveTab('ai-chatbot')}
+                      className={`btn ${activeTab === 'ai-chatbot' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{
+                        justifyContent: 'flex-start',
+                        padding: '8px 14px',
+                        fontSize: '0.84rem',
+                        background: activeTab === 'ai-chatbot' ? '' : 'transparent',
+                        border: 'none',
+                        color: activeTab === 'ai-chatbot' ? '#fff' : 'var(--text-secondary-dark)',
+                      }}
+                    >
+                      🤖 AI Chatbot
+                    </button>
+                  )}
+
+                  {showResponsibilityChartTab && (
+                    <button
+                      onClick={() => setActiveTab('settings-responsibility-chart')}
+                      className={`btn ${activeTab === 'settings-responsibility-chart' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{
+                        justifyContent: 'flex-start',
+                        padding: '8px 14px',
+                        fontSize: '0.84rem',
+                        background: activeTab === 'settings-responsibility-chart' ? '' : 'transparent',
+                        border: 'none',
+                        color: activeTab === 'settings-responsibility-chart' ? '#fff' : 'var(--text-secondary-dark)',
+                      }}
+                    >
+                      🧭 Responsibility Chart
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Dynamic Sreni sections — each Sreni created in Settings appears here */}
           {sreniParentMenus.map(sreni => {
@@ -982,6 +1200,61 @@ export const AdminDashboardPage: React.FC = () => {
               </div>
             );
           })}
+
+          {/* Sthans section — one collapsible group, each sthan is a direct clickable item */}
+          {sthansRootMenu && sthanChildMenus.length > 0 && (
+            <div>
+              <button
+                onClick={() => toggleSthanOpen('sthans')}
+                className={`btn ${activeSthanKey ? 'btn-primary' : 'btn-secondary'}`}
+                style={{
+                  justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
+                  padding: '10px 16px', fontSize: '0.9rem',
+                  background: activeSthanKey ? '' : 'transparent', border: 'none',
+                  color: activeSthanKey ? '#fff' : 'var(--text-secondary-dark)', width: '100%',
+                }}
+                title="Sthans"
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <span>📍</span>
+                  {!isSidebarCollapsed && <span>Sthans</span>}
+                </span>
+                {!isSidebarCollapsed && (
+                  <span style={{ fontSize: '0.8rem', flexShrink: 0 }}>
+                    {(openSthanKeys.has('sthans') || !!activeSthanKey) ? '▾' : '▸'}
+                  </span>
+                )}
+              </button>
+
+              {(openSthanKeys.has('sthans') || !!activeSthanKey) && !isSidebarCollapsed && (
+                <div style={{ display: 'grid', gap: '2px', paddingLeft: '14px' }}>
+                  {sthanChildMenus.map(child => {
+                    const locId = child.key.replace(/^sthan-/, '');
+                    const childTab = `sthan-${locId}` as ActiveTab;
+                    const isActive = (activeTab as string) === childTab;
+                    return (
+                      <button
+                        key={child.key}
+                        onClick={() => setActiveTab(childTab)}
+                        className={`btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
+                        style={{
+                          justifyContent: 'flex-start',
+                          padding: '8px 14px',
+                          fontSize: '0.84rem',
+                          background: isActive ? '' : 'transparent',
+                          border: 'none',
+                          color: isActive ? '#fff' : 'var(--text-secondary-dark)',
+                        }}
+                        title={child.label}
+                      >
+                        {child.icon ?? '📍'} {child.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {showGatewaySection && (
             <div>
@@ -1590,13 +1863,13 @@ export const AdminDashboardPage: React.FC = () => {
 
               <div className="glass-panel" style={{ padding: '14px 16px', display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>
-                  {isSreniAdmin ? 'Service intake backlog' : 'Sreni zone mapping coverage'}: <strong style={{ color: 'var(--text-primary-dark)' }}>{isSreniAdmin ? intakeBacklogCount : `${coverageRate}%`}</strong>
+                  Contacts baseline: <strong style={{ color: 'var(--text-primary-dark)' }}>{contactCoverageTotal}</strong>
                 </span>
-                <span className={`badge ${signalStyles[unmappedSignal].badgeClass}`}>
-                  {unmappedSreniesCount} unmapped srenies
+                <span className={`badge ${signalStyles[attendanceSignal].badgeClass}`}>
+                  Attendance pulse {attendanceCoverageTotal}
                 </span>
-                <span className={`badge ${signalStyles[expiringSignal].badgeClass}`}>
-                  {expiringJobPostingsCount} job posts expiring in 14 days
+                <span className={`badge ${signalStyles[reportingSignal].badgeClass}`}>
+                  Reporting output {reportingCoverageTotal}
                 </span>
               </div>
 
@@ -1658,14 +1931,24 @@ export const AdminDashboardPage: React.FC = () => {
                 <div className="glass-panel" style={{ padding: '18px' }}>
                   <h3 style={{ fontSize: '1.02rem', fontWeight: 700, marginBottom: '12px' }}>Quick Navigation</h3>
                   <div style={{ display: 'grid', gap: '8px' }}>
-                    <button className="btn btn-secondary" style={{ justifyContent: 'space-between' }} onClick={() => setActiveTab('my-approvals')}>
-                      <span>My Approvals</span>
-                      <span className="badge badge-warning" style={{ marginLeft: '8px' }}>{pendingApprovalsCount}</span>
-                    </button>
-                    <button className="btn btn-secondary" style={{ justifyContent: 'space-between' }} onClick={() => setActiveTab('settings-responsibility-chart')}>
-                      <span>Responsibility Chart</span>
-                      <span>↗</span>
-                    </button>
+                    {showMyApprovalsTab && (
+                      <button className="btn btn-secondary" style={{ justifyContent: 'space-between' }} onClick={() => setActiveTab('my-approvals')}>
+                        <span>My Approvals</span>
+                        <span className="badge badge-warning" style={{ marginLeft: '8px' }}>{pendingApprovalsCount}</span>
+                      </button>
+                    )}
+                    {showResponsibilityChartTab && (
+                      <button className="btn btn-secondary" style={{ justifyContent: 'space-between' }} onClick={() => setActiveTab('settings-responsibility-chart')}>
+                        <span>Responsibility Chart</span>
+                        <span>↗</span>
+                      </button>
+                    )}
+                    {showAiChatbotTab && (
+                      <button className="btn btn-secondary" style={{ justifyContent: 'space-between' }} onClick={() => setActiveTab('ai-chatbot')}>
+                        <span>AI Chatbot</span>
+                        <span>↗</span>
+                      </button>
+                    )}
                     {showGatewaySection && (
                       <button className="btn btn-secondary" style={{ justifyContent: 'space-between' }} onClick={() => setActiveTab(showHelpdeskTicketsTab ? 'helpdesk-tickets' : showJobPostingsTab ? 'job-postings' : 'job-applications')}>
                         <span>Helpdesk Workspace</span>
@@ -1680,6 +1963,8 @@ export const AdminDashboardPage: React.FC = () => {
           )}
 
           {activeTab === 'insights' && <InsightsPage />}
+
+          {activeTab === 'ai-chatbot' && <AiChatbotPage />}
 
           {/* TAB 2: ADMINS LIST (now under Settings) */}
           {activeTab === 'settings-admins' && showAdminsTab && (
@@ -1850,6 +2135,14 @@ export const AdminDashboardPage: React.FC = () => {
           {activeTab === 'settings-google-integration' && showAdminsTab && <GoogleIntegrationSettingsPage />}
 
           {activeTab === 'settings-responsibility-chart' && <ResponsibilityChartPage />}
+
+          {/* Sthan detail page — tabs (Reports / Expenses / Contacts) are rendered inside */}
+          {(activeTab as string).startsWith('sthan-') && activeSthanKey && (() => {
+            const sthanMenu = sthanChildMenus.find(m => m.key === `sthan-${activeSthanKey}`);
+            return sthanMenu ? (
+              <SthanDetailPage locationId={activeSthanKey} locationName={sthanMenu.label} />
+            ) : null;
+          })()}
 
         </div>
 

@@ -23,6 +23,7 @@ export interface SrenyRecord {
   name: string;
   zoneId?: string;
   isServiceSreny: boolean;
+  joinUsVisible: boolean;
   code?: string;
   description?: string;
   active: boolean;
@@ -347,6 +348,7 @@ export interface ReportMetricDefinitionRecord {
   sortOrder: number;
   target?: number;
   active: boolean;
+  scope: 'sreni' | 'location';
   createdAt: string;
   updatedAt: string;
 }
@@ -493,4 +495,64 @@ export interface ResponsibilityChartRecord {
   availableYears: number[];
   nodes: ResponsibilityChartNodeRecord[];
   edges: ResponsibilityChartEdgeRecord[];
+}
+
+// ── Sthan-specific types ─────────────────────────────────────────────────────
+
+export interface SthanReportMetricRecord {
+  id: string;
+  locationId: string;
+  name: string;
+  description?: string;
+  unit?: string;
+  inputType: 'number' | 'text';
+  isRequired: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SthanReportRecord {
+  id: string;
+  locationId: string;
+  periodYear: number;
+  periodMonth: number;
+  entries: Record<string, string>;
+  notes?: string;
+  submittedBy?: string;
+  submittedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SthanExpenseCategory = 'travel' | 'food' | 'accommodation' | 'event_supplies' | 'printing' | 'other';
+export type SthanExpenseStatus = 'draft' | 'submitted' | 'pending_review' | 'approved' | 'rejected';
+
+export interface SthanExpenseRecord {
+  id: string;
+  locationId: string;
+  submittedBy?: string;
+  category: SthanExpenseCategory;
+  description: string;
+  amount: number;
+  currency: string;
+  receiptUrl?: string;
+  receiptOriginalName?: string;
+  status: SthanExpenseStatus;
+  reviewerNotes?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SthanContactRecord {
+  id: string;
+  locationId: string;
+  rowIndex: number;
+  data: Record<string, string | number | boolean | null>;
+  sourceFile?: string;
+  uploadedBy?: string;
+  createdAt: string;
+  updatedAt: string;
 }

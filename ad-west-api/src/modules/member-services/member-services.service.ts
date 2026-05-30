@@ -113,6 +113,25 @@ export class MemberServicesService {
   private readonly ALLOWED_RECEIPT_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.pdf']);
   private readonly MAX_RECEIPT_BYTES = 512 * 1024;
 
+  private parseDateRange(fromDate?: string, toDate?: string): { from?: Date; to?: Date } {
+    const from = fromDate ? new Date(fromDate) : undefined;
+    const to = toDate ? new Date(toDate) : undefined;
+
+    if (fromDate && Number.isNaN(from?.getTime())) {
+      throw new BadRequestException('fromDate must be a valid date string');
+    }
+
+    if (toDate && Number.isNaN(to?.getTime())) {
+      throw new BadRequestException('toDate must be a valid date string');
+    }
+
+    if (from && to && from.getTime() > to.getTime()) {
+      throw new BadRequestException('fromDate must be before or equal to toDate');
+    }
+
+    return { from, to };
+  }
+
   private async persistReceiptFile(reimbursementId: string, file: Express.Multer.File): Promise<{ url: string; storagePath: string; originalName: string; mimeType: string }> {
     if (!file?.buffer?.length) throw new BadRequestException('Receipt file is empty');
     if (file.size > this.MAX_RECEIPT_BYTES) throw new BadRequestException('Receipt must not exceed 500 KB');
@@ -317,12 +336,26 @@ export class MemberServicesService {
     };
   }
 
-  async listEvents(): Promise<SpecialEvent[]> {
+  async listEvents(fromDate?: string, toDate?: string): Promise<SpecialEvent[]> {
+    const { from, to } = this.parseDateRange(fromDate, toDate);
+
     if (this.useDb()) {
-      const rows = await this.eventRepo!.find({ order: { dateTime: 'DESC' } });
+      const qb = this.eventRepo!.createQueryBuilder('event');
+      if (from) qb.andWhere('event.date_time >= :from', { from });
+      if (to) qb.andWhere('event.date_time <= :to', { to });
+
+      const rows = await qb.orderBy('event.date_time', 'DESC').getMany();
       return Promise.all(rows.map((r) => this.loadEventWithDetails(r)));
     }
-    return [...this.memEvents.values()].sort((a, b) => b.dateTime.localeCompare(a.dateTime));
+
+    return [...this.memEvents.values()]
+      .filter((event) => {
+        const eventMs = Date.parse(event.dateTime);
+        if (from && Number.isFinite(eventMs) && eventMs < from.getTime()) return false;
+        if (to && Number.isFinite(eventMs) && eventMs > to.getTime()) return false;
+        return true;
+      })
+      .sort((a, b) => b.dateTime.localeCompare(a.dateTime));
   }
 
   async listEventsForSreni(sreniId: string): Promise<SpecialEvent[]> {

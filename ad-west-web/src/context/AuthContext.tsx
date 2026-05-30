@@ -6,6 +6,7 @@ import { AdminSessionUser, AuthContext } from './auth-context'
 interface SessionPayload {
   sub: string
   type: 'admin' | 'member'
+  roles?: string[]
   authProvider?: 'password' | 'google'
   code?: string
   name?: string
@@ -71,6 +72,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setMustResetPassword(payload.mustResetPassword === true)
 
+    const normalizeRole = (value: string): string =>
+      value
+        .trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '')
+    const isTokenSuperAdmin = payload.origin === 'user'
+      || (payload.roles ?? []).some((role) => normalizeRole(role) === 'SUPERADMIN')
+
     // Build session from the signed token payload — always valid when token is valid
     const tokenUser: AdminSessionUser = {
       sub: payload.sub,
@@ -92,6 +101,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             : user.email.toLowerCase() === payload.email!.toLowerCase()
         )
         if (current) {
+          const mappedRoles = current.roles.map((role) => ({
+            role: toUiRole(role.role),
+            scopeType: role.scopeType,
+            scopeId: role.scopeId || 'global',
+          }))
+
+          if (isTokenSuperAdmin && !mappedRoles.some((role) => normalizeRole(String(role.role)) === 'SUPERADMIN')) {
+            mappedRoles.push({ role: 'Super Admin', scopeType: 'global', scopeId: 'global' })
+          }
+
           setAdminUser({
             sub: current.id,
             code: current.code,
@@ -99,11 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             email: payload.email ?? current.email,
             picture: payload.picture,
             authProvider: payload.authProvider ?? 'password',
-            roles: current.roles.map((role) => ({
-              role: toUiRole(role.role),
-              scopeType: role.scopeType,
-              scopeId: role.scopeId || 'global',
-            })),
+            roles: mappedRoles,
           })
           return
         }

@@ -24,6 +24,9 @@ export class CoreBusinessDbBootstrapService {
         `ALTER TABLE adwest.users ADD COLUMN IF NOT EXISTS reporting_to_role_ids TEXT[] NOT NULL DEFAULT '{}'`,
       );
       await this.dataSource.query(
+        `ALTER TABLE adwest.srenies ADD COLUMN IF NOT EXISTS join_us_visible BOOLEAN NOT NULL DEFAULT FALSE`,
+      );
+      await this.dataSource.query(
         `ALTER TABLE adwest.approval_items ADD COLUMN IF NOT EXISTS target_type VARCHAR(64)`,
       );
       await this.dataSource.query(`

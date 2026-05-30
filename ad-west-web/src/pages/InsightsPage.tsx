@@ -1,27 +1,55 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
   ResponsiveContainer,
-  PieChart, Pie, Cell, Tooltip as RTooltip, Legend,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RTooltip,
+  Cell,
 } from 'recharts'
 import { backendApi } from '../utils/backendApi'
 
-// ─── Palette ─────────────────────────────────────────────────────────────────
+type InsightDatePreset = 'last_1_month' | 'last_3_months' | 'last_6_months' | 'last_1_year' | 'custom'
 
-const C = {
-  primary: '#6366f1',
-  success: '#10b981',
-  warning: '#f59e0b',
-  error:   '#ef4444',
-  sky:     '#0ea5e9',
-  violet:  '#8b5cf6',
-  rose:    '#f43f5e',
-  teal:    '#14b8a6',
-  slate:   '#64748b',
-  amber:   '#f59e0b',
+const INSIGHT_DATE_PRESETS: Array<{ value: InsightDatePreset; label: string; months: number }> = [
+  { value: 'last_1_month', label: 'Last One month', months: 1 },
+  { value: 'last_3_months', label: 'Last Three months', months: 3 },
+  { value: 'last_6_months', label: 'Last Six Months', months: 6 },
+  { value: 'last_1_year', label: 'Last One Year', months: 12 },
+  { value: 'custom', label: 'Custom', months: 0 },
+]
+
+const toIsoDateOnly = (value: Date): string => {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
-const SRENI_COLORS = [C.primary, C.sky, C.teal, C.success, C.violet, C.rose, C.warning, C.amber, '#e11d48', '#06b6d4', '#84cc16', '#f97316']
+const buildPresetDateRange = (months: number) => {
+  const to = new Date()
+  const from = new Date(to)
+  from.setMonth(from.getMonth() - months)
+
+  return {
+    fromDate: toIsoDateOnly(from),
+    toDate: toIsoDateOnly(to),
+  }
+}
+
+const LAST_ONE_MONTH_RANGE = buildPresetDateRange(1)
+
+const C = {
+  primary: '#2563eb',
+  sreni: '#0ea5e9',
+  sthan: '#14b8a6',
+  attendance: '#f59e0b',
+  reporting: '#8b5cf6',
+}
+
+const CHART_COLORS = ['#2563eb', '#14b8a6', '#f59e0b', '#8b5cf6', '#06b6d4', '#f97316', '#10b981', '#ec4899', '#84cc16', '#6366f1']
 
 const TOOLTIP_STYLE: React.CSSProperties = {
   background: 'var(--surface-dark)',
@@ -66,80 +94,172 @@ function EmptyChart({ message = 'No data yet', height = 200 }: { message?: strin
   )
 }
 
-const customLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
-  if (percent < 0.05) return null
-  const RADIAN = Math.PI / 180
-  const r = innerRadius + (outerRadius - innerRadius) * 0.55
-  const x = cx + r * Math.cos(-midAngle * RADIAN)
-  const y = cy + r * Math.sin(-midAngle * RADIAN)
-  return (
-    <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={700}>
-      {`${(percent * 100).toFixed(0)}%`}
-    </text>
-  )
+const withinRange = (isoDate: string | undefined, range?: { fromDate: string; toDate: string }): boolean => {
+  if (!isoDate) return false
+  if (!range) return true
+  const valueMs = Date.parse(isoDate)
+  if (!Number.isFinite(valueMs)) return false
+  const fromMs = Date.parse(range.fromDate)
+  const toMs = Date.parse(range.toDate)
+  if (Number.isFinite(fromMs) && valueMs < fromMs) return false
+  if (Number.isFinite(toMs) && valueMs > toMs) return false
+  return true
 }
+
+const toMonthIso = (year: number, month: number): string => `${year}-${String(month).padStart(2, '0')}-01`
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function InsightsPage() {
   const [loading, setLoading] = useState(true)
+  const [datePreset, setDatePreset] = useState<InsightDatePreset>('last_1_month')
 
-  const [tickets, setTickets] = useState<any[]>([])
-  const [jobPostings, setJobPostings] = useState<any[]>([])
-  const [jobApplications, setJobApplications] = useState<any[]>([])
-  const [events, setEvents] = useState<any[]>([])
   const [srenies, setSrenies] = useState<any[]>([])
+  const [sthans, setSthans] = useState<any[]>([])
   const [contactCountsBySreni, setContactCountsBySreni] = useState<Record<string, number>>({})
+  const [contactCountsBySthan, setContactCountsBySthan] = useState<Record<string, number>>({})
+  const [attendanceBySreni, setAttendanceBySreni] = useState<Record<string, number>>({})
+  const [attendanceBySthan, setAttendanceBySthan] = useState<Record<string, number>>({})
   const [monthlyReports, setMonthlyReports] = useState<any[]>([])
-  const [reportParams, setReportParams] = useState<any[]>([])
+  const [sthanReportsByLocation, setSthanReportsByLocation] = useState<Record<string, number>>({})
+  const [customFromDate, setCustomFromDate] = useState(() => LAST_ONE_MONTH_RANGE.fromDate)
+  const [customToDate, setCustomToDate] = useState(() => LAST_ONE_MONTH_RANGE.toDate)
+
+  const selectedRange = useMemo(() => {
+    if (datePreset === 'custom') {
+      const hasBothDates = Boolean(customFromDate && customToDate)
+      return hasBothDates
+        ? { fromDate: customFromDate, toDate: customToDate }
+        : undefined
+    }
+
+    const preset = INSIGHT_DATE_PRESETS.find((item) => item.value === datePreset) ?? INSIGHT_DATE_PRESETS[0]
+    return buildPresetDateRange(preset.months)
+  }, [customFromDate, customToDate, datePreset])
+
+  const customDateRangeInvalid =
+    datePreset === 'custom' &&
+    customFromDate &&
+    customToDate &&
+    Date.parse(customFromDate) > Date.parse(customToDate)
+
+  const handleResetDateFilter = () => {
+    const nextRange = buildPresetDateRange(1)
+    setDatePreset('last_1_month')
+    setCustomFromDate(nextRange.fromDate)
+    setCustomToDate(nextRange.toDate)
+  }
 
   useEffect(() => {
     let cancelled = false
 
     const loadInsights = async () => {
-      const [t, jp, ja, ev, sr, mr, rp] = await Promise.allSettled([
-        backendApi.listHelpdeskTickets(),
-        backendApi.listJobPostings(),
-        backendApi.listAllJobApplications(),
-        backendApi.listSpecialEvents(),
+      if (customDateRangeInvalid) {
+        if (!cancelled) setLoading(false)
+        return
+      }
+
+      if (!cancelled) setLoading(true)
+
+      const [sr, locations, mr] = await Promise.allSettled([
         backendApi.listSreniDefinitions(),
-        backendApi.listAllMonthlyReports(),
-        backendApi.listReportMetricDefinitions(),
+        backendApi.listLocationDefinitions(),
+        backendApi.listAllMonthlyReports(selectedRange),
       ])
 
       if (cancelled) return
 
-      if (t.status === 'fulfilled') setTickets((t.value as any).items ?? t.value)
-      if (jp.status === 'fulfilled') setJobPostings((jp.value as any).items ?? jp.value)
-      if (ja.status === 'fulfilled') setJobApplications((ja.value as any).items ?? ja.value)
-      if (ev.status === 'fulfilled') setEvents((ev.value as any).items ?? ev.value)
-
       const sreniItems = sr.status === 'fulfilled'
         ? (Array.isArray(sr.value) ? sr.value : (sr.value as any).items ?? [])
         : []
+      const sthanItems = locations.status === 'fulfilled'
+        ? locations.value.filter((location: any) => location.level === 'STHAN' && location.active)
+        : []
 
       setSrenies(sreniItems)
+      setSthans(sthanItems)
 
       if (mr.status === 'fulfilled') setMonthlyReports(Array.isArray(mr.value) ? mr.value : (mr.value as any).items ?? [])
-      if (rp.status === 'fulfilled') setReportParams(Array.isArray(rp.value) ? rp.value : (rp.value as any).items ?? [])
 
-      const nextContactCounts: Record<string, number> = {}
-      if (sreniItems.length > 0) {
-        const contactResults = await Promise.allSettled(
-          sreniItems.map((sreni: any) => backendApi.listSreniContacts(sreni.id, 1, 1)),
-        )
+      const [
+        sreniContacts,
+        sthanContacts,
+        sreniAttendance,
+        sthanReports,
+      ] = await Promise.all([
+        Promise.allSettled(sreniItems.map((sreni: any) => backendApi.listSreniContacts(sreni.id, 1, 1))),
+        Promise.allSettled(sthanItems.map((sthan: any) => backendApi.listSthanContacts(sthan.id, 1, 1))),
+        Promise.allSettled(sreniItems.map((sreni: any) => backendApi.listSreniAttendanceListing(sreni.id))),
+        Promise.allSettled(sthanItems.map((sthan: any) => backendApi.listSthanReports(sthan.id))),
+      ])
 
-        if (cancelled) return
+      if (cancelled) return
 
-        sreniItems.forEach((sreni: any, index: number) => {
-          const result = contactResults[index]
-          nextContactCounts[sreni.id] = result?.status === 'fulfilled'
-            ? result.value.total ?? result.value.items.length
-            : 0
-        })
-      }
+      const nextSreniContacts: Record<string, number> = {}
+      sreniItems.forEach((sreni: any, index: number) => {
+        const result = sreniContacts[index]
+        nextSreniContacts[sreni.id] = result?.status === 'fulfilled'
+          ? result.value.total ?? result.value.items.length
+          : 0
+      })
+      setContactCountsBySreni(nextSreniContacts)
 
-      setContactCountsBySreni(nextContactCounts)
+      const nextSthanContacts: Record<string, number> = {}
+      sthanItems.forEach((sthan: any, index: number) => {
+        const result = sthanContacts[index]
+        nextSthanContacts[sthan.id] = result?.status === 'fulfilled'
+          ? result.value.total ?? result.value.items.length
+          : 0
+      })
+      setContactCountsBySthan(nextSthanContacts)
+
+      const nextSreniAttendance: Record<string, number> = {}
+      const nextSthanAttendance: Record<string, number> = {}
+      sreniItems.forEach((sreni: any, index: number) => {
+        const result = sreniAttendance[index]
+        if (result?.status !== 'fulfilled') {
+          nextSreniAttendance[sreni.id] = 0
+          return
+        }
+
+        const listingItems = Array.isArray(result.value) ? result.value : []
+        const score = listingItems.reduce((sum: number, item: any) => {
+          if (!withinRange(item.event?.date, selectedRange)) return sum
+          const itemScore = item.metrics.reduce((metricSum: number, metricItem: any) => {
+            const values = metricItem.capture?.values ?? {}
+            const numeric = Object.values(values).reduce((acc, value) => acc + parseNumericValue(value), 0)
+            return metricSum + (numeric > 0 ? numeric : metricItem.capture ? 1 : 0)
+          }, 0)
+
+          if (item.event?.scope === 'sthan' && Array.isArray(item.event?.sthanIds)) {
+            item.event.sthanIds.forEach((sthanId: string) => {
+              nextSthanAttendance[sthanId] = (nextSthanAttendance[sthanId] ?? 0) + (itemScore > 0 ? itemScore : 1)
+            })
+          }
+
+          return sum + itemScore
+        }, 0)
+
+        nextSreniAttendance[sreni.id] = score
+      })
+      setAttendanceBySreni(nextSreniAttendance)
+      setAttendanceBySthan(nextSthanAttendance)
+
+      const nextSthanReportsByLocation: Record<string, number> = {}
+      sthanItems.forEach((sthan: any, index: number) => {
+        const result = sthanReports[index]
+        if (result?.status !== 'fulfilled') {
+          nextSthanReportsByLocation[sthan.id] = 0
+          return
+        }
+
+        const reports = Array.isArray(result.value) ? result.value : []
+        nextSthanReportsByLocation[sthan.id] = reports.filter((report: any) => {
+          const reportMonthIso = toMonthIso(report.periodYear, report.periodMonth)
+          return withinRange(reportMonthIso, selectedRange)
+        }).length
+      })
+      setSthanReportsByLocation(nextSthanReportsByLocation)
     }
 
     loadInsights().finally(() => {
@@ -149,206 +269,138 @@ export function InsightsPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [customDateRangeInvalid, selectedRange])
 
-  const now = new Date().toISOString()
-
-  // ── Helpdesk ──
-  const ticketStatusColors: Record<string, string> = { open: C.error, in_progress: C.warning, resolved: C.success, closed: C.slate }
-  const ticketsByStatus = Object.entries(
-    tickets.reduce((acc, t) => { acc[t.status] = (acc[t.status] || 0) + 1; return acc }, {} as Record<string, number>)
-  ).map(([name, value]) => ({ name: name.replace('_', ' '), value, fill: ticketStatusColors[name] ?? C.slate }))
-
-  const ticketCategoryColors: Record<string, string> = { general: C.primary, technical: C.sky, financial: C.warning, membership: C.violet, other: C.slate }
-  const ticketsByCategory = Object.entries(
-    tickets.reduce((acc, t) => { acc[t.category] = (acc[t.category] || 0) + 1; return acc }, {} as Record<string, number>)
-  ).map(([name, value]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), value, fill: ticketCategoryColors[name] ?? C.slate }))
-
-  // ── Jobs ──
-  const appStatusColors: Record<string, string> = { new: C.primary, under_review: C.sky, shortlisted: C.teal, rejected: C.error, accepted: C.success }
-  const appsByStatus = Object.entries(
-    jobApplications.reduce((acc, a) => { acc[a.status] = (acc[a.status] || 0) + 1; return acc }, {} as Record<string, number>)
-  ).map(([name, value]) => ({ name: name.replace('_', ' '), value, fill: appStatusColors[name] ?? C.slate }))
-
-  const postingTypeColors = [C.primary, C.sky, C.success, C.violet]
-  const postingsByType = Object.entries(
-    jobPostings.reduce((acc, j) => { acc[j.type] = (acc[j.type] || 0) + 1; return acc }, {} as Record<string, number>)
-  ).map(([name, value], i) => ({ name: name.replace('_', ' '), value, fill: postingTypeColors[i % postingTypeColors.length] }))
-
-  const activePostings = jobPostings.filter((j) => j.isActive).length
-  const inactivePostings = jobPostings.length - activePostings
-
-  // ── Upcoming Events ──
-  const upcomingEventsList = events
-    .filter((e) => e.dateTime > now)
-    .sort((a, b) => a.dateTime.localeCompare(b.dateTime))
-    .slice(0, 6)
-
-  // ── 1. Sreni Contacts Distribution ──
-  // Count contacts per sreni using the srenyIds array on each contact
   const contactsBySreni = useMemo(() => {
     return srenies
       .map((s, i) => ({
         name: s.name?.length > 14 ? s.name.slice(0, 14) + '…' : s.name,
         fullName: s.name,
-        Contacts: contactCountsBySreni[s.id] ?? 0,
-        fill: SRENI_COLORS[i % SRENI_COLORS.length],
+        value: contactCountsBySreni[s.id] ?? 0,
+        fill: CHART_COLORS[i % CHART_COLORS.length],
       }))
-      .filter((s) => s.Contacts > 0)
-      .sort((a, b) => b.Contacts - a.Contacts)
+      .filter((s) => s.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10)
   }, [srenies, contactCountsBySreni])
 
-  const totalContacts = Object.values(contactCountsBySreni).reduce((sum, count) => sum + count, 0)
+  const contactsBySthan = useMemo(() => {
+    return sthans
+      .map((sthan, index) => ({
+        name: sthan.name?.length > 16 ? sthan.name.slice(0, 16) + '…' : sthan.name,
+        fullName: sthan.name,
+        value: contactCountsBySthan[sthan.id] ?? 0,
+        fill: CHART_COLORS[index % CHART_COLORS.length],
+      }))
+      .filter((sthan) => sthan.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10)
+  }, [sthans, contactCountsBySthan])
 
-  // ── 2. Revenue Generation by Sreni ──
-  // Aggregate numeric report entries per sreni — look for revenue/collection/amount/fee fields
-  const REVENUE_KEYS = /revenue|collection|amount|fee|income|total|receipt|fund/i
-  const revenueMap = useMemo(() => {
-    const next = new Map<string, number>()
-
-    monthlyReports.forEach((report) => {
-      if (!report.sreniId || !report.entries) return
-      const current = next.get(report.sreniId) ?? 0
-      const revenueFromReport = Object.entries(report.entries as Record<string, unknown>)
-        .filter(([key]) => REVENUE_KEYS.test(key))
-        .reduce((sum, [, val]) => sum + parseNumericValue(val), 0)
-      next.set(report.sreniId, current + revenueFromReport)
-    })
-
-    return next
-  }, [monthlyReports])
-
-  const revenueData = useMemo(() => {
+  const attendanceSeriesBySreni = useMemo(() => {
     return srenies
       .map((s, i) => ({
         name: s.name?.length > 14 ? s.name.slice(0, 14) + '…' : s.name,
         fullName: s.name,
-        'Revenue (AED)': revenueMap.get(s.id) ?? 0,
-        fill: SRENI_COLORS[i % SRENI_COLORS.length],
+        value: attendanceBySreni[s.id] ?? 0,
+        fill: CHART_COLORS[i % CHART_COLORS.length],
       }))
-      .filter((s) => s['Revenue (AED)'] > 0)
-      .sort((a, b) => b['Revenue (AED)'] - a['Revenue (AED)'])
-  }, [srenies, revenueMap])
+      .filter((s) => s.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10)
+  }, [attendanceBySreni, srenies])
 
-  const hasRevenueData = revenueData.length > 0
-  const totalRevenue = revenueData.reduce((sum, r) => sum + r['Revenue (AED)'], 0)
-
-  // Revenue placeholder: show all srenis with 0 if no real data (so chart structure is visible)
-  const revenueChartData = hasRevenueData
-    ? revenueData
-    : srenies.slice(0, 8).map((s, i) => ({
-        name: s.name?.length > 14 ? s.name.slice(0, 14) + '…' : s.name,
-        fullName: s.name,
-        'Revenue (AED)': 0,
-        fill: SRENI_COLORS[i % SRENI_COLORS.length],
+  const attendanceSeriesBySthan = useMemo(() => {
+    return sthans
+      .map((sthan, index) => ({
+        name: sthan.name?.length > 16 ? sthan.name.slice(0, 16) + '…' : sthan.name,
+        fullName: sthan.name,
+        value: attendanceBySthan[sthan.id] ?? 0,
+        fill: CHART_COLORS[index % CHART_COLORS.length],
       }))
+      .filter((sthan) => sthan.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10)
+  }, [attendanceBySthan, sthans])
 
-  // ── 3. Monthly Target Achievement ──
-  const currentMonth = new Date().getMonth() + 1
-  const currentYear = new Date().getFullYear()
-  const monthName = new Date().toLocaleString('en-AE', { month: 'long' })
-
-  // Reports submitted this month
-  const thisMonthReports = useMemo(() => {
-    return monthlyReports.filter(
-      (r) => r.year === currentYear && r.month === currentMonth && r.status === 'submitted'
-    )
-  }, [monthlyReports, currentYear, currentMonth])
-  const submittedCount = new Set(thisMonthReports.map((r) => r.sreniId)).size
-  const pendingCount = srenies.length - submittedCount
-  const submissionPct = srenies.length > 0 ? Math.round((submittedCount / srenies.length) * 100) : 0
-
-  // Build metric achievement: compare total actuals against the combined target for all srenis.
-  const metricsWithTarget = useMemo(() => {
-    return reportParams.filter(
-      (m: any) => m.inputType === 'number' && m.target != null && m.target > 0
-    )
-  }, [reportParams])
-
-  const metricAchievementData = useMemo(() => {
-    return metricsWithTarget.map((metric: any, i: number) => {
-      const actual = thisMonthReports.reduce((sum: number, report: any) => {
-        const raw = report.entries?.[metric.name]
-        return sum + parseNumericValue(raw)
-      }, 0)
-      const combinedTarget = metric.target * srenies.length
-      const pct = combinedTarget > 0 ? Math.min(100, Math.round((actual / combinedTarget) * 100)) : 0
-      return {
-        name: metric.name.length > 18 ? metric.name.slice(0, 18) + '…' : metric.name,
-        fullName: metric.name,
-        Achieved: actual,
-        Target: combinedTarget,
-        PerSreniTarget: metric.target,
-        unit: metric.unit ?? '',
-        pct,
-        fill: SRENI_COLORS[i % SRENI_COLORS.length],
-      }
-    })
-  }, [metricsWithTarget, thisMonthReports, srenies.length])
-
-  const hasMetricTargets = metricAchievementData.length > 0
-  const perSreniTargetTotal = useMemo(
-    () => metricsWithTarget.reduce((sum: number, metric: any) => sum + metric.target, 0),
-    [metricsWithTarget],
-  )
-
-  const achievementBySreni = useMemo(() => {
-    const reportsBySreni = new Map<string, any>()
-    thisMonthReports.forEach((report: any) => {
-      reportsBySreni.set(report.sreniId, report)
+  const reportsBySreni = useMemo(() => {
+    const counts: Record<string, number> = {}
+    monthlyReports.forEach((report: any) => {
+      counts[report.sreniId] = (counts[report.sreniId] ?? 0) + 1
     })
 
-    return srenies.map((sreni: any, index: number) => {
-      const report = reportsBySreni.get(sreni.id)
+    return srenies
+      .map((sreni, index) => ({
+        name: sreni.name?.length > 14 ? sreni.name.slice(0, 14) + '…' : sreni.name,
+        fullName: sreni.name,
+        value: counts[sreni.id] ?? 0,
+        fill: CHART_COLORS[index % CHART_COLORS.length],
+      }))
+      .filter((sreni) => sreni.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10)
+  }, [monthlyReports, srenies])
 
-      if (!hasMetricTargets) {
-        const pct = report ? 100 : 0
-        return {
-          id: sreni.id,
-          name: sreni.name,
-          achieved: report ? 1 : 0,
-          target: 1,
-          pct,
-          statusLabel: report ? 'Submitted' : 'Pending',
-          color: pct >= 80 ? C.success : pct >= 50 ? C.warning : C.error,
-          fill: SRENI_COLORS[index % SRENI_COLORS.length],
-        }
-      }
+  const reportsBySthan = useMemo(() => {
+    return sthans
+      .map((sthan, index) => ({
+        name: sthan.name?.length > 16 ? sthan.name.slice(0, 16) + '…' : sthan.name,
+        fullName: sthan.name,
+        value: sthanReportsByLocation[sthan.id] ?? 0,
+        fill: CHART_COLORS[index % CHART_COLORS.length],
+      }))
+      .filter((sthan) => sthan.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10)
+  }, [sthanReportsByLocation, sthans])
 
-      const achieved = metricsWithTarget.reduce((sum: number, metric: any) => {
-        const raw = report?.entries?.[metric.name]
-        return sum + parseNumericValue(raw)
-      }, 0)
-      const target = perSreniTargetTotal
-      const pct = target > 0 ? Math.min(100, Math.round((achieved / target) * 100)) : 0
+  const kpis = useMemo(() => {
+    const sreniContactsTotal = Object.values(contactCountsBySreni).reduce((sum, value) => sum + value, 0)
+    const sthanContactsTotal = Object.values(contactCountsBySthan).reduce((sum, value) => sum + value, 0)
+    const sreniAttendanceScore = Object.values(attendanceBySreni).reduce((sum, value) => sum + value, 0)
+    const sthanAttendanceScore = Object.values(attendanceBySthan).reduce((sum, value) => sum + value, 0)
+    const sreniReportingTotal = monthlyReports.length
+    const sthanReportingTotal = Object.values(sthanReportsByLocation).reduce((sum, value) => sum + value, 0)
 
-      return {
-        id: sreni.id,
-        name: sreni.name,
-        achieved,
-        target,
-        pct,
-        statusLabel: report ? 'Submitted' : 'No report',
-        color: pct >= 80 ? C.success : pct >= 50 ? C.warning : C.error,
-        fill: SRENI_COLORS[index % SRENI_COLORS.length],
-      }
-    })
-  }, [hasMetricTargets, metricsWithTarget, perSreniTargetTotal, srenies, thisMonthReports])
+    return {
+      sreniContactsTotal,
+      sthanContactsTotal,
+      sreniAttendanceScore,
+      sthanAttendanceScore,
+      sreniReportingTotal,
+      sthanReportingTotal,
+    }
+  }, [attendanceBySreni, attendanceBySthan, contactCountsBySreni, contactCountsBySthan, monthlyReports.length, sthanReportsByLocation])
 
-  const overallAchievementPct = useMemo(() => {
-    if (!hasMetricTargets) return submissionPct
+  const renderHorizontalBar = (
+    data: Array<{ name: string; fullName: string; value: number; fill: string }>,
+    valueLabel: string,
+    emptyMessage: string,
+  ) => {
+    if (data.length === 0) {
+      return <EmptyChart message={emptyMessage} height="100%" />
+    }
 
-    const totals = achievementBySreni.reduce(
-      (sum, sreni: any) => ({
-        achieved: sum.achieved + sreni.achieved,
-        target: sum.target + sreni.target,
-      }),
-      { achieved: 0, target: 0 },
+    return (
+      <div style={{ flex: 1, minHeight: 240 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} layout="vertical" barSize={18}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-dark)" horizontal={false} />
+            <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--text-secondary-dark)' }} axisLine={false} tickLine={false} allowDecimals={false} />
+            <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--text-secondary-dark)' }} axisLine={false} tickLine={false} width={86} />
+            <RTooltip
+              contentStyle={TOOLTIP_STYLE}
+              cursor={{ fill: 'rgba(37,99,235,0.06)' }}
+              formatter={(value: any, _: any, props: any) => [value, `${props.payload.fullName} (${valueLabel})`]}
+            />
+            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+              {data.map((entry, index) => <Cell key={index} fill={entry.fill} />)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     )
-
-    if (totals.target <= 0) return 0
-    return Math.min(100, Math.round((totals.achieved / totals.target) * 100))
-  }, [achievementBySreni, hasMetricTargets, submissionPct])
+  }
 
   if (loading) {
     return (
@@ -365,228 +417,126 @@ export function InsightsPage() {
       <div>
         <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>Insights</h2>
         <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.9rem', margin: '6px 0 0' }}>
-          Community activity and operational overview across all modules.
+          Contacts, attendance, and reporting insights across Sreni and Sthan units.
         </p>
       </div>
 
-      {/* Row 1: Helpdesk */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-        <ChartCard title="Helpdesk Tickets by Status" subtitle="Open vs resolved breakdown">
-          {ticketsByStatus.length === 0 ? <EmptyChart /> : (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie data={ticketsByStatus} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={90} labelLine={false} label={customLabel}>
-                  {ticketsByStatus.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                </Pie>
-                <RTooltip contentStyle={TOOLTIP_STYLE} />
-                <Legend iconType="circle" iconSize={10} wrapperStyle={{ fontSize: '0.78rem' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-
-        <ChartCard title="Helpdesk Tickets by Category" subtitle="What members are asking about">
-          {ticketsByCategory.length === 0 ? <EmptyChart /> : (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={ticketsByCategory} barSize={28}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-dark)" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-secondary-dark)' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary-dark)' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <RTooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(99,102,241,0.06)' }} />
-                <Bar dataKey="value" name="Tickets" radius={[4, 4, 0, 0]}>
-                  {ticketsByCategory.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-      </div>
-
-      {/* Row 2: Jobs */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-        <ChartCard title="Job Applications by Status" subtitle="Pipeline from new to accepted">
-          {appsByStatus.length === 0 ? <EmptyChart /> : (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={appsByStatus} barSize={28}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-dark)" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-secondary-dark)' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary-dark)' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <RTooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(99,102,241,0.06)' }} />
-                <Bar dataKey="value" name="Applications" radius={[4, 4, 0, 0]}>
-                  {appsByStatus.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-
-        <ChartCard title="Job Postings by Type" subtitle={`${activePostings} active · ${inactivePostings} inactive`}>
-          {postingsByType.length === 0 ? <EmptyChart /> : (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie data={postingsByType} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={90} labelLine={false} label={customLabel}>
-                  {postingsByType.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                </Pie>
-                <RTooltip contentStyle={TOOLTIP_STYLE} />
-                <Legend iconType="circle" iconSize={10} wrapperStyle={{ fontSize: '0.78rem' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-      </div>
-
-      {/* Row 3: Sreni Intelligence */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-
-        {/* Chart 1: Contacts per Sreni */}
-        <ChartCard
-          title="Contacts by Sreni"
-          subtitle={`${totalContacts} total contacts across ${srenies.length} srenis`}
-        >
-          {contactsBySreni.length === 0 ? (
-            <EmptyChart message="No contacts mapped to srenis yet" height="100%" />
-          ) : (
-            <div style={{ flex: 1, minHeight: 260 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={contactsBySreni} barSize={20} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-dark)" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--text-secondary-dark)' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--text-secondary-dark)' }} axisLine={false} tickLine={false} width={80} />
-                  <RTooltip
-                    contentStyle={TOOLTIP_STYLE}
-                    cursor={{ fill: 'rgba(99,102,241,0.06)' }}
-                    formatter={(val: any, _: any, props: any) => [val, props.payload.fullName]}
-                  />
-                  <Bar dataKey="Contacts" radius={[0, 4, 4, 0]}>
-                    {contactsBySreni.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </ChartCard>
-
-        {/* Chart 2: Revenue by Sreni */}
-        <ChartCard
-          title="Revenue by Sreni"
-          badge={
-            !hasRevenueData
-              ? <span className="badge badge-info" style={{ fontSize: '0.68rem', whiteSpace: 'nowrap' }}>Awaiting reports</span>
-              : undefined
-          }
-        >
-          {srenies.length === 0 ? (
-            <EmptyChart message="No srenis configured" height="100%" />
-          ) : (
-            <div style={{ flex: 1, minHeight: 260 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={revenueChartData} barSize={20} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-dark)" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--text-secondary-dark)' }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--text-secondary-dark)' }} axisLine={false} tickLine={false} width={80} />
-                  <RTooltip
-                    contentStyle={TOOLTIP_STYLE}
-                    cursor={{ fill: 'rgba(99,102,241,0.06)' }}
-                    formatter={(val: any, _: any, props: any) => [`AED ${Number(val).toLocaleString()}`, props.payload.fullName]}
-                  />
-                  <Bar dataKey="Revenue (AED)" radius={[0, 4, 4, 0]}>
-                    {revenueChartData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </ChartCard>
-
-        {/* Chart 3: Monthly Target Achievement — per metric */}
-        <ChartCard
-          title={`${monthName} Target Achievement`}
-          badge={
-            <span
-              className={`badge ${overallAchievementPct >= 80 ? 'badge-success' : overallAchievementPct >= 50 ? 'badge-warning' : 'badge-error'}`}
-              style={{ fontSize: '0.68rem' }}
+      <div className="glass-panel" style={{ padding: '16px', display: 'grid', gap: '8px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'end' }}>
+          <label style={{ display: 'grid', gap: '6px', minWidth: '240px' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)', fontWeight: 600 }}>Date filter</span>
+            <select
+              value={datePreset}
+              onChange={(event) => setDatePreset(event.target.value as InsightDatePreset)}
+              style={{
+                background: 'var(--surface-dark)',
+                color: 'var(--text-primary-dark)',
+                border: '1px solid var(--border-dark)',
+                borderRadius: '10px',
+                padding: '9px 12px',
+                fontSize: '0.88rem',
+                fontWeight: 600,
+              }}
             >
-              {overallAchievementPct}%
-            </span>
-          }
-        >
-          {/* Submission progress bar */}
-          <div style={{ marginBottom: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>
-              <span>Report submissions</span>
-              <span>{submittedCount} / {srenies.length}</span>
-            </div>
-            <div style={{ height: '6px', background: 'var(--border-dark)', borderRadius: '3px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${submissionPct}%`, background: submissionPct >= 80 ? C.success : submissionPct >= 50 ? C.warning : C.error, borderRadius: '3px', transition: 'width 0.4s' }} />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gap: '10px' }}>
-              {achievementBySreni.map((sreni: any) => (
-                <div key={sreni.id}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '48%' }} title={sreni.name}>
-                      {sreni.name}
-                    </span>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)', flexShrink: 0 }}>
-                      <strong style={{ color: sreni.color }}>
-                        {hasMetricTargets ? sreni.achieved.toLocaleString() : sreni.statusLabel}
-                      </strong>
-                      {hasMetricTargets
-                        ? ` / ${sreni.target.toLocaleString()} · ${sreni.pct}%`
-                        : ` · ${sreni.pct}%`}
-                    </span>
-                  </div>
-                  <div style={{ height: '7px', background: 'var(--border-dark)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${sreni.pct}%`, background: sreni.color, borderRadius: '4px', transition: 'width 0.5s' }} />
-                  </div>
-                </div>
+              {INSIGHT_DATE_PRESETS.map((preset) => (
+                <option key={preset.value} value={preset.value}>{preset.label}</option>
               ))}
-          </div>
+            </select>
+          </label>
+
+          {datePreset === 'custom' && (
+            <>
+              <label style={{ display: 'grid', gap: '6px', minWidth: '180px' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)', fontWeight: 600 }}>From date</span>
+                <input
+                  type="date"
+                  value={customFromDate}
+                  onChange={(event) => setCustomFromDate(event.target.value)}
+                  style={{
+                    background: 'var(--surface-dark)',
+                    color: 'var(--text-primary-dark)',
+                    border: '1px solid var(--border-dark)',
+                    borderRadius: '10px',
+                    padding: '9px 12px',
+                    fontSize: '0.88rem',
+                    fontWeight: 600,
+                  }}
+                />
+              </label>
+
+              <label style={{ display: 'grid', gap: '6px', minWidth: '180px' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)', fontWeight: 600 }}>To date</span>
+                <input
+                  type="date"
+                  value={customToDate}
+                  onChange={(event) => setCustomToDate(event.target.value)}
+                  style={{
+                    background: 'var(--surface-dark)',
+                    color: 'var(--text-primary-dark)',
+                    border: '1px solid var(--border-dark)',
+                    borderRadius: '10px',
+                    padding: '9px 12px',
+                    fontSize: '0.88rem',
+                    fontWeight: 600,
+                  }}
+                />
+              </label>
+            </>
+          )}
+
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={handleResetDateFilter}
+            style={{ height: '40px' }}
+          >
+            Reset
+          </button>
+        </div>
+
+        {customDateRangeInvalid ? (
+          <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--error)' }}>
+            From date cannot be after To date.
+          </p>
+        ) : (
+          <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary-dark)' }}>
+            Range sent to API: {selectedRange?.fromDate ?? '-'} to {selectedRange?.toDate ?? '-'}
+          </p>
+        )}
+      </div>
+
+      {/* Row 1: Contacts */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <ChartCard title="Sreni Contacts" subtitle={`${kpis.sreniContactsTotal} total contacts`}>
+          {renderHorizontalBar(contactsBySreni, 'Contacts', 'No Sreni contacts uploaded yet')}
+        </ChartCard>
+
+        <ChartCard title="Sthan Contacts" subtitle={`${kpis.sthanContactsTotal} total contacts`}>
+          {renderHorizontalBar(contactsBySthan, 'Contacts', 'No Sthan contacts uploaded yet')}
         </ChartCard>
       </div>
 
-      {/* Row 4: Upcoming Events */}
-      <ChartCard title="Upcoming Special Events" subtitle="Next events scheduled across Srenis">
-        {upcomingEventsList.length === 0 ? (
-          <div style={{ color: 'var(--text-secondary-dark)', fontSize: '0.85rem', padding: '12px 0' }}>No upcoming events scheduled.</div>
-        ) : (
-          <div className="table-container">
-            <table className="custom-table">
-              <thead>
-                <tr>
-                  <th>Event</th>
-                  <th>Date &amp; Time</th>
-                  <th>Venue</th>
-                  <th>Srenis</th>
-                  <th>Registration</th>
-                </tr>
-              </thead>
-              <tbody>
-                {upcomingEventsList.map((ev) => (
-                  <tr key={ev.id}>
-                    <td style={{ fontWeight: 600 }}>{ev.title}</td>
-                    <td style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)', whiteSpace: 'nowrap' }}>
-                      {new Date(ev.dateTime).toLocaleString('en-AE', { dateStyle: 'medium', timeStyle: 'short' })}
-                    </td>
-                    <td style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>{ev.venue || '—'}</td>
-                    <td>
-                      {ev.sreniIds?.length > 0
-                        ? <span className="badge badge-info" style={{ fontSize: '0.7rem' }}>{ev.sreniIds.length} sreni{ev.sreniIds.length > 1 ? 's' : ''}</span>
-                        : <span style={{ color: 'var(--text-secondary-dark)', fontSize: '0.8rem' }}>—</span>}
-                    </td>
-                    <td>
-                      {ev.registrationEnabled
-                        ? <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>Open</span>
-                        : <span className="badge badge-info" style={{ fontSize: '0.7rem' }}>Closed</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </ChartCard>
+      {/* Row 2: Attendance */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <ChartCard title="Sreni Attendance" subtitle={`${kpis.sreniAttendanceScore.toLocaleString()} attendance score in selected range`}>
+          {renderHorizontalBar(attendanceSeriesBySreni, 'Attendance', 'No Sreni attendance captured in selected range')}
+        </ChartCard>
+
+        <ChartCard title="Sthan Attendance" subtitle={`${kpis.sthanAttendanceScore.toLocaleString()} attendance score in selected range`}>
+          {renderHorizontalBar(attendanceSeriesBySthan, 'Attendance', 'No Sthan attendance captured in selected range')}
+        </ChartCard>
+      </div>
+
+      {/* Row 3: Reporting */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <ChartCard title="Sreni Reporting" subtitle={`${kpis.sreniReportingTotal} reports submitted in selected range`}>
+          {renderHorizontalBar(reportsBySreni, 'Reports', 'No Sreni reports submitted in selected range')}
+        </ChartCard>
+
+        <ChartCard title="Sthan Reporting" subtitle={`${kpis.sthanReportingTotal} reports submitted in selected range`}>
+          {renderHorizontalBar(reportsBySthan, 'Reports', 'No Sthan reports submitted in selected range')}
+        </ChartCard>
+      </div>
 
     </div>
   )

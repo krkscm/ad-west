@@ -167,6 +167,26 @@ export class OrgRuntimeService {
       updatedAt: this.ctx.toIsoTimestamp(row.updated_at),
     };
     this.ctx.locations.set(record.id, record);
+
+    // Auto-create sidebar menu for new STHAN locations under the shared "Sthans" parent.
+    if (record.level === 'sthan') {
+      const menuNow = new Date().toISOString();
+      // Ensure "Sthans" root parent exists
+      await this.ctx.dataSource.query(
+        `INSERT INTO adwest.menu_items (id, key, label, parent_key, icon, sort_order, active, created_at, updated_at)
+         VALUES (gen_random_uuid()::text, 'sthans', 'Sthans', null, '📍', 1500, true, $1, $1)
+         ON CONFLICT (key) DO UPDATE SET label = 'Sthans', parent_key = NULL, icon = '📍', sort_order = 1500, active = true`,
+        [menuNow],
+      );
+      // Add this sthan as a child of "sthans" — tabs (Reports/Expenses/Contacts) are rendered in the UI
+      await this.ctx.dataSource.query(
+        `INSERT INTO adwest.menu_items (id, key, label, parent_key, icon, sort_order, active, created_at, updated_at)
+         VALUES (gen_random_uuid()::text, $1, $2, 'sthans', null, 0, true, $3, $3)
+         ON CONFLICT (key) DO UPDATE SET label = $2, parent_key = 'sthans', active = true`,
+        [`sthan-${record.id}`, record.name, menuNow],
+      );
+    }
+
     return record;
   }
 
@@ -253,6 +273,7 @@ export class OrgRuntimeService {
         name: dto.name,
         zoneId: dto.zoneId,
         isServiceSreny: dto.isServiceSreny ?? false,
+        joinUsVisible: false,
         active: true,
         createdAt: now,
         updatedAt: now,
@@ -264,15 +285,16 @@ export class OrgRuntimeService {
     const rows = (await this.ctx.dataSource.query(
       `INSERT INTO adwest.srenies (zone_id, name, is_service_sreny)
        VALUES ($1, $2, $3)
-       RETURNING id, zone_id, name, is_service_sreny, active, created_at, updated_at`,
+       RETURNING id, zone_id, name, is_service_sreny, join_us_visible, active, created_at, updated_at`,
       [dto.zoneId, dto.name, dto.isServiceSreny ?? false],
-    )) as Array<{ id: string; zone_id: string; name: string; is_service_sreny: boolean; active: boolean; created_at: string | Date; updated_at: string | Date }>;
+    )) as Array<{ id: string; zone_id: string; name: string; is_service_sreny: boolean; join_us_visible: boolean; active: boolean; created_at: string | Date; updated_at: string | Date }>;
     const row = rows[0];
     const record: SrenyRecord = {
       id: row.id,
       name: row.name,
       zoneId: row.zone_id,
       isServiceSreny: row.is_service_sreny,
+      joinUsVisible: row.join_us_visible,
       active: row.active,
       createdAt: this.ctx.toIsoTimestamp(row.created_at),
       updatedAt: this.ctx.toIsoTimestamp(row.updated_at),
@@ -351,6 +373,7 @@ export class OrgRuntimeService {
       code: row.code ?? undefined,
       active: row.active,
       isServiceSreny: row.is_service_sreny,
+      joinUsVisible: current.joinUsVisible,
       createdBy: row.created_by ?? undefined,
       updatedBy: row.updated_by ?? undefined,
       createdAt: this.ctx.toIsoTimestamp(row.created_at),
@@ -397,18 +420,19 @@ export class OrgRuntimeService {
         [searchParam],
       ),
       this.ctx.dataSource.query(
-        `SELECT id, name, description, code, active, is_service_sreny, created_by, updated_by, created_at, updated_at FROM adwest.srenies WHERE zone_id IS NULL AND ($1::text IS NULL OR name ILIKE $1 OR code ILIKE $1 OR description ILIKE $1) ORDER BY name LIMIT $2 OFFSET $3`,
+        `SELECT id, name, description, code, active, is_service_sreny, join_us_visible, created_by, updated_by, created_at, updated_at FROM adwest.srenies WHERE zone_id IS NULL AND ($1::text IS NULL OR name ILIKE $1 OR code ILIKE $1 OR description ILIKE $1) ORDER BY name LIMIT $2 OFFSET $3`,
         [searchParam, pageSize, (page - 1) * pageSize],
       ),
     ]);
     const total = (countRows as Array<{ total: number }>)[0].total;
     const items = (dataRows as Array<{
       id: string; name: string; description: string | null; code: string | null; active: boolean;
-      is_service_sreny: boolean; created_by: string | null; updated_by: string | null;
+      is_service_sreny: boolean; join_us_visible: boolean; created_by: string | null; updated_by: string | null;
       created_at: string | Date; updated_at: string | Date;
     }>).map((r) => ({
       id: r.id, name: r.name, description: r.description ?? undefined, code: r.code ?? undefined,
       active: r.active, isServiceSreny: r.is_service_sreny,
+      joinUsVisible: r.join_us_visible,
       createdBy: r.created_by ?? undefined, updatedBy: r.updated_by ?? undefined,
       createdAt: this.ctx.toIsoTimestamp(r.created_at), updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
     }));
@@ -424,6 +448,7 @@ export class OrgRuntimeService {
         code: dto.code,
         description: dto.description,
         isServiceSreny: false,
+        joinUsVisible: dto.joinUsVisible ?? false,
         active: true,
         createdBy: actorEmail,
         updatedBy: actorEmail,
@@ -435,10 +460,10 @@ export class OrgRuntimeService {
     }
 
     const rows = (await this.ctx.dataSource.query(
-      `INSERT INTO adwest.srenies (name, code, description, is_service_sreny, active, created_by, updated_by)
-       VALUES ($1, $2, $3, false, true, $4, $4)
-       RETURNING id, name, description, code, active, is_service_sreny, created_by, updated_by, created_at, updated_at`,
-      [dto.name, dto.code ?? null, dto.description ?? null, actorEmail ?? null],
+      `INSERT INTO adwest.srenies (name, code, description, is_service_sreny, join_us_visible, active, created_by, updated_by)
+       VALUES ($1, $2, $3, false, $4, true, $5, $5)
+       RETURNING id, name, description, code, active, is_service_sreny, join_us_visible, created_by, updated_by, created_at, updated_at`,
+      [dto.name, dto.code ?? null, dto.description ?? null, dto.joinUsVisible ?? false, actorEmail ?? null],
     )) as Array<{
       id: string;
       name: string;
@@ -446,6 +471,7 @@ export class OrgRuntimeService {
       code: string | null;
       active: boolean;
       is_service_sreny: boolean;
+      join_us_visible: boolean;
       created_by: string | null;
       updated_by: string | null;
       created_at: string | Date;
@@ -459,6 +485,7 @@ export class OrgRuntimeService {
       code: row.code ?? undefined,
       active: row.active,
       isServiceSreny: row.is_service_sreny,
+      joinUsVisible: row.join_us_visible,
       createdBy: row.created_by ?? undefined,
       updatedBy: row.updated_by ?? undefined,
       createdAt: this.ctx.toIsoTimestamp(row.created_at),
@@ -515,12 +542,12 @@ export class OrgRuntimeService {
   async updateSreniDefinition(sreniId: string, dto: UpdateSreniDefinitionDto, actorEmail?: string): Promise<SrenyRecord> {
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource && !this.ctx.srenies.has(sreniId)) {
       const rows = await this.ctx.dataSource.query(
-        'SELECT id, name, code, description, active, is_service_sreny, created_by, updated_by, created_at, updated_at FROM adwest.srenies WHERE id=$1',
+        'SELECT id, name, code, description, active, is_service_sreny, join_us_visible, created_by, updated_by, created_at, updated_at FROM adwest.srenies WHERE id=$1',
         [sreniId],
-      ) as Array<{ id: string; name: string; code: string | null; description: string | null; active: boolean; is_service_sreny: boolean; created_by: string | null; updated_by: string | null; created_at: string | Date; updated_at: string | Date }>;
+      ) as Array<{ id: string; name: string; code: string | null; description: string | null; active: boolean; is_service_sreny: boolean; join_us_visible: boolean; created_by: string | null; updated_by: string | null; created_at: string | Date; updated_at: string | Date }>;
       if (!rows.length) throw new NotFoundException('Sreni not found');
       const r = rows[0];
-      this.ctx.srenies.set(r.id, { id: r.id, name: r.name, code: r.code ?? undefined, description: r.description ?? undefined, active: r.active, isServiceSreny: r.is_service_sreny, createdBy: r.created_by ?? undefined, updatedBy: r.updated_by ?? undefined, createdAt: this.ctx.toIsoTimestamp(r.created_at), updatedAt: this.ctx.toIsoTimestamp(r.updated_at) });
+      this.ctx.srenies.set(r.id, { id: r.id, name: r.name, code: r.code ?? undefined, description: r.description ?? undefined, active: r.active, isServiceSreny: r.is_service_sreny, joinUsVisible: r.join_us_visible, createdBy: r.created_by ?? undefined, updatedBy: r.updated_by ?? undefined, createdAt: this.ctx.toIsoTimestamp(r.created_at), updatedAt: this.ctx.toIsoTimestamp(r.updated_at) });
     }
     const current = this.ctx.srenies.get(sreniId);
     if (!current) throw new NotFoundException('Sreni not found');
@@ -532,6 +559,7 @@ export class OrgRuntimeService {
         code: dto.code !== undefined ? dto.code : current.code,
         description: dto.description !== undefined ? dto.description : current.description,
         active: dto.active !== undefined ? dto.active : current.active,
+        joinUsVisible: dto.joinUsVisible !== undefined ? dto.joinUsVisible : current.joinUsVisible,
         updatedBy: actorEmail ?? current.updatedBy,
         updatedAt: new Date().toISOString(),
       };
@@ -543,6 +571,7 @@ export class OrgRuntimeService {
     const nextCode = dto.code !== undefined ? dto.code : current.code ?? null;
     const nextDescription = dto.description !== undefined ? dto.description : current.description ?? null;
     const nextActive = dto.active !== undefined ? dto.active : current.active;
+    const nextJoinUsVisible = dto.joinUsVisible !== undefined ? dto.joinUsVisible : current.joinUsVisible;
 
     const rows = (await this.ctx.dataSource.query(
       `UPDATE adwest.srenies
@@ -550,12 +579,13 @@ export class OrgRuntimeService {
            code        = $3,
            description = $4,
            active      = $5,
-           updated_by  = $6,
+           join_us_visible = $6,
+           updated_by  = $7,
            updated_at  = now()
        WHERE id = $1
-       RETURNING id, name, description, code, active, is_service_sreny, created_by, updated_by, created_at, updated_at`,
-      [sreniId, nextName, nextCode, nextDescription, nextActive, actorEmail ?? null],
-    )) as unknown as [Array<{ id: string; name: string; description: string | null; code: string | null; active: boolean; is_service_sreny: boolean; created_by: string | null; updated_by: string | null; created_at: string | Date; updated_at: string | Date }>, number];
+       RETURNING id, name, description, code, active, is_service_sreny, join_us_visible, created_by, updated_by, created_at, updated_at`,
+      [sreniId, nextName, nextCode, nextDescription, nextActive, nextJoinUsVisible, actorEmail ?? null],
+    )) as unknown as [Array<{ id: string; name: string; description: string | null; code: string | null; active: boolean; is_service_sreny: boolean; join_us_visible: boolean; created_by: string | null; updated_by: string | null; created_at: string | Date; updated_at: string | Date }>, number];
     const row = rows[0][0];
     const updated: SrenyRecord = {
       id: row.id,
@@ -565,6 +595,7 @@ export class OrgRuntimeService {
       code: row.code ?? undefined,
       active: row.active,
       isServiceSreny: row.is_service_sreny,
+      joinUsVisible: row.join_us_visible,
       createdBy: row.created_by ?? undefined,
       updatedBy: row.updated_by ?? undefined,
       createdAt: this.ctx.toIsoTimestamp(row.created_at),

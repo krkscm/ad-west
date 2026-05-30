@@ -47,6 +47,13 @@ This folder contains executable PostgreSQL scripts for ADWest.
 37. 042_drop_audit_fks.sql (Drops selected member-services audit FK constraints for mixed persistence/runtime compatibility)
 38. 043_report_metric_target.sql (Adds target column for report metric definitions)
 39. 044_sreni_analytics_menu.sql (Backfills Analytics Studio child menu for all existing Srenis)
+40. 045_sthan_menus_reports_expenses_contacts.sql (Adds Sthan reports/expenses/contact persistence and backfills Sthan menu hierarchy)
+41. 046_governance_menu_access_control.sql (Normalizes Governance parent and children so menu grants can govern Insights/My Approvals/Responsibility Chart)
+42. 047_location_report_metrics_scope.sql (Adds report metric scope discriminator so Sthan/location metrics live in the shared report-metric table)
+43. 048_fix_sthan_table_types.sql (Repairs Sthan report/expense table definitions with UUID location keys and reconciles sreni_contacts location linkage)
+44. 049_sthan_contacts.sql (Adds standalone Sthan contacts persistence table with row index + JSONB payload)
+45. 050_governance_ai_chatbot_menu.sql (Adds AI Chatbot governance menu key for grant-driven access control)
+46. 051_sreni_join_us_visibility.sql (Adds explicit Join Us visibility flag on Sreni definitions for public intake filtering)
 
 ## Enum Visibility Note
 - API now serves only supported active enum domains to the UI, even if legacy rows still exist in `adwest.enum_values`.
@@ -109,5 +116,12 @@ psql "$env:DATABASE_URL" -f "ad-docs/database-script/041_google_integration_conf
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/042_drop_audit_fks.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/043_report_metric_target.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/044_sreni_analytics_menu.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/045_sthan_menus_reports_expenses_contacts.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/046_governance_menu_access_control.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/047_location_report_metrics_scope.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/048_fix_sthan_table_types.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/049_sthan_contacts.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/050_governance_ai_chatbot_menu.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/051_sreni_join_us_visibility.sql"
 ```
 

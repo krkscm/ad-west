@@ -21,9 +21,11 @@ import { createReadStream } from 'fs';
 import { memoryStorage } from 'multer';
 import { CurrentUser } from '@modules/user-management/decorators/current-user.decorator';
 import { AuthPrincipal } from '@modules/user-management/interfaces/auth-principal.interface';
+import { CryptoService } from '@modules/user-management/services/crypto.service';
 import {
   ApplicationStatus,
   JobType,
+  PublicSreniOption,
   PublicGatewayService,
   TicketCategory,
   TicketStatus,
@@ -31,6 +33,80 @@ import {
 import { GatewayAdminAuthGuard } from '../guards/gateway-admin-auth.guard';
 
 const MAX_RESUME_SIZE_BYTES = 1024 * 1024;
+
+@Controller('public/sreni-contacts')
+export class PublicSreniContactsController {
+  constructor(
+    private readonly service: PublicGatewayService,
+    private readonly cryptoService: CryptoService,
+  ) {}
+
+  @Get('srenies')
+  async listSrenies(): Promise<{ items: PublicSreniOption[] }> {
+    return { items: await this.service.listPublicSreniOptions() };
+  }
+
+  @Post('register')
+  @Throttle({ default: { limit: 6, ttl: 60000 } })
+  async register(
+    @Body()
+    body: {
+      sreniId: string;
+      fullName: string;
+      phone: string;
+      email?: string;
+      city?: string;
+      country?: string;
+      notes?: string;
+      personalNumber?: string;
+      familyOrBachelor?: string;
+      family?: string;
+      bachelor?: string;
+      addressInUae?: string;
+      company?: string;
+      profession?: string;
+      wifeName?: string;
+      landLine?: string;
+      zoneOrLandMark?: string;
+      district?: string;
+      captchaToken: string;
+      captchaAnswer: string;
+      website?: string;
+    },
+  ) {
+    if (body.website && body.website.trim().length > 0) {
+      throw new BadRequestException('Suspicious submission blocked.');
+    }
+    if (!this.cryptoService.verifyCaptcha(body.captchaToken, body.captchaAnswer)) {
+      throw new BadRequestException('Captcha validation failed.');
+    }
+    if (!body.sreniId?.trim()) throw new BadRequestException('Sreni is required.');
+    if (!body.fullName?.trim()) throw new BadRequestException('Full name is required.');
+    if (!body.phone?.trim()) throw new BadRequestException('Phone number is required.');
+
+    return this.service.submitPublicSreniContact({
+      sreniId: body.sreniId,
+      fullName: body.fullName,
+      phone: body.phone,
+      email: body.email,
+      city: body.city,
+      country: body.country,
+      notes: body.notes,
+      personalNumber: body.personalNumber,
+      familyOrBachelor: body.familyOrBachelor,
+      family: body.family,
+      bachelor: body.bachelor,
+      addressInUae: body.addressInUae,
+      company: body.company,
+      profession: body.profession,
+      wifeName: body.wifeName,
+      landLine: body.landLine,
+      zoneOrLandMark: body.zoneOrLandMark,
+      district: body.district,
+      submittedFrom: 'public_join_us_page',
+    });
+  }
+}
 
 // ─── Public — Helpdesk ───────────────────────────────────────────────────────
 
@@ -67,8 +143,12 @@ export class AdminHelpdeskController {
   constructor(private readonly service: PublicGatewayService) {}
 
   @Get('tickets')
-  async listTickets(@Query('status') status?: string) {
-    return { items: await this.service.listTickets(status) };
+  async listTickets(
+    @Query('status') status?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    return { items: await this.service.listTickets(status, fromDate, toDate) };
   }
 
   @Get('tickets/:id')
@@ -163,8 +243,8 @@ export class AdminJobsController {
   constructor(private readonly service: PublicGatewayService) {}
 
   @Get()
-  async listAllJobs() {
-    return { items: await this.service.listAllJobPostings() };
+  async listAllJobs(@Query('fromDate') fromDate?: string, @Query('toDate') toDate?: string) {
+    return { items: await this.service.listAllJobPostings(fromDate, toDate) };
   }
 
   @Post()
@@ -212,8 +292,8 @@ export class AdminJobsController {
   }
 
   @Get('applications')
-  async listAllApplications() {
-    return { items: await this.service.listAllApplications() };
+  async listAllApplications(@Query('fromDate') fromDate?: string, @Query('toDate') toDate?: string) {
+    return { items: await this.service.listAllApplications(fromDate, toDate) };
   }
 
   @Get('applications/:id/resume')

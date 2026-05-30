@@ -58,6 +58,11 @@ import {
   CreateSreniReportParameterDto,
   UpdateSreniReportParameterDto,
   SubmitSreniReportDto,
+  CreateSthanExpenseDto,
+  ReviewSthanExpenseDto,
+  SubmitSthanReportDto,
+  CreateLocationReportMetricDto,
+  UpdateLocationReportMetricDto,
 } from './dto/core-business.dto';
 import { ApprovalRuntimeService } from './services/approval-runtime.service';
 import { AttendanceRuntimeService, type AttendanceRuntimeContext } from './services/attendance-runtime.service';
@@ -76,6 +81,7 @@ import { ResponsibilityChartRuntimeService } from './services/responsibility-cha
 import { OrgRuntimeService, type OrgRuntimeContext } from './services/org-runtime.service';
 import { SreniAdminRuntimeService } from './services/sreni-admin-runtime.service';
 import { SreniReportsRuntimeService } from './services/sreni-reports-runtime.service';
+import { SthanRuntimeService } from './services/sthan-runtime.service';
 import { UserAdminRuntimeService } from './services/user-admin-runtime.service';
 import { CoreBusinessStore } from './store/core-business-store.interface';
 import { DataSource } from 'typeorm';
@@ -111,6 +117,9 @@ import type {
   SreniReportRecord,
   SrenyRecord,
   SthanRecord,
+  SthanReportRecord,
+  SthanExpenseRecord,
+  SthanContactRecord,
   TicketActivityRecord,
   TicketRecord,
   UserRecord,
@@ -258,6 +267,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
       name: 'Default Service Sreny',
       zoneId,
       isServiceSreny: true,
+      joinUsVisible: false,
       active: true,
       createdAt: now,
       updatedAt: now,
@@ -1330,14 +1340,26 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getSreniAdminRuntime().deleteReportMetricDefinition(metricId);
   }
 
+  async listLocationReportMetrics(): Promise<ReportMetricDefinitionRecord[]> {
+    return this.getSreniAdminRuntime().listLocationReportMetrics();
+  }
+
+  async createLocationReportMetric(dto: CreateLocationReportMetricDto): Promise<ReportMetricDefinitionRecord> {
+    return this.getSreniAdminRuntime().createLocationReportMetric(dto);
+  }
+
+  async updateLocationReportMetric(metricId: string, dto: UpdateLocationReportMetricDto): Promise<ReportMetricDefinitionRecord> {
+    return this.getSreniAdminRuntime().updateLocationReportMetric(metricId, dto);
+  }
+
   // ── Sreni Monthly Reports ───────────────────────────────────────────────────
 
   async listSreniMonthlyReports(sreniId: string): Promise<SreniMonthlyReportRecord[]> {
     return this.getSreniAdminRuntime().listSreniMonthlyReports(sreniId);
   }
 
-  async listAllMonthlyReports(): Promise<SreniMonthlyReportRecord[]> {
-    return this.getSreniAdminRuntime().listAllMonthlyReports();
+  async listAllMonthlyReports(fromDate?: string, toDate?: string): Promise<SreniMonthlyReportRecord[]> {
+    return this.getSreniAdminRuntime().listAllMonthlyReports(fromDate, toDate);
   }
 
   async upsertSreniMonthlyReport(sreniId: string, dto: SubmitSreniMonthlyReportDto, submittedBy?: string): Promise<SreniMonthlyReportRecord> {
@@ -1389,5 +1411,60 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
       });
     }
     return this.sreniReportsRuntimeService;
+  }
+
+  // ── Sthan Methods ────────────────────────────────────────────────────────────
+
+  private sthanRuntimeService: SthanRuntimeService | null = null;
+
+  private getSthanRuntime(): SthanRuntimeService {
+    if (!this.sthanRuntimeService) {
+      this.sthanRuntimeService = new SthanRuntimeService({
+        runtimeMode: this.runtimeMode,
+        dataSource: this.dataSource ?? undefined,
+        toIsoTimestamp: (value) => this.getCoreBusinessDomainUtilsService().toIsoTimestamp(value),
+        newId: (prefix) => this.newId(prefix),
+      });
+    }
+    return this.sthanRuntimeService;
+  }
+
+  // Location report metrics are now shared (scope='location' in report_metric_definitions)
+  // and delegated through sreni-admin-runtime service — see listLocationReportMetrics et al.
+
+  async listSthanReports(locationId: string): Promise<SthanReportRecord[]> {
+    return this.getSthanRuntime().listSthanReports(locationId);
+  }
+
+  async upsertSthanReport(locationId: string, dto: SubmitSthanReportDto, submittedBy?: string): Promise<SthanReportRecord> {
+    return this.getSthanRuntime().upsertSthanReport(locationId, dto, submittedBy);
+  }
+
+  async listSthanExpenses(locationId: string, status?: string): Promise<SthanExpenseRecord[]> {
+    return this.getSthanRuntime().listSthanExpenses(locationId, status);
+  }
+
+  async createSthanExpense(locationId: string, dto: CreateSthanExpenseDto, submittedBy?: string): Promise<SthanExpenseRecord> {
+    return this.getSthanRuntime().createSthanExpense(locationId, dto, submittedBy);
+  }
+
+  async reviewSthanExpense(locationId: string, expenseId: string, dto: ReviewSthanExpenseDto, reviewedBy?: string): Promise<SthanExpenseRecord> {
+    return this.getSthanRuntime().reviewSthanExpense(locationId, expenseId, dto, reviewedBy);
+  }
+
+  async deleteSthanExpense(locationId: string, expenseId: string): Promise<void> {
+    return this.getSthanRuntime().deleteSthanExpense(locationId, expenseId);
+  }
+
+  async listSthanContacts(locationId: string, page = 1, pageSize = 50): Promise<{ items: SthanContactRecord[]; total: number; totalPages: number }> {
+    return this.getSthanRuntime().listSthanContacts(locationId, page, pageSize);
+  }
+
+  async uploadSthanContacts(locationId: string, fileBuffer: Buffer, originalName: string, uploadedBy?: string): Promise<{ inserted: number; locationId: string }> {
+    return this.getSthanRuntime().uploadSthanContacts(locationId, fileBuffer, originalName, uploadedBy);
+  }
+
+  async clearSthanContacts(locationId: string): Promise<{ deleted: number }> {
+    return this.getSthanRuntime().clearSthanContacts(locationId);
   }
 }

@@ -77,6 +77,10 @@ export class CreateSreniDefinitionDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  joinUsVisible?: boolean;
 }
 
 export class UpdateSreniDefinitionDto {
@@ -96,6 +100,10 @@ export class UpdateSreniDefinitionDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  joinUsVisible?: boolean;
 }
 
 export class CreateSthanDto {
@@ -857,6 +865,61 @@ export class UpdateReportMetricDefinitionDto {
   active?: boolean;
 }
 
+// ── Location Report Metric Definitions (shared across all sthans) ────────────
+
+export class CreateLocationReportMetricDto {
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  unit?: string;
+
+  @IsIn(['number', 'text'])
+  inputType!: 'number' | 'text';
+
+  @IsOptional()
+  @IsBoolean()
+  isRequired?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  sortOrder?: number;
+}
+
+export class UpdateLocationReportMetricDto {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  unit?: string;
+
+  @IsOptional()
+  @IsIn(['number', 'text'])
+  inputType?: 'number' | 'text';
+
+  @IsOptional()
+  @IsBoolean()
+  isRequired?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  sortOrder?: number;
+  // NOTE: no active field — location metrics cannot be deactivated
+}
+
 // ── Sreni Monthly Reports ─────────────────────────────────────────────────────
 
 export class SubmitSreniMonthlyReportDto {
@@ -959,4 +1022,106 @@ export class SubmitSreniReportDto {
   @IsOptional()
   @IsString()
   notes?: string;
+}
+
+// ── Sthan DTOs ────────────────────────────────────────────────────────────────
+
+export class CreateSthanReportMetricDto {
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  unit?: string;
+
+  @IsIn(['number', 'text'])
+  inputType!: 'number' | 'text';
+
+  @IsBoolean()
+  isRequired!: boolean;
+
+  @IsInt()
+  @Min(0)
+  sortOrder!: number;
+}
+
+export class UpdateSthanReportMetricDto {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  unit?: string;
+
+  @IsOptional()
+  @IsIn(['number', 'text'])
+  inputType?: 'number' | 'text';
+
+  @IsOptional()
+  @IsBoolean()
+  isRequired?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+}
+
+export class SubmitSthanReportDto {
+  @IsInt()
+  @Min(2020)
+  periodYear!: number;
+
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  periodMonth!: number;
+
+  @IsObject()
+  entries!: Record<string, string>;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class CreateSthanExpenseDto {
+  @IsIn(['travel', 'food', 'accommodation', 'event_supplies', 'printing', 'other'])
+  category!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  description!: string;
+
+  @IsNumber()
+  @Min(0)
+  amount!: number;
+
+  @IsOptional()
+  @IsString()
+  currency?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  asDraft?: boolean;
+}
+
+export class ReviewSthanExpenseDto {
+  @IsIn(['approved', 'rejected', 'pending_review'])
+  status!: 'approved' | 'rejected' | 'pending_review';
+
+  @IsOptional()
+  @IsString()
+  reviewerNotes?: string;
 }

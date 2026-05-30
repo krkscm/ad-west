@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { backendApi, TicketCategory } from '../../utils/backendApi'
+import { PublicPageShell } from './PublicPageShell'
 
 const CATEGORIES: { value: TicketCategory; label: string }[] = [
   { value: 'general', label: 'General Inquiry' },
@@ -49,27 +50,16 @@ export function PublicHelpdeskPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--landing-bg)', fontFamily: 'var(--font-sans)', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
-      <header className="public-page-header" style={{ background: 'var(--glass-bg)', backdropFilter: 'blur(16px)', borderBottom: '1px solid var(--border-dark)', padding: '16px 24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <img src="/favicon.png" alt="IFCA Abu Dhabi" style={{ width: '36px', height: '36px', borderRadius: '8px' }} />
-        <div>
-          <h1 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary-dark)' }}>IFCA Abu Dhabi</h1>
-          <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>Helpdesk Support</p>
-        </div>
-      </header>
-
-      {/* Body */}
-      <main className="public-page-main" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '48px 16px' }}>
-        <div style={{ width: '100%', maxWidth: '560px' }}>
-          {submitted ? (
-            <div className="public-page-card" style={{ background: 'var(--surface-dark)', border: '1px solid var(--border-dark)', borderRadius: '16px', padding: '40px', textAlign: 'center', boxShadow: 'var(--shadow-lg)' }}>
+    <PublicPageShell subtitle="Helpdesk Support">
+      <div style={{ width: '100%', maxWidth: '560px' }}>
+        {submitted ? (
+          <div style={{ background: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
               <div style={{ fontSize: '3rem', marginBottom: '16px' }}>✅</div>
-              <h2 style={{ margin: '0 0 8px', color: 'var(--text-primary-dark)' }}>Request Submitted</h2>
-              <p style={{ margin: '0 0 20px', color: 'var(--text-secondary-dark)' }}>
+              <h2 style={{ margin: '0 0 8px', color: '#fff' }}>Request Submitted</h2>
+              <p style={{ margin: '0 0 20px', color: 'rgba(255,255,255,0.72)' }}>
                 Your helpdesk ticket has been received. Our team will be in touch shortly.
               </p>
-              <p style={{ margin: '0 0 24px', fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>
+              <p style={{ margin: '0 0 24px', fontSize: '0.8rem', color: 'rgba(255,255,255,0.72)' }}>
                 Reference ID: <code style={{ fontWeight: 700 }}>{ticketId.slice(0, 12).toUpperCase()}</code>
               </p>
               <button
@@ -79,10 +69,10 @@ export function PublicHelpdeskPage() {
                 Submit Another Request
               </button>
             </div>
-          ) : (
-            <div className="public-page-card" style={{ background: 'var(--surface-dark)', border: '1px solid var(--border-dark)', borderRadius: '16px', padding: '36px', boxShadow: 'var(--shadow-lg)' }}>
-              <h2 style={{ margin: '0 0 6px', color: 'var(--text-primary-dark)', fontSize: '1.4rem' }}>Contact Helpdesk</h2>
-              <p style={{ margin: '0 0 28px', color: 'var(--text-secondary-dark)', fontSize: '0.9rem' }}>
+        ) : (
+          <div style={{ background: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '16px', padding: '36px' }}>
+              <h2 style={{ margin: '0 0 6px', color: '#fff', fontSize: '1.4rem' }}>Contact Helpdesk</h2>
+              <p style={{ margin: '0 0 28px', color: 'rgba(255,255,255,0.72)', fontSize: '0.9rem' }}>
                 Submit a support request and our team will respond as soon as possible.
               </p>
 
@@ -95,7 +85,7 @@ export function PublicHelpdeskPage() {
               <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
                       Full Name <span style={{ color: 'var(--error)' }}>*</span>
                     </label>
                     <input
@@ -108,7 +98,7 @@ export function PublicHelpdeskPage() {
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
                       Phone <span style={{ color: 'var(--error)' }}>*</span>
                     </label>
                     <input
@@ -123,7 +113,7 @@ export function PublicHelpdeskPage() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
                     Email Address
                   </label>
                   <input
@@ -136,7 +126,7 @@ export function PublicHelpdeskPage() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
                     Category
                   </label>
                   <select
@@ -151,7 +141,7 @@ export function PublicHelpdeskPage() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
                     Subject <span style={{ color: 'var(--error)' }}>*</span>
                   </label>
                   <input
@@ -165,7 +155,7 @@ export function PublicHelpdeskPage() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
                     Description <span style={{ color: 'var(--error)' }}>*</span>
                   </label>
                   <textarea
@@ -189,13 +179,8 @@ export function PublicHelpdeskPage() {
                 </button>
               </form>
             </div>
-          )}
-        </div>
-      </main>
-
-      <footer style={{ textAlign: 'center', padding: '20px', fontSize: '0.78rem', color: 'var(--text-secondary-dark)', borderTop: '1px solid var(--border-dark)' }}>
-        © {new Date().getFullYear()} IFCA Abu Dhabi. All rights reserved.
-      </footer>
-    </div>
+        )}
+      </div>
+    </PublicPageShell>
   )
 }

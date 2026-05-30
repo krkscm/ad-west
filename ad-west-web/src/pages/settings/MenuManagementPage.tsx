@@ -16,7 +16,7 @@ export const MenuManagementPage: React.FC = () => {
   const loadMenus = useCallback(async () => {
     setIsLoading(true);
     try {
-      const items = await backendApi.listMenuItems();
+      const items = await backendApi.listMenuItems(false, 'all');
       setMenus(items.slice().sort((a, b) => {
         if (!a.parentKey && b.parentKey) return -1;
         if (a.parentKey && !b.parentKey) return 1;

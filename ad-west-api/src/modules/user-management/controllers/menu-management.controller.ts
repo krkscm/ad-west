@@ -32,8 +32,10 @@ export class MenuManagementController {
   @Get()
   async listMenuItems(
     @Query('activeOnly') activeOnly?: string,
+    @Query('scope') scope?: string,
+    @CurrentUser() principal?: AuthPrincipal,
   ): Promise<MenuItem[]> {
-    return this.menuService.listMenuItems(activeOnly === 'true');
+    return this.menuService.listMenuItems(activeOnly === 'true', principal, scope === 'all');
   }
 
   @Post()

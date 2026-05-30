@@ -17,6 +17,7 @@ A modern React application built with Vite, TypeScript, and best practices for m
 - Context API for state management
 - Utility functions for API calls
 - Public utility entry points at `/helpdesk`, `/jobs`, and `/jobs/apply?job=<jobId>`, plus internal admin management pages for helpdesk tickets, job postings, and job applications
+- Public portal entry point at `/` and `/portal`, plus a sectioned Join Us intake at `/join-us` for Sreni-based contact registration
 - Public job applications now support optional resume uploads with client/server validation for PDF, DOC, and DOCX files up to 1 MB, and authenticated admin resume viewing
 
 **Quick Start:**

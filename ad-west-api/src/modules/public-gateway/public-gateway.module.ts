@@ -6,6 +6,7 @@ import {
   AdminJobsController,
   PublicHelpdeskController,
   PublicJobsController,
+  PublicSreniContactsController,
 } from './controllers/public-gateway.controller';
 import { HelpdeskTicketEntity } from './entities/helpdesk-ticket.entity';
 import { JobApplicationEntity } from './entities/job-application.entity';
@@ -23,6 +24,7 @@ export class PublicGatewayModule {
       imports: useDbPersistence ? [TypeOrmModule.forFeature(entities)] : [],
       controllers: [
         PublicHelpdeskController,
+        PublicSreniContactsController,
         AdminHelpdeskController,
         PublicJobsController,
         AdminJobsController,

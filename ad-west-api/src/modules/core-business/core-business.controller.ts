@@ -66,6 +66,11 @@ import {
   CreateSreniReportParameterDto,
   UpdateSreniReportParameterDto,
   SubmitSreniReportDto,
+  CreateSthanExpenseDto,
+  ReviewSthanExpenseDto,
+  SubmitSthanReportDto,
+  CreateLocationReportMetricDto,
+  UpdateLocationReportMetricDto,
 } from './dto/core-business.dto';
 import { CoreBusinessService } from './core-business.service';
 
@@ -770,12 +775,32 @@ export class CoreBusinessController {
     return this.service.deleteReportMetricDefinition(metricId);
   }
 
+  // ── Location Report Metrics (shared across all sthans) ────────────────────
+
+  @Get('settings/location-report-metrics')
+  @UseGuards(CoreAdminAuthGuard)
+  listLocationReportMetrics() {
+    return this.service.listLocationReportMetrics();
+  }
+
+  @Post('settings/location-report-metrics')
+  @UseGuards(CoreAdminAuthGuard)
+  createLocationReportMetric(@Body() dto: CreateLocationReportMetricDto) {
+    return this.service.createLocationReportMetric(dto);
+  }
+
+  @Patch('settings/location-report-metrics/:metricId')
+  @UseGuards(CoreAdminAuthGuard)
+  updateLocationReportMetric(@Param('metricId') metricId: string, @Body() dto: UpdateLocationReportMetricDto) {
+    return this.service.updateLocationReportMetric(metricId, dto);
+  }
+
   // ── Sreni Monthly Reports ───────────────────────────────────────────────────
 
   @Get('org/reports')
   @UseGuards(CoreAdminAuthGuard)
-  listAllMonthlyReports() {
-    return this.service.listAllMonthlyReports();
+  listAllMonthlyReports(@Query('fromDate') fromDate?: string, @Query('toDate') toDate?: string) {
+    return this.service.listAllMonthlyReports(fromDate, toDate);
   }
 
   @Get('org/sreni-definitions/:sreniId/reports')
@@ -849,6 +874,107 @@ export class CoreBusinessController {
     @CurrentUser() actor?: AuthPrincipal,
   ) {
     return this.service.upsertSreniReport(sreniId, dto, actor?.email ?? actor?.userId, actor);
+  }
+
+  // ── Sthan Reports ──────────────────────────────────────────────────────────
+
+  @Get('org/locations/:locationId/sthan-reports')
+  @UseGuards(CoreAdminAuthGuard)
+  listSthanReports(@Param('locationId') locationId: string) {
+    return this.service.listSthanReports(locationId);
+  }
+
+  @Post('org/locations/:locationId/sthan-reports')
+  @UseGuards(CoreAdminAuthGuard)
+  upsertSthanReport(
+    @Param('locationId') locationId: string,
+    @Body() dto: SubmitSthanReportDto,
+    @CurrentUser() actor?: AuthPrincipal,
+  ) {
+    return this.service.upsertSthanReport(locationId, dto, actor?.email ?? actor?.userId);
+  }
+
+  // ── Sthan Expenses ────────────────────────────────────────────────────────
+
+  @Get('org/locations/:locationId/expenses')
+  @UseGuards(CoreAdminAuthGuard)
+  listSthanExpenses(
+    @Param('locationId') locationId: string,
+    @Query('status') status?: string,
+  ) {
+    return this.service.listSthanExpenses(locationId, status);
+  }
+
+  @Post('org/locations/:locationId/expenses')
+  @UseGuards(CoreAdminAuthGuard)
+  createSthanExpense(
+    @Param('locationId') locationId: string,
+    @Body() dto: CreateSthanExpenseDto,
+    @CurrentUser() actor?: AuthPrincipal,
+  ) {
+    return this.service.createSthanExpense(locationId, dto, actor?.email ?? actor?.userId);
+  }
+
+  @Patch('org/locations/:locationId/expenses/:expenseId/review')
+  @UseGuards(CoreAdminAuthGuard)
+  reviewSthanExpense(
+    @Param('locationId') locationId: string,
+    @Param('expenseId') expenseId: string,
+    @Body() dto: ReviewSthanExpenseDto,
+    @CurrentUser() actor?: AuthPrincipal,
+  ) {
+    return this.service.reviewSthanExpense(locationId, expenseId, dto, actor?.email ?? actor?.userId);
+  }
+
+  @Delete('org/locations/:locationId/expenses/:expenseId')
+  @UseGuards(CoreAdminAuthGuard)
+  deleteSthanExpense(
+    @Param('locationId') locationId: string,
+    @Param('expenseId') expenseId: string,
+  ) {
+    return this.service.deleteSthanExpense(locationId, expenseId);
+  }
+
+  // ── Sthan Contacts ────────────────────────────────────────────────────────
+
+  @Get('org/locations/:locationId/contacts')
+  @UseGuards(CoreAdminAuthGuard)
+  listSthanContacts(
+    @Param('locationId') locationId: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.service.listSthanContacts(
+      locationId,
+      page ? parseInt(page, 10) : 1,
+      pageSize ? parseInt(pageSize, 10) : 50,
+    );
+  }
+
+  @Post('org/locations/:locationId/contacts/upload')
+  @UseGuards(CoreAdminAuthGuard)
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async uploadSthanContacts(
+    @Param('locationId') locationId: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentUser() actor?: AuthPrincipal,
+  ) {
+    if (!file) throw new BadRequestException('No file uploaded. Send the Excel file as "file" in a multipart/form-data request.');
+    const allowedMimes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'application/octet-stream',
+    ];
+    if (!allowedMimes.includes(file.mimetype) && !file.originalname.match(/\.(xlsx|xls)$/i)) {
+      throw new BadRequestException('Only .xlsx and .xls files are accepted.');
+    }
+    return this.service.uploadSthanContacts(locationId, file.buffer, file.originalname, actor?.email ?? actor?.userId);
+  }
+
+  @Delete('org/locations/:locationId/contacts')
+  @UseGuards(CoreAdminAuthGuard)
+  clearSthanContacts(@Param('locationId') locationId: string) {
+    return this.service.clearSthanContacts(locationId);
   }
 }
 

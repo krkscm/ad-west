@@ -16,6 +16,8 @@
 - application-documentation/07-runtime-and-deployment.md
 - application-documentation/diagrams/adwest-architecture.svg
 
+Public surface notes in the application docs now cover the public portal landing page, the Join Us intake, and Sreni visibility gating so those changes are easy to find in the frontend and public-gateway sections.
+
 ## Required Documentation Structure
 - business-intake-modular
 - business-intake

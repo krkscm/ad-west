@@ -68,7 +68,7 @@ export const AdminUserForm: React.FC<Props> = ({ editingId, onBack, onSaved }) =
     setIsLoading(true)
     try {
       await loadRoleDefinitions()
-      const menuItems = await backendApi.listMenuItems()
+      const menuItems = await backendApi.listMenuItems(false, 'all')
       setMenus(menuItems.slice().sort((a, b) => {
         if (!a.parentKey && b.parentKey) return -1
         if (a.parentKey && !b.parentKey) return 1

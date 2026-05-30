@@ -4,6 +4,7 @@ import { ROLE_DEFINITION_STORE, USER_STORE } from './constants';
 import { AuthController } from './controllers/auth.controller';
 import { AdminUsersController } from './controllers/admin-users.controller';
 import { AuditController } from './controllers/audit.controller';
+import { AiChatController } from './controllers/ai-chat.controller';
 import { GmailController } from './controllers/gmail.controller';
 import { GoogleIntegrationConfigController } from './controllers/google-integration-config.controller';
 import { MenuManagementController } from './controllers/menu-management.controller';
@@ -20,6 +21,7 @@ import { MemberAuthGuard } from './guards/member-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { AdminUsersService } from './services/admin-users.service';
 import { AuditService } from './services/audit.service';
+import { AiChatService } from './services/ai-chat.service';
 import { AuthService } from './services/auth.service';
 import { CryptoService } from './services/crypto.service';
 import { InMemoryRoleDefinitionStoreService } from './services/in-memory-role-definition-store.service';
@@ -82,6 +84,7 @@ export class UserManagementModule {
           : [InMemoryRoleDefinitionStoreService],
       },
       AuditService,
+      AiChatService,
       GoogleIntegrationConfigService,
       AuthService,
       AdminUsersService,
@@ -95,7 +98,7 @@ export class UserManagementModule {
     return {
       module: UserManagementModule,
       imports,
-      controllers: [AuthController, AdminUsersController, AuditController, GmailController, GoogleIntegrationConfigController, RoleDefinitionsController, MenuManagementController],
+      controllers: [AuthController, AdminUsersController, AuditController, AiChatController, GmailController, GoogleIntegrationConfigController, RoleDefinitionsController, MenuManagementController],
       providers,
       exports: [USER_STORE, ROLE_DEFINITION_STORE, AuthService, AuthGuard, MemberAuthGuard, RolesGuard],
     };
