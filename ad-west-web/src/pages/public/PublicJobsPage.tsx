@@ -347,7 +347,17 @@ export function PublicJobsPage() {
             <div style={{ marginBottom: '32px', textAlign: 'center' }}>
               <h2 style={{ margin: '0 0 8px', fontSize: '1.8rem', fontWeight: 800, color: '#fff' }}>Open Positions</h2>
               <p style={{ margin: '0 0 16px', color: 'rgba(255,255,255,0.72)' }}>Join IFCA Abu Dhabi — serving our community with purpose.</p>
-              <button className="btn btn-secondary public-jobs-top-action" onClick={handlePostJob} style={{ fontSize: '0.88rem' }}>
+              <button
+                onClick={handlePostJob}
+                style={{
+                  fontSize: '0.88rem', padding: '8px 22px', borderRadius: '8px', cursor: 'pointer',
+                  border: '1px solid rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.1)',
+                  color: '#fff', fontWeight: 600, backdropFilter: 'blur(8px)',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.2)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
+              >
                 + Post a Job
               </button>
             </div>
