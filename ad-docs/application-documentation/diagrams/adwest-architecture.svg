@@ -37,7 +37,7 @@
 
   <rect x="0" y="0" width="1400" height="880" fill="url(#bg)"/>
 
-  <text x="38" y="48" class="title">ADWest Application Architecture (Reverse Engineered)</text>
+  <text x="38" y="48" class="title">ADWest Application Architecture</text>
   <text x="38" y="73" class="subtitle">Frontend: React + Vite (3000) | Backend: NestJS (3001, /api/v1) | Persistence: PostgreSQL</text>
 
   <rect class="box" x="36" y="120" width="310" height="250" fill="url(#frontend)"/>
@@ -46,9 +46,10 @@
   <text x="56" y="206" class="t">- Member Browser Session</text>
   <text x="56" y="228" class="t">- Public Visitors</text>
   <text x="56" y="260" class="t">Routes:</text>
-  <text x="56" y="282" class="small">/helpdesk, /jobs, /events/:id/register</text>
-  <text x="56" y="304" class="small">Admin dashboard + settings pages</text>
-  <text x="56" y="326" class="small">Member portal pages</text>
+  <text x="56" y="282" class="small">/, /portal, /helpdesk, /jobs, /join-us</text>
+  <text x="56" y="304" class="small">/events/:id/register</text>
+  <text x="56" y="326" class="small">Admin dashboard + settings pages</text>
+  <text x="56" y="348" class="small">Member portal pages</text>
 
   <rect class="box" x="392" y="120" width="370" height="250" fill="url(#frontend)"/>
   <text x="412" y="154" class="h">Web App Layer (ad-west-web)</text>
@@ -57,20 +58,22 @@
   <text x="412" y="228" class="t">API Client: backendApi.ts</text>
   <text x="412" y="260" class="t">Auth Flows:</text>
   <text x="412" y="282" class="small">credential login, member login, Google OAuth popup</text>
-  <text x="412" y="304" class="t">Proxy target: /api/v1 -&gt; backend service</text>
+  <text x="412" y="304" class="small">Public shell routes + branded portal theme</text>
+  <text x="412" y="326" class="t">Proxy target: /api/v1 -&gt; backend service</text>
 
   <rect class="box" x="808" y="120" width="556" height="380" fill="url(#backend)"/>
   <text x="828" y="154" class="h">API Layer (ad-west-api)</text>
   <text x="828" y="182" class="t">NestJS Modules</text>
-  <text x="828" y="212" class="small">- UserManagement (auth, roles, menu, audit, Google config, Gmail)</text>
+  <text x="828" y="212" class="small">- UserManagement (auth, roles, menu, audit, Google config, Gmail, AI chat)</text>
   <text x="828" y="236" class="small">- CoreBusiness (org, permissions, programs, reports, docs, attendance)</text>
-  <text x="828" y="260" class="small">- PublicGateway (helpdesk, jobs, public event registration)</text>
+  <text x="828" y="260" class="small">- PublicGateway (helpdesk, jobs, join-us contacts, public event registration)</text>
   <text x="828" y="284" class="small">- MemberServices (reimbursements, events, notifications)</text>
   <text x="828" y="308" class="small">- EnumValues, ApprovalWorkflowDefinitions, Health</text>
   <text x="828" y="340" class="t">Cross-cutting:</text>
   <text x="828" y="362" class="small">Guards, validation pipe, exception filter, swagger</text>
   <text x="828" y="384" class="small">Auth/session verification for admin/member routes</text>
-  <text x="828" y="406" class="small">Public routes intentionally unauthenticated</text>
+  <text x="828" y="406" class="small">Captcha + throttling guards on auth/public submission routes</text>
+  <text x="828" y="428" class="small">Public routes intentionally unauthenticated</text>
 
   <rect class="box" x="392" y="414" width="370" height="190" fill="url(#ext)"/>
   <text x="412" y="448" class="h">External Integration</text>
@@ -85,11 +88,12 @@
   <text x="828" y="610" class="t">Migration scripts in ad-docs/database-script</text>
   <text x="828" y="634" class="small">- Core schema/indexes/triggers</text>
   <text x="828" y="656" class="small">- Auth/session tables</text>
-  <text x="828" y="678" class="small">- Public gateway tables</text>
-  <text x="828" y="700" class="small">- Member services tables</text>
+  <text x="828" y="678" class="small">- Public gateway + join-us contact tables</text>
+  <text x="828" y="700" class="small">- Member services + sthan contacts tables</text>
   <text x="828" y="722" class="small">- Google integration config (041)</text>
-  <text x="828" y="752" class="t">Persistence mode switch:</text>
-  <text x="828" y="774" class="small">DB mode or in-memory runtime fallback (feature-dependent)</text>
+  <text x="828" y="744" class="small">- Governance AI chatbot menu + join-us visibility (050/051)</text>
+  <text x="828" y="766" class="t">Persistence mode switch:</text>
+  <text x="828" y="788" class="small">DB mode or in-memory runtime fallback (feature-dependent)</text>
 
   <path class="edge" d="M346 246 L392 246"/>
   <path class="edge" d="M762 246 L808 246"/>

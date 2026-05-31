@@ -12,6 +12,7 @@ interface Props {
 export function PublicPageShell({ subtitle, children }: Props) {
   return (
     <div
+      className="public-theme"
       style={{
         minHeight: '100vh',
         fontFamily: 'var(--font-sans)',
@@ -42,7 +43,7 @@ export function PublicPageShell({ subtitle, children }: Props) {
           position: 'fixed',
           inset: 0,
           zIndex: 1,
-          background: 'linear-gradient(160deg, rgba(2,6,23,0.82) 0%, rgba(15,23,42,0.75) 50%, rgba(2,6,23,0.88) 100%)',
+          background: 'var(--public-shell-overlay)',
         }}
       />
 
@@ -52,10 +53,10 @@ export function PublicPageShell({ subtitle, children }: Props) {
         {/* Header */}
         <header
           style={{
-            background: 'rgba(2, 6, 23, 0.55)',
+            background: 'var(--public-header-bg)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
-            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            borderBottom: '1px solid var(--public-header-border)',
             padding: '14px 24px',
             display: 'flex',
             alignItems: 'center',
@@ -69,10 +70,10 @@ export function PublicPageShell({ subtitle, children }: Props) {
               style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'contain' }}
             />
             <div>
-              <h1 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>
+              <h1 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--public-text-primary)', lineHeight: 1.2 }}>
                 IFCA Abu Dhabi
               </h1>
-              <p style={{ margin: 0, fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)' }}>{subtitle}</p>
+              <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--public-text-secondary)' }}>{subtitle}</p>
             </div>
           </div>
 
@@ -84,9 +85,9 @@ export function PublicPageShell({ subtitle, children }: Props) {
               fontSize: '0.8rem',
               padding: '6px 14px',
               borderRadius: '8px',
-              border: '1px solid rgba(255,255,255,0.15)',
-              background: 'rgba(255,255,255,0.08)',
-              color: 'rgba(255,255,255,0.8)',
+              border: '1px solid rgba(255, 248, 235, 0.18)',
+              background: 'var(--public-button-secondary-bg)',
+              color: 'var(--public-text-primary)',
               cursor: 'pointer',
               fontWeight: 500,
               backdropFilter: 'blur(8px)',
@@ -95,8 +96,8 @@ export function PublicPageShell({ subtitle, children }: Props) {
               alignItems: 'center',
               gap: '5px',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.16)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--public-button-secondary-hover)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--public-button-secondary-bg)' }}
           >
             ← Portal
           </button>
@@ -110,12 +111,12 @@ export function PublicPageShell({ subtitle, children }: Props) {
         {/* Footer */}
         <footer
           style={{
-            borderTop: '1px solid rgba(255,255,255,0.08)',
-            background: 'rgba(2, 6, 23, 0.55)',
+            borderTop: '1px solid var(--public-header-border)',
+            background: 'var(--public-header-bg)',
             padding: '12px 24px',
             textAlign: 'center',
             fontSize: '0.73rem',
-            color: 'rgba(255,255,255,0.3)',
+            color: 'var(--public-text-muted)',
           }}
         >
           © {new Date().getFullYear()} IFCA Abu Dhabi · Powered by VGK Technologies

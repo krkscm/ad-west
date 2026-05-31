@@ -10,6 +10,14 @@ const CATEGORIES: { value: TicketCategory; label: string }[] = [
   { value: 'other', label: 'Other' },
 ]
 
+const fieldLabelStyle = {
+  display: 'block',
+  fontSize: '0.82rem',
+  fontWeight: 600,
+  color: 'var(--public-text-secondary)',
+  marginBottom: '4px',
+} as const
+
 export function PublicHelpdeskPage() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -53,13 +61,13 @@ export function PublicHelpdeskPage() {
     <PublicPageShell subtitle="Helpdesk Support">
       <div style={{ width: '100%', maxWidth: '560px' }}>
         {submitted ? (
-          <div style={{ background: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
+          <div className="public-page-card" style={{ padding: '40px', textAlign: 'center' }}>
               <div style={{ fontSize: '3rem', marginBottom: '16px' }}>✅</div>
-              <h2 style={{ margin: '0 0 8px', color: '#fff' }}>Request Submitted</h2>
-              <p style={{ margin: '0 0 20px', color: 'rgba(255,255,255,0.72)' }}>
+              <h2 style={{ margin: '0 0 8px', color: 'var(--public-text-primary)' }}>Request Submitted</h2>
+              <p style={{ margin: '0 0 20px', color: 'var(--public-text-secondary)' }}>
                 Your helpdesk ticket has been received. Our team will be in touch shortly.
               </p>
-              <p style={{ margin: '0 0 24px', fontSize: '0.8rem', color: 'rgba(255,255,255,0.72)' }}>
+              <p style={{ margin: '0 0 24px', fontSize: '0.8rem', color: 'var(--public-text-secondary)' }}>
                 Reference ID: <code style={{ fontWeight: 700 }}>{ticketId.slice(0, 12).toUpperCase()}</code>
               </p>
               <button
@@ -70,9 +78,9 @@ export function PublicHelpdeskPage() {
               </button>
             </div>
         ) : (
-          <div style={{ background: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '16px', padding: '36px' }}>
-              <h2 style={{ margin: '0 0 6px', color: '#fff', fontSize: '1.4rem' }}>Contact Helpdesk</h2>
-              <p style={{ margin: '0 0 28px', color: 'rgba(255,255,255,0.72)', fontSize: '0.9rem' }}>
+          <div className="public-page-card" style={{ padding: '36px' }}>
+              <h2 style={{ margin: '0 0 6px', color: 'var(--public-text-primary)', fontSize: '1.4rem' }}>Contact Helpdesk</h2>
+              <p style={{ margin: '0 0 28px', color: 'var(--public-text-secondary)', fontSize: '0.9rem' }}>
                 Submit a support request and our team will respond as soon as possible.
               </p>
 
@@ -85,7 +93,7 @@ export function PublicHelpdeskPage() {
               <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                    <label style={fieldLabelStyle}>
                       Full Name <span style={{ color: 'var(--error)' }}>*</span>
                     </label>
                     <input
@@ -98,7 +106,7 @@ export function PublicHelpdeskPage() {
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                    <label style={fieldLabelStyle}>
                       Phone <span style={{ color: 'var(--error)' }}>*</span>
                     </label>
                     <input
@@ -113,7 +121,7 @@ export function PublicHelpdeskPage() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                  <label style={fieldLabelStyle}>
                     Email Address
                   </label>
                   <input
@@ -126,7 +134,7 @@ export function PublicHelpdeskPage() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                  <label style={fieldLabelStyle}>
                     Category
                   </label>
                   <select
@@ -141,7 +149,7 @@ export function PublicHelpdeskPage() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                  <label style={fieldLabelStyle}>
                     Subject <span style={{ color: 'var(--error)' }}>*</span>
                   </label>
                   <input
@@ -155,7 +163,7 @@ export function PublicHelpdeskPage() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                  <label style={fieldLabelStyle}>
                     Description <span style={{ color: 'var(--error)' }}>*</span>
                   </label>
                   <textarea

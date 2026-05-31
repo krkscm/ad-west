@@ -5,7 +5,7 @@
 - business-intake/BRS_Zone_Remaining_Requirement.md
 - business-intake-modular/README.md
 
-## Reverse Engineered Application Docs (Current Implementation)
+## Application Docs (Current Implementation)
 - application-documentation/README.md
 - application-documentation/01-system-overview.md
 - application-documentation/02-backend-architecture.md

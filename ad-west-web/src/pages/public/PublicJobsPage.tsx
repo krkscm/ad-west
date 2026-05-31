@@ -24,20 +24,37 @@ const ALLOWED_RESUME_MIME_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ])
 
+const fieldLabelStyle = {
+  display: 'block',
+  fontSize: '0.82rem',
+  fontWeight: 600,
+  color: 'var(--public-text-secondary)',
+  marginBottom: '4px',
+} as const
+
+const sectionEyebrowStyle = {
+  margin: '0 0 4px',
+  fontWeight: 700,
+  fontSize: '0.82rem',
+  color: 'var(--public-hero-kicker)',
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.06em',
+}
+
 function JobCard({ job, onApply }: { job: JobPostingApi; onApply: (job: JobPostingApi) => void }) {
   const [expanded, setExpanded] = useState(false)
   const description = stripContactBlock(job.description)
   return (
-    <div style={{ background: 'rgba(15,23,42,0.65)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '12px', padding: '24px',  }}>
+    <div className="public-page-card" style={{ borderRadius: '12px', padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
         <div>
-          <h3 style={{ margin: '0 0 4px', color: '#fff', fontSize: '1.05rem', fontWeight: 700 }}>{job.title}</h3>
+          <h3 style={{ margin: '0 0 4px', color: 'var(--public-text-primary)', fontSize: '1.05rem', fontWeight: 700 }}>{job.title}</h3>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={{ background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '20px', padding: '2px 10px', fontSize: '0.78rem', fontWeight: 600 }}>
+            <span style={{ background: 'var(--public-accent-soft)', color: 'var(--public-accent)', borderRadius: '20px', padding: '2px 10px', fontSize: '0.78rem', fontWeight: 600 }}>
               {JOB_TYPE_LABELS[job.type] ?? job.type}
             </span>
             {job.location && (
-              <span style={{ color: 'rgba(255,255,255,0.72)', fontSize: '0.82rem' }}>📍 {job.location}</span>
+              <span style={{ color: 'var(--public-text-secondary)', fontSize: '0.82rem' }}>📍 {job.location}</span>
             )}
           </div>
         </div>
@@ -46,13 +63,13 @@ function JobCard({ job, onApply }: { job: JobPostingApi; onApply: (job: JobPosti
         </button>
       </div>
 
-      <div style={{ marginTop: '12px', color: 'rgba(255,255,255,0.72)', fontSize: '0.88rem', lineHeight: 1.6 }}>
+      <div style={{ marginTop: '12px', color: 'var(--public-text-secondary)', fontSize: '0.88rem', lineHeight: 1.6 }}>
         {expanded ? (
           <>
             <p style={{ margin: '0 0 12px', whiteSpace: 'pre-wrap' }}>{description}</p>
             {job.requirements && (
               <>
-                <p style={{ margin: '0 0 4px', fontWeight: 600, color: '#fff', fontSize: '0.85rem' }}>Requirements:</p>
+                <p style={{ margin: '0 0 4px', fontWeight: 600, color: 'var(--public-text-primary)', fontSize: '0.85rem' }}>Requirements:</p>
                 <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{job.requirements}</p>
               </>
             )}
@@ -62,7 +79,7 @@ function JobCard({ job, onApply }: { job: JobPostingApi; onApply: (job: JobPosti
         )}
         <button
           onClick={() => setExpanded(!expanded)}
-          style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '4px 0', marginTop: '4px', fontSize: '0.82rem', fontWeight: 600 }}
+          style={{ background: 'none', border: 'none', color: 'var(--public-accent)', cursor: 'pointer', padding: '4px 0', marginTop: '4px', fontSize: '0.82rem', fontWeight: 600 }}
         >
           {expanded ? 'Show less ▲' : 'Read more ▼'}
         </button>
@@ -328,7 +345,7 @@ export function PublicJobsPage() {
         <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '12px' }}>
           <button
             className="btn btn-secondary public-jobs-back-btn"
-            style={{ background: 'rgba(255,255,255,0.1)', borderColor: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: '0.84rem' }}
+            style={{ fontSize: '0.84rem' }}
             onClick={() => {
               window.history.pushState({}, '', '/jobs')
               setView('listings')
@@ -345,31 +362,31 @@ export function PublicJobsPage() {
         {view === 'listings' && (
           <div style={{ maxWidth: '760px', margin: '0 auto' }}>
             <div style={{ marginBottom: '32px', textAlign: 'center' }}>
-              <h2 style={{ margin: '0 0 8px', fontSize: '1.8rem', fontWeight: 800, color: '#fff' }}>Open Positions</h2>
-              <p style={{ margin: '0 0 16px', color: 'rgba(255,255,255,0.72)' }}>Join IFCA Abu Dhabi — serving our community with purpose.</p>
+              <h2 style={{ margin: '0 0 8px', fontSize: '1.8rem', fontWeight: 800, color: 'var(--public-text-primary)' }}>Open Positions</h2>
+              <p style={{ margin: '0 0 16px', color: 'var(--public-text-secondary)' }}>Join IFCA Abu Dhabi — serving our community with purpose.</p>
               <button
                 onClick={handlePostJob}
                 style={{
                   fontSize: '0.88rem', padding: '8px 22px', borderRadius: '8px', cursor: 'pointer',
-                  border: '1px solid rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.1)',
-                  color: '#fff', fontWeight: 600, backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255, 248, 235, 0.22)', background: 'var(--public-button-secondary-bg)',
+                  color: 'var(--public-text-primary)', fontWeight: 600, backdropFilter: 'blur(8px)',
                   transition: 'background 0.15s',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.2)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--public-button-secondary-hover)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--public-button-secondary-bg)' }}
               >
                 + Post a Job
               </button>
             </div>
 
             {loading && (
-              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.72)', padding: '40px' }}>Loading opportunities…</div>
+              <div style={{ textAlign: 'center', color: 'var(--public-text-secondary)', padding: '40px' }}>Loading opportunities…</div>
             )}
             {loadError && (
               <div style={{ textAlign: 'center', color: 'var(--error)', padding: '40px' }}>{loadError}</div>
             )}
             {!loading && !loadError && jobs.length === 0 && (
-              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.72)', padding: '60px', background: 'rgba(15,23,42,0.65)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.10)' }}>
+              <div className="public-page-card" style={{ textAlign: 'center', color: 'var(--public-text-secondary)', padding: '60px', borderRadius: '12px' }}>
                 <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>📋</div>
                 <p style={{ margin: 0, fontWeight: 600 }}>No open positions at this time.</p>
                 <p style={{ margin: '6px 0 0', fontSize: '0.88rem' }}>Please check back later for new opportunities.</p>
@@ -387,12 +404,12 @@ export function PublicJobsPage() {
 
         {view === 'apply' && selectedJob && (
           <div style={{ maxWidth: '560px', margin: '0 auto' }}>
-            <div className="public-jobs-panel public-page-card" style={{ background: 'rgba(15,23,42,0.65)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '16px',  }}>
+            <div className="public-jobs-panel public-page-card" style={{ borderRadius: '16px' }}>
               {submitted ? (
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '3rem', marginBottom: '16px' }}>✅</div>
-                  <h2 style={{ margin: '0 0 8px', color: '#fff' }}>Application Submitted</h2>
-                  <p style={{ margin: '0 0 20px', color: 'rgba(255,255,255,0.72)' }}>
+                  <h2 style={{ margin: '0 0 8px', color: 'var(--public-text-primary)' }}>Application Submitted</h2>
+                  <p style={{ margin: '0 0 20px', color: 'var(--public-text-secondary)' }}>
                     Thank you for applying for <strong>{selectedJob.title}</strong>. We will review your application and reach out if there is a match.
                   </p>
                   <div className="public-jobs-actions">
@@ -412,8 +429,8 @@ export function PublicJobsPage() {
                 </div>
               ) : (
                 <>
-                  <h2 style={{ margin: '0 0 4px', color: '#fff', fontSize: '1.3rem' }}>Apply — {selectedJob.title}</h2>
-                  <p style={{ margin: '0 0 24px', color: 'rgba(255,255,255,0.72)', fontSize: '0.88rem' }}>
+                  <h2 style={{ margin: '0 0 4px', color: 'var(--public-text-primary)', fontSize: '1.3rem' }}>Apply — {selectedJob.title}</h2>
+                  <p style={{ margin: '0 0 24px', color: 'var(--public-text-secondary)', fontSize: '0.88rem' }}>
                     {JOB_TYPE_LABELS[selectedJob.type] ?? selectedJob.type}
                     {selectedJob.location && ` · ${selectedJob.location}`}
                   </p>
@@ -427,13 +444,13 @@ export function PublicJobsPage() {
                   <form className="public-jobs-form" onSubmit={handleSubmitApplication} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     <div className="public-jobs-grid-2">
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                        <label style={fieldLabelStyle}>
                           Full Name <span style={{ color: 'var(--error)' }}>*</span>
                         </label>
                         <input className="form-input" type="text" value={appName} onChange={(e) => setAppName(e.target.value)} placeholder="Your full name" required />
                       </div>
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                        <label style={fieldLabelStyle}>
                           Phone <span style={{ color: 'var(--error)' }}>*</span>
                         </label>
                         <input className="form-input" type="tel" value={appPhone} onChange={(e) => setAppPhone(e.target.value)} placeholder="+971 50 000 0000" required />
@@ -441,12 +458,12 @@ export function PublicJobsPage() {
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>Email Address</label>
+                      <label style={fieldLabelStyle}>Email Address</label>
                       <input className="form-input" type="email" value={appEmail} onChange={(e) => setAppEmail(e.target.value)} placeholder="your@email.com (optional)" />
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>Resume Upload</label>
+                      <label style={fieldLabelStyle}>Resume Upload</label>
                       <FileUploadZone
                         accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         maxBytes={MAX_RESUME_SIZE_BYTES}
@@ -461,7 +478,7 @@ export function PublicJobsPage() {
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>Cover Letter / Message</label>
+                      <label style={fieldLabelStyle}>Cover Letter / Message</label>
                       <textarea
                         className="form-input"
                         value={appCoverLetter}
@@ -483,12 +500,12 @@ export function PublicJobsPage() {
         )}
         {view === 'post' && (
           <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-            <div className="public-jobs-panel public-page-card" style={{ background: 'rgba(15,23,42,0.65)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '16px',  }}>
+            <div className="public-jobs-panel public-page-card" style={{ borderRadius: '16px' }}>
               {postSubmitted ? (
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '3rem', marginBottom: '16px' }}>✅</div>
-                  <h2 style={{ margin: '0 0 8px', color: '#fff' }}>Job Submitted for Review</h2>
-                  <p style={{ margin: '0 0 20px', color: 'rgba(255,255,255,0.72)' }}>
+                  <h2 style={{ margin: '0 0 8px', color: 'var(--public-text-primary)' }}>Job Submitted for Review</h2>
+                  <p style={{ margin: '0 0 20px', color: 'var(--public-text-secondary)' }}>
                     Thank you! Your job posting has been received and is pending admin review. We will publish it once approved.
                   </p>
                   <div className="public-jobs-actions">
@@ -506,8 +523,8 @@ export function PublicJobsPage() {
                 </div>
               ) : (
                 <>
-                  <h2 style={{ margin: '0 0 4px', color: '#fff', fontSize: '1.3rem' }}>Post a Job</h2>
-                  <p style={{ margin: '0 0 24px', color: 'rgba(255,255,255,0.72)', fontSize: '0.88rem' }}>
+                  <h2 style={{ margin: '0 0 4px', color: 'var(--public-text-primary)', fontSize: '1.3rem' }}>Post a Job</h2>
+                  <p style={{ margin: '0 0 24px', color: 'var(--public-text-secondary)', fontSize: '0.88rem' }}>
                     Submit a job opening — our team will review and publish it shortly.
                   </p>
 
@@ -518,17 +535,17 @@ export function PublicJobsPage() {
                   )}
 
                   <form className="public-jobs-form" onSubmit={handleSubmitJobPosting} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: '0.82rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Your Contact Details</p>
+                    <p style={sectionEyebrowStyle}>Your Contact Details</p>
 
                     <div className="public-jobs-grid-2">
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                        <label style={fieldLabelStyle}>
                           Your Name <span style={{ color: 'var(--error)' }}>*</span>
                         </label>
                         <input className="form-input" type="text" value={postContactName} onChange={(e) => setPostContactName(e.target.value)} placeholder="Full name" required />
                       </div>
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                        <label style={fieldLabelStyle}>
                           Phone <span style={{ color: 'var(--error)' }}>*</span>
                         </label>
                         <input className="form-input" type="tel" value={postContactPhone} onChange={(e) => setPostContactPhone(e.target.value)} placeholder="+971 50 000 0000" required />
@@ -536,15 +553,15 @@ export function PublicJobsPage() {
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>Contact Email</label>
+                      <label style={fieldLabelStyle}>Contact Email</label>
                       <input className="form-input" type="email" value={postContactEmail} onChange={(e) => setPostContactEmail(e.target.value)} placeholder="your@email.com (optional)" />
                     </div>
 
-                    <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.12)', margin: '4px 0' }} />
-                    <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: '0.82rem', color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job Details</p>
+                    <hr style={{ border: 'none', borderTop: '1px solid rgba(255, 237, 213, 0.14)', margin: '4px 0' }} />
+                    <p style={sectionEyebrowStyle}>Job Details</p>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                      <label style={fieldLabelStyle}>
                         Job Title <span style={{ color: 'var(--error)' }}>*</span>
                       </label>
                       <input className="form-input" type="text" value={postTitle} onChange={(e) => setPostTitle(e.target.value)} placeholder="e.g. Community Outreach Coordinator" required />
@@ -552,7 +569,7 @@ export function PublicJobsPage() {
 
                     <div className="public-jobs-grid-2">
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>Job Type</label>
+                        <label style={fieldLabelStyle}>Job Type</label>
                         <select className="form-input" value={postJobType} onChange={(e) => setPostJobType(e.target.value)}>
                           <option value="">Select type</option>
                           <option value="full_time">Full Time</option>
@@ -562,13 +579,13 @@ export function PublicJobsPage() {
                         </select>
                       </div>
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>Location</label>
+                        <label style={fieldLabelStyle}>Location</label>
                         <input className="form-input" type="text" value={postLocation} onChange={(e) => setPostLocation(e.target.value)} placeholder="e.g. Abu Dhabi (optional)" />
                       </div>
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                      <label style={fieldLabelStyle}>
                         Description <span style={{ color: 'var(--error)' }}>*</span>
                       </label>
                       <textarea
@@ -583,7 +600,7 @@ export function PublicJobsPage() {
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>Requirements</label>
+                      <label style={fieldLabelStyle}>Requirements</label>
                       <textarea
                         className="form-input"
                         value={postRequirements}

@@ -1,4 +1,4 @@
-# ADWest Application Documentation (Reverse Engineered)
+# ADWest Application Documentation
 
 This documentation set is generated from the currently implemented code in:
 - `ad-west-api`

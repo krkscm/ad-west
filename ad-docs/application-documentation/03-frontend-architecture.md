@@ -58,6 +58,7 @@ HTTP execution behavior in `src/utils/api.ts` now includes endpoint normalizatio
 ## UI Architecture Notes
 
 - Shared utility classes and theme variables live in global SCSS.
+- Public-facing routes use a dedicated warm palette in `src/styles/index.scss` (`--public-*` tokens), centered on saffron/ivory surfaces with green support accents so the landing, helpdesk, jobs, join-us, and event-registration pages stay visually distinct from the admin/member workspace theme.
 - Shared date/time entry controls are centralized via `src/components/common/DateFields.tsx` to keep placeholders and picker interactions consistent across modules.
 - Notification authoring and similar admin forms use wider responsive DateTimePicker layout blocks to preserve full date/time placeholder readability without icon overlap.
 - Date/time composite controls (`DateTimePicker` and `DateRangePicker`) include explicit mobile breakpoints that stack fields to one column, and notification form actions also stack for small-screen usability.

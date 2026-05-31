@@ -8,8 +8,8 @@ const PHONE_PERMISSIVE_REGEX = /^\+?[\d\s()\-]{7,20}$/
 const formSectionStyle = {
   padding: '18px 18px 16px',
   borderRadius: '14px',
-  border: '1px solid rgba(148, 163, 184, 0.22)',
-  background: 'rgba(15, 23, 42, 0.28)',
+  border: '1px solid rgba(255, 237, 213, 0.14)',
+  background: 'rgba(255, 248, 235, 0.04)',
   display: 'flex',
   flexDirection: 'column' as const,
   gap: '14px',
@@ -21,15 +21,23 @@ const formSectionTitleStyle = {
   fontWeight: 800,
   letterSpacing: '0.08em',
   textTransform: 'uppercase' as const,
-  color: 'rgba(226, 232, 240, 0.88)',
+  color: 'var(--public-hero-kicker)',
 }
 
 const formSectionTextStyle = {
   margin: '-4px 0 0',
   fontSize: '0.8rem',
   lineHeight: 1.55,
-  color: 'rgba(148, 163, 184, 0.92)',
+  color: 'var(--public-text-secondary)',
 }
+
+const fieldLabelStyle = {
+  display: 'block',
+  fontSize: '0.82rem',
+  fontWeight: 600,
+  color: 'var(--public-text-secondary)',
+  marginBottom: '4px',
+} as const
 
 type JoinUsFormState = {
   fullName: string
@@ -179,13 +187,13 @@ export function PublicContactRegistrationPage() {
     <PublicPageShell subtitle="Join Us — Contact Registration">
       <div style={{ width: '100%', maxWidth: '620px' }}>
         {submitted ? (
-          <div style={{ background: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
+          <div className="public-page-card" style={{ padding: '40px', textAlign: 'center' }}>
               <div style={{ fontSize: '3rem', marginBottom: '16px' }}>✅</div>
-              <h2 style={{ margin: '0 0 8px', color: '#fff' }}>Registration Received</h2>
-              <p style={{ margin: '0 0 20px', color: 'rgba(255,255,255,0.72)' }}>
+              <h2 style={{ margin: '0 0 8px', color: 'var(--public-text-primary)' }}>Registration Received</h2>
+              <p style={{ margin: '0 0 20px', color: 'var(--public-text-secondary)' }}>
                 Thank you. Your details were shared with our team. We will contact you soon.
               </p>
-              <p style={{ margin: '0 0 24px', fontSize: '0.8rem', color: 'rgba(255,255,255,0.72)' }}>
+              <p style={{ margin: '0 0 24px', fontSize: '0.8rem', color: 'var(--public-text-secondary)' }}>
                 Reference ID: <code style={{ fontWeight: 700 }}>{reference}</code>
               </p>
               <button
@@ -200,9 +208,9 @@ export function PublicContactRegistrationPage() {
               </button>
             </div>
         ) : (
-          <div style={{ background: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '16px', padding: '36px' }}>
-              <h2 style={{ margin: '0 0 6px', color: '#fff', fontSize: '1.4rem' }}>Register Your Interest</h2>
-              <p style={{ margin: '0 0 28px', color: 'rgba(255,255,255,0.72)', fontSize: '0.9rem' }}>
+          <div className="public-page-card" style={{ padding: '36px' }}>
+              <h2 style={{ margin: '0 0 6px', color: 'var(--public-text-primary)', fontSize: '1.4rem' }}>Register Your Interest</h2>
+              <p style={{ margin: '0 0 28px', color: 'var(--public-text-secondary)', fontSize: '0.9rem' }}>
                 Fill this form to connect with a sreni team. Required fields are marked with an asterisk.
               </p>
 
@@ -224,7 +232,7 @@ export function PublicContactRegistrationPage() {
                     <p style={formSectionTextStyle}>Start with the Sreni you want to join and the identity fields we need to reach you.</p>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                    <label style={fieldLabelStyle}>
                       Interested Sreni <span style={{ color: 'var(--error)' }}>*</span>
                     </label>
                     <select
@@ -244,7 +252,7 @@ export function PublicContactRegistrationPage() {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                      <label style={fieldLabelStyle}>
                         Full Name <span style={{ color: 'var(--error)' }}>*</span>
                       </label>
                       <input
@@ -257,7 +265,7 @@ export function PublicContactRegistrationPage() {
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                      <label style={fieldLabelStyle}>
                         Phone <span style={{ color: 'var(--error)' }}>*</span>
                       </label>
                       <input
@@ -278,7 +286,7 @@ export function PublicContactRegistrationPage() {
                     <p style={formSectionTextStyle}>This helps us follow up and understand where you are based.</p>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                    <label style={fieldLabelStyle}>
                       Email Address
                     </label>
                     <input
@@ -291,7 +299,7 @@ export function PublicContactRegistrationPage() {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                      <label style={fieldLabelStyle}>
                         City
                       </label>
                       <input
@@ -303,7 +311,7 @@ export function PublicContactRegistrationPage() {
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                      <label style={fieldLabelStyle}>
                         Country
                       </label>
                       <input
@@ -323,7 +331,7 @@ export function PublicContactRegistrationPage() {
                     <p style={formSectionTextStyle}>Optional family and work details help us match your record accurately.</p>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                    <label style={fieldLabelStyle}>
                       Personal Number
                     </label>
                     <input
@@ -335,13 +343,13 @@ export function PublicContactRegistrationPage() {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                      <label style={fieldLabelStyle}>
                         Family / Bachelor
                       </label>
                       <input className="form-input" type="text" value={form.familyOrBachelor} onChange={(e) => setForm((prev) => ({ ...prev, familyOrBachelor: e.target.value }))} />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                      <label style={fieldLabelStyle}>
                         Family
                       </label>
                       <input className="form-input" type="text" value={form.family} onChange={(e) => setForm((prev) => ({ ...prev, family: e.target.value }))} />
@@ -349,13 +357,13 @@ export function PublicContactRegistrationPage() {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                      <label style={fieldLabelStyle}>
                         Bachelor
                       </label>
                       <input className="form-input" type="text" value={form.bachelor} onChange={(e) => setForm((prev) => ({ ...prev, bachelor: e.target.value }))} />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                      <label style={fieldLabelStyle}>
                         Wife Name
                       </label>
                       <input className="form-input" type="text" value={form.wifeName} onChange={(e) => setForm((prev) => ({ ...prev, wifeName: e.target.value }))} />
@@ -363,20 +371,20 @@ export function PublicContactRegistrationPage() {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                      <label style={fieldLabelStyle}>
                         Company
                       </label>
                       <input className="form-input" type="text" value={form.company} onChange={(e) => setForm((prev) => ({ ...prev, company: e.target.value }))} />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                      <label style={fieldLabelStyle}>
                         Profession
                       </label>
                       <input className="form-input" type="text" value={form.profession} onChange={(e) => setForm((prev) => ({ ...prev, profession: e.target.value }))} />
                     </div>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                    <label style={fieldLabelStyle}>
                       Land Line
                     </label>
                     <input className="form-input" type="text" value={form.landLine} onChange={(e) => setForm((prev) => ({ ...prev, landLine: e.target.value }))} />
@@ -390,20 +398,20 @@ export function PublicContactRegistrationPage() {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                      <label style={fieldLabelStyle}>
                         Address in UAE
                       </label>
                       <input className="form-input" type="text" value={form.addressInUae} onChange={(e) => setForm((prev) => ({ ...prev, addressInUae: e.target.value }))} />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                      <label style={fieldLabelStyle}>
                         District
                       </label>
                       <input className="form-input" type="text" value={form.district} onChange={(e) => setForm((prev) => ({ ...prev, district: e.target.value }))} />
                     </div>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+                    <label style={fieldLabelStyle}>
                       Notes
                     </label>
                     <textarea
@@ -423,20 +431,20 @@ export function PublicContactRegistrationPage() {
                     <p style={formSectionTextStyle}>This keeps the public form protected from automated submissions.</p>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '6px' }}>
+                    <label style={{ ...fieldLabelStyle, marginBottom: '6px' }}>
                       Security Check <span style={{ color: 'var(--error)' }}>*</span>
                     </label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                       {captcha?.captchaImage ? (
-                        <img src={captcha.captchaImage} alt="Captcha" style={{ borderRadius: '6px', border: '1px solid #dde', display: 'block' }} />
+                        <img src={captcha.captchaImage} alt="Captcha" style={{ borderRadius: '6px', border: '1px solid rgba(255, 237, 213, 0.4)', display: 'block' }} />
                       ) : (
-                        <div style={{ width: '200px', height: '60px', background: '#eef0f8', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '13px' }}>Loading...</div>
+                        <div style={{ width: '200px', height: '60px', background: 'rgba(255, 248, 235, 0.9)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7c5a2a', fontSize: '13px' }}>Loading...</div>
                       )}
                       <button
                         type="button"
                         onClick={() => void loadCaptcha()}
                         title="Get a new captcha"
-                        style={{ padding: '6px 10px', background: 'none', border: '1px solid #ccd', borderRadius: '6px', cursor: 'pointer', color: '#555', fontSize: '18px', lineHeight: 1 }}
+                        style={{ padding: '6px 10px', background: 'rgba(255, 248, 235, 0.08)', border: '1px solid rgba(255, 237, 213, 0.24)', borderRadius: '6px', cursor: 'pointer', color: 'var(--public-text-primary)', fontSize: '18px', lineHeight: 1 }}
                       >
                         ↺
                       </button>

@@ -58,6 +58,30 @@
   --table-row-hover: rgba(55, 97, 164, 0.07);
   --chip-bg-soft: rgba(15, 23, 42, 0.08);
   --helper-bg: rgba(59, 130, 246, 0.08);
+
+  /* Public theme inspired by saffron, ivory, and green accents */
+  --public-shell-overlay: linear-gradient(165deg, rgba(63, 28, 6, 0.82) 0%, rgba(16, 24, 39, 0.78) 38%, rgba(5, 46, 22, 0.76) 100%);
+  --public-header-bg: rgba(49, 24, 11, 0.56);
+  --public-header-border: rgba(255, 248, 235, 0.14);
+  --public-panel-bg: linear-gradient(180deg, rgba(33, 18, 10, 0.76) 0%, rgba(15, 23, 42, 0.68) 100%);
+  --public-panel-bg-hover: linear-gradient(180deg, rgba(52, 26, 11, 0.84) 0%, rgba(22, 33, 52, 0.78) 100%);
+  --public-panel-border: rgba(255, 237, 213, 0.18);
+  --public-panel-shadow: 0 22px 44px -24px rgba(0, 0, 0, 0.58);
+  --public-hero-kicker: #fbbf24;
+  --public-accent: #f59e0b;
+  --public-accent-soft: rgba(245, 158, 11, 0.18);
+  --public-accent-strong: #f97316;
+  --public-support: #22c55e;
+  --public-support-soft: rgba(34, 197, 94, 0.16);
+  --public-text-primary: #fff8eb;
+  --public-text-secondary: rgba(255, 248, 235, 0.78);
+  --public-text-muted: rgba(255, 248, 235, 0.58);
+  --public-button-secondary-bg: rgba(255, 248, 235, 0.08);
+  --public-button-secondary-hover: rgba(255, 248, 235, 0.16);
+  --public-input-bg: rgba(255, 251, 235, 0.96);
+  --public-input-border: rgba(251, 146, 60, 0.28);
+  --public-input-text: #3b1d0a;
+  --public-focus-ring: 0 0 0 3px rgba(245, 158, 11, 0.22);
 }
 
 :root[data-theme='dark'] {
@@ -136,6 +160,10 @@ body {
   color: var(--text-primary-dark);
   min-height: 100vh;
   background-attachment: fixed;
+}
+
+.public-theme {
+  color: var(--public-text-primary);
 }
 
 /* Solid opaque panel for modals and overlays */
@@ -339,6 +367,49 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: 16px;
   box-shadow: var(--shadow-lg);
+}
+
+.public-page-card {
+  background: var(--public-panel-bg);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid var(--public-panel-border);
+  border-radius: 18px;
+  box-shadow: var(--public-panel-shadow);
+}
+
+.public-theme .form-input {
+  background: var(--public-input-bg);
+  border-color: var(--public-input-border);
+  color: var(--public-input-text);
+}
+
+.public-theme .form-input::placeholder {
+  color: rgba(59, 29, 10, 0.46);
+}
+
+.public-theme .form-input:focus {
+  border-color: var(--public-accent);
+  box-shadow: var(--public-focus-ring);
+}
+
+.public-theme .btn-primary {
+  background: linear-gradient(135deg, var(--public-accent) 0%, var(--public-accent-strong) 100%);
+  box-shadow: 0 16px 32px -18px rgba(249, 115, 22, 0.72);
+}
+
+.public-theme .btn-primary:hover:not(:disabled) {
+  box-shadow: 0 20px 34px -18px rgba(249, 115, 22, 0.78);
+}
+
+.public-theme .btn-secondary {
+  background: var(--public-button-secondary-bg);
+  border-color: rgba(255, 248, 235, 0.22);
+  color: var(--public-text-primary);
+}
+
+.public-theme .btn-secondary:hover:not(:disabled) {
+  background: var(--public-button-secondary-hover);
 }
 
 /* Typography Utilities */

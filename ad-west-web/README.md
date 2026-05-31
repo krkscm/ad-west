@@ -28,6 +28,7 @@ src/
 - `DateTimePicker` and `DateRangePicker` explicitly collapse to a single-column layout on smaller screens for mobile readability.
 - `src/utils/api.ts` enforces endpoint normalization, default request timeout handling, and unified error/response processing for safer and more resilient API calls.
 - Vite build output uses targeted manual chunk splitting (React, charts, editor, workflow) for improved caching and initial load performance.
+- Public routes (`/`, `/portal`, `/helpdesk`, `/jobs`, `/join-us`, `/events/:id/register`) use dedicated `--public-*` theme tokens in `src/styles/index.scss`, with a saffron/ivory base and green support accents separate from the authenticated workspace theme.
 
 ## Getting Started
 

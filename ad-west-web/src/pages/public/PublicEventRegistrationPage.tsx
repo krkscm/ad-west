@@ -3,6 +3,14 @@ import { backendApi, EventFormFieldApi, SpecialEventApi } from '../../utils/back
 import { DateField } from '../../components/common/DateFields'
 import { PublicPageShell } from './PublicPageShell'
 
+const fieldLabelStyle = {
+  display: 'block',
+  fontSize: '0.82rem',
+  fontWeight: 600,
+  color: 'var(--public-text-secondary)',
+  marginBottom: '4px',
+} as const
+
 function getEventId(): string {
   const parts = window.location.pathname.split('/')
   const idx = parts.indexOf('events')
@@ -20,7 +28,7 @@ function FormField({ field, value, onChange }: {
 }) {
   const base = 'form-input'
   const label = (
-    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.72)', marginBottom: '4px' }}>
+    <label style={fieldLabelStyle}>
       {field.label} {field.isRequired && <span style={{ color: 'var(--error)' }}>*</span>}
     </label>
   )
@@ -139,7 +147,7 @@ export function PublicEventRegistrationPage() {
     <PublicPageShell subtitle="Event Registration">
       <div style={{ width: '100%', maxWidth: '560px' }}>
         {loading && (
-          <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.6)', padding: '60px' }}>Loading…</div>
+          <div style={{ textAlign: 'center', color: 'var(--public-text-muted)', padding: '60px' }}>Loading…</div>
         )}
 
         {!loading && error && (
@@ -150,12 +158,12 @@ export function PublicEventRegistrationPage() {
         )}
 
         {!loading && !error && event && (
-          <div style={{ background: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '16px', padding: '36px' }}>
+          <div className="public-page-card" style={{ padding: '36px' }}>
               {submitted ? (
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '3rem', marginBottom: '16px' }}>✅</div>
-                  <h2 style={{ margin: '0 0 8px', color: '#fff' }}>Registered!</h2>
-                  <p style={{ margin: '0 0 20px', color: 'rgba(255,255,255,0.72)' }}>
+                  <h2 style={{ margin: '0 0 8px', color: 'var(--public-text-primary)' }}>Registered!</h2>
+                  <p style={{ margin: '0 0 20px', color: 'var(--public-text-secondary)' }}>
                     You have successfully registered for <strong>{event.title}</strong>. We look forward to seeing you!
                   </p>
                   <button
@@ -167,18 +175,18 @@ export function PublicEventRegistrationPage() {
                 </div>
               ) : (
                 <>
-                  <h2 style={{ margin: '0 0 4px', color: '#fff', fontSize: '1.3rem' }}>{event.title}</h2>
-                  <p style={{ margin: '0 0 4px', fontSize: '0.85rem', color: 'rgba(255,255,255,0.72)' }}>
+                  <h2 style={{ margin: '0 0 4px', color: 'var(--public-text-primary)', fontSize: '1.3rem' }}>{event.title}</h2>
+                  <p style={{ margin: '0 0 4px', fontSize: '0.85rem', color: 'var(--public-text-secondary)' }}>
                     {formatDateTime(event.dateTime)}{event.endDateTime ? ` – ${formatDateTime(event.endDateTime)}` : ''}
                   </p>
                   {event.venue && (
-                    <p style={{ margin: '0 0 16px', fontSize: '0.85rem', color: 'rgba(255,255,255,0.72)' }}>📍 {event.venue}</p>
+                    <p style={{ margin: '0 0 16px', fontSize: '0.85rem', color: 'var(--public-text-secondary)' }}>📍 {event.venue}</p>
                   )}
                   {event.description && (
-                    <p style={{ margin: '0 0 20px', fontSize: '0.88rem', color: 'rgba(255,255,255,0.72)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{event.description}</p>
+                    <p style={{ margin: '0 0 20px', fontSize: '0.88rem', color: 'var(--public-text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{event.description}</p>
                   )}
 
-                  <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.12)', margin: '0 0 20px' }} />
+                  <hr style={{ border: 'none', borderTop: '1px solid rgba(255, 237, 213, 0.14)', margin: '0 0 20px' }} />
 
                   {submitError && (
                     <div style={{ background: 'var(--error-light)', border: '1px solid var(--error)', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', color: 'var(--error)', fontSize: '0.88rem' }}>
@@ -188,7 +196,7 @@ export function PublicEventRegistrationPage() {
 
                   {event.formFields.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                      <p style={{ color: 'rgba(255,255,255,0.72)', marginBottom: '16px' }}>Click below to confirm your registration.</p>
+                      <p style={{ color: 'var(--public-text-secondary)', marginBottom: '16px' }}>Click below to confirm your registration.</p>
                       <button className="btn btn-primary" disabled={submitting} onClick={async () => {
                         setSubmitting(true)
                         try {

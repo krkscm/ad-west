@@ -41,6 +41,7 @@ export function PublicPortalPage() {
 
   return (
     <div
+      className="public-theme"
       style={{
         minHeight: '100vh',
         fontFamily: 'var(--font-sans)',
@@ -72,7 +73,7 @@ export function PublicPortalPage() {
           position: 'fixed',
           inset: 0,
           zIndex: 1,
-          background: 'linear-gradient(160deg, rgba(2,6,23,0.78) 0%, rgba(15,23,42,0.70) 50%, rgba(2,6,23,0.85) 100%)',
+          background: 'var(--public-shell-overlay)',
         }}
       />
 
@@ -82,10 +83,10 @@ export function PublicPortalPage() {
         {/* Header */}
         <header
           style={{
-            background: 'rgba(2, 6, 23, 0.55)',
+            background: 'var(--public-header-bg)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
-            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            borderBottom: '1px solid var(--public-header-border)',
             padding: '14px 24px',
             display: 'flex',
             alignItems: 'center',
@@ -99,10 +100,10 @@ export function PublicPortalPage() {
               style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'contain' }}
             />
             <div>
-              <h1 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>
+              <h1 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--public-text-primary)', lineHeight: 1.2 }}>
                 IFCA Abu Dhabi
               </h1>
-              <p style={{ margin: 0, fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)' }}>
+              <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--public-text-secondary)' }}>
                 Public Services Portal
               </p>
             </div>
@@ -114,16 +115,16 @@ export function PublicPortalPage() {
               fontSize: '0.82rem',
               padding: '7px 18px',
               borderRadius: '8px',
-              border: '1px solid rgba(255,255,255,0.2)',
-              background: 'rgba(255,255,255,0.1)',
-              color: '#fff',
+              border: '1px solid rgba(255, 248, 235, 0.18)',
+              background: 'var(--public-button-secondary-bg)',
+              color: 'var(--public-text-primary)',
               cursor: 'pointer',
               fontWeight: 600,
               backdropFilter: 'blur(8px)',
               transition: 'background 0.15s',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--public-button-secondary-hover)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--public-button-secondary-bg)' }}
           >
             🔐 Login
           </button>
@@ -147,7 +148,7 @@ export function PublicPortalPage() {
               fontWeight: 700,
               letterSpacing: '0.12em',
               textTransform: 'uppercase',
-              color: 'rgba(167,139,250,0.9)',
+              color: 'var(--public-hero-kicker)',
             }}
           >
             ✦ Welcome
@@ -157,7 +158,7 @@ export function PublicPortalPage() {
               fontSize: 'clamp(1.6rem, 5vw, 2.6rem)',
               fontWeight: 800,
               margin: '0 0 14px',
-              color: '#fff',
+              color: 'var(--public-text-primary)',
               lineHeight: 1.18,
               textShadow: '0 2px 12px rgba(0,0,0,0.4)',
             }}
@@ -167,7 +168,7 @@ export function PublicPortalPage() {
           <p
             style={{
               fontSize: 'clamp(0.95rem, 2vw, 1.05rem)',
-              color: 'rgba(255,255,255,0.72)',
+              color: 'var(--public-text-secondary)',
               margin: 0,
               lineHeight: 1.65,
               maxWidth: '520px',
@@ -200,15 +201,14 @@ export function PublicPortalPage() {
             {PORTAL_CARDS.map((card) => (
               <button
                 key={card.href}
+                className="public-page-card"
                 type="button"
                 onClick={() => navigate(card.href)}
                 style={{
                   padding: '28px 24px',
                   textAlign: 'left',
                   cursor: 'pointer',
-                  border: '1px solid rgba(255,255,255,0.12)',
                   borderRadius: '16px',
-                  background: 'rgba(15, 23, 42, 0.55)',
                   backdropFilter: 'blur(20px)',
                   WebkitBackdropFilter: 'blur(20px)',
                   transition: 'transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease',
@@ -219,14 +219,14 @@ export function PublicPortalPage() {
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = 'translateY(-4px)'
                   e.currentTarget.style.boxShadow = '0 16px 40px rgba(0,0,0,0.35)'
-                  e.currentTarget.style.borderColor = 'rgba(167,139,250,0.5)'
-                  e.currentTarget.style.background = 'rgba(15, 23, 42, 0.72)'
+                  e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.52)'
+                  e.currentTarget.style.background = 'var(--public-panel-bg-hover)'
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = 'translateY(0)'
                   e.currentTarget.style.boxShadow = ''
-                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'
-                  e.currentTarget.style.background = 'rgba(15, 23, 42, 0.55)'
+                  e.currentTarget.style.borderColor = 'var(--public-panel-border)'
+                  e.currentTarget.style.background = 'var(--public-panel-bg)'
                 }}
               >
                 {/* Icon + badge */}
@@ -237,8 +237,8 @@ export function PublicPortalPage() {
                       width: '52px',
                       height: '52px',
                       borderRadius: '12px',
-                      background: 'rgba(167,139,250,0.15)',
-                      border: '1px solid rgba(167,139,250,0.25)',
+                      background: 'var(--public-accent-soft)',
+                      border: '1px solid rgba(251, 191, 36, 0.28)',
                       display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -254,9 +254,9 @@ export function PublicPortalPage() {
                         fontWeight: 700,
                         padding: '3px 9px',
                         borderRadius: '999px',
-                        border: '1px solid rgba(52,211,153,0.4)',
-                        color: 'rgba(52,211,153,0.9)',
-                        background: 'rgba(52,211,153,0.1)',
+                        border: '1px solid rgba(34, 197, 94, 0.4)',
+                        color: '#86efac',
+                        background: 'var(--public-support-soft)',
                         letterSpacing: '0.04em',
                       }}
                     >
@@ -272,7 +272,7 @@ export function PublicPortalPage() {
                       margin: '0 0 6px',
                       fontSize: '1.1rem',
                       fontWeight: 700,
-                      color: '#fff',
+                      color: 'var(--public-text-primary)',
                     }}
                   >
                     {card.title}
@@ -281,7 +281,7 @@ export function PublicPortalPage() {
                     style={{
                       margin: 0,
                       fontSize: '0.875rem',
-                      color: 'rgba(255,255,255,0.62)',
+                      color: 'var(--public-text-secondary)',
                       lineHeight: 1.6,
                     }}
                   >
@@ -296,7 +296,7 @@ export function PublicPortalPage() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
-                    color: 'rgba(167,139,250,0.9)',
+                    color: 'var(--public-accent)',
                     fontWeight: 600,
                     fontSize: '0.875rem',
                   }}
@@ -310,12 +310,11 @@ export function PublicPortalPage() {
 
           {/* Info strip */}
           <div
+            className="public-page-card"
             style={{
               marginTop: '28px',
               padding: '14px 18px',
               borderRadius: '12px',
-              border: '1px solid rgba(255,255,255,0.08)',
-              background: 'rgba(2, 6, 23, 0.45)',
               backdropFilter: 'blur(12px)',
               display: 'flex',
               alignItems: 'flex-start',
@@ -323,7 +322,7 @@ export function PublicPortalPage() {
             }}
           >
             <span style={{ fontSize: '1rem', flexShrink: 0, marginTop: '1px' }}>ℹ️</span>
-            <p style={{ margin: 0, fontSize: '0.8rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.6 }}>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--public-text-muted)', lineHeight: 1.6 }}>
               Already a member? Your membership administrator will provide login credentials for the full workspace.
             </p>
           </div>
@@ -332,12 +331,12 @@ export function PublicPortalPage() {
         {/* Footer */}
         <footer
           style={{
-            borderTop: '1px solid rgba(255,255,255,0.08)',
-            background: 'rgba(2, 6, 23, 0.55)',
+            borderTop: '1px solid var(--public-header-border)',
+            background: 'var(--public-header-bg)',
             padding: '14px 24px',
             textAlign: 'center',
             fontSize: '0.75rem',
-            color: 'rgba(255,255,255,0.35)',
+            color: 'var(--public-text-muted)',
           }}
         >
           © {new Date().getFullYear()} IFCA Abu Dhabi · Powered by VGK Technologies
