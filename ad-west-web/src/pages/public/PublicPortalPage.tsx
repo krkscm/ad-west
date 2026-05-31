@@ -308,24 +308,6 @@ export function PublicPortalPage() {
             ))}
           </div>
 
-          {/* Info strip */}
-          <div
-            className="public-page-card"
-            style={{
-              marginTop: '28px',
-              padding: '14px 18px',
-              borderRadius: '12px',
-              backdropFilter: 'blur(12px)',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '10px',
-            }}
-          >
-            <span style={{ fontSize: '1rem', flexShrink: 0, marginTop: '1px' }}>ℹ️</span>
-            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--public-text-muted)', lineHeight: 1.6 }}>
-              Already a member? Your membership administrator will provide login credentials for the full workspace.
-            </p>
-          </div>
         </main>
 
         {/* Footer */}

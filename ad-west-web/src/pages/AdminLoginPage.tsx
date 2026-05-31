@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useAuth } from '../context/auth-context'
 import { useToast } from '../components/common/Toast'
+import { AuthPageLayout } from '../components/common/AuthPageLayout'
 
 interface AdminLoginPageProps {
 }
@@ -63,8 +64,8 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = () => {
   }
 
   return (
-    <div className="login-shell flex-center" style={{ padding: '24px' }}>
-      <div className="login-card animate-slide-up">
+    <AuthPageLayout title="Sign In" backgroundImage="/login-bg.webp">
+      <div className="login-card login-card--compact animate-slide-up">
         <div className="login-card-title-wrap">
           <h1 className="login-card-title">User Sign In</h1>
           <p className="login-card-copy">
@@ -106,11 +107,11 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = () => {
             <label className="form-label">Security Check</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
               {captchaImage ? (
-                <img src={captchaImage} alt="Captcha" style={{ borderRadius: '6px', border: '1px solid rgba(148, 163, 184, 0.5)', display: 'block' }} />
+                <img src={captchaImage} alt="Captcha" style={{ borderRadius: '6px', border: '1px solid #dde', display: 'block' }} />
               ) : (
-                <div style={{ width: '200px', height: '60px', background: 'rgba(15, 23, 42, 0.52)', border: '1px solid rgba(148, 163, 184, 0.4)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1', fontSize: '13px' }}>Loading...</div>
+                <div style={{ width: '200px', height: '60px', background: '#eef0f8', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '13px' }}>Loading...</div>
               )}
-              <button type="button" onClick={() => void loadCaptcha()} title="Get a new captcha" style={{ padding: '6px 10px', background: 'rgba(15, 23, 42, 0.34)', border: '1px solid rgba(148, 163, 184, 0.48)', borderRadius: '6px', cursor: 'pointer', color: '#e2e8f0', fontSize: '18px', lineHeight: 1 }}>↺</button>
+              <button type="button" onClick={() => void loadCaptcha()} title="Get a new captcha" style={{ padding: '6px 10px', background: 'none', border: '1px solid #ccd', borderRadius: '6px', cursor: 'pointer', color: '#555', fontSize: '18px', lineHeight: 1 }}>↺</button>
             </div>
             <input
               type="text"
@@ -124,20 +125,20 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = () => {
             />
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '16px', minHeight: '54px' }}>
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '10px', minHeight: '46px' }}>
             Continue
           </button>
 
-          <div style={{ margin: '12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ height: '1px', flex: 1, background: 'rgba(148,163,184,0.5)' }} />
-            <span style={{ fontSize: '0.78rem', color: 'rgba(226, 232, 240, 0.76)' }}>OR</span>
-            <div style={{ height: '1px', flex: 1, background: 'rgba(148,163,184,0.5)' }} />
+          <div style={{ margin: '8px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ height: '1px', flex: 1, background: 'rgba(148,163,184,0.35)' }} />
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>OR</span>
+            <div style={{ height: '1px', flex: 1, background: 'rgba(148,163,184,0.35)' }} />
           </div>
 
           <button
             type="button"
             className="btn btn-secondary"
-            style={{ width: '100%', minHeight: '50px', justifyContent: 'center', gap: '10px' }}
+            style={{ width: '100%', minHeight: '42px', justifyContent: 'center', gap: '10px' }}
             onClick={() => void handleGoogleLogin()}
           >
             <span style={{ fontSize: '1rem' }}>🔐</span>
@@ -145,6 +146,6 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = () => {
           </button>
         </form>
       </div>
-    </div>
+    </AuthPageLayout>
   )
 }

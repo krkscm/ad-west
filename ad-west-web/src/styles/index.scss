@@ -636,6 +636,28 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.7;
 }
 
+.login-card--compact {
+  padding: 22px 32px 26px;
+
+  .login-card-title-wrap {
+    margin-bottom: 14px;
+  }
+
+  .login-card-title {
+    font-size: clamp(1.4rem, 2vw, 1.75rem);
+    margin-bottom: 4px;
+  }
+
+  .login-card-copy {
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .form-group {
+    margin-bottom: 12px;
+  }
+}
+
 .login-hero {
   position: relative;
   z-index: 2;

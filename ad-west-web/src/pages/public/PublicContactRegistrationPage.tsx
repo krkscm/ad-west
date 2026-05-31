@@ -5,6 +5,22 @@ import { PublicPageShell } from './PublicPageShell'
 const EMAIL_FORMAT_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE_PERMISSIVE_REGEX = /^\+?[\d\s()\-]{7,20}$/
 
+const UAE_CITIES = [
+  'Abu Dhabi', 'Al Ain', 'Dubai', 'Sharjah', 'Ajman',
+  'Ras Al Khaimah', 'Fujairah', 'Umm Al Quwain',
+]
+
+const ABU_DHABI_DISTRICTS = [
+  'Abu Dhabi City', 'Al Ain', 'Al Dhafra',
+  'Khalifa City A', 'Khalifa City B', 'Mohammed Bin Zayed City',
+  'Al Shamkha', 'Baniyas', 'Al Wathba', 'Al Falah', 'Al Rahba',
+  'Shakhbout City', 'Zayed City', 'Al Reem Island', 'Saadiyat Island',
+  'Yas Island', 'Al Mushrif', 'Al Karamah', 'Al Nahyan', 'Al Muroor',
+  'Al Mussafah', 'Mussafah Industrial', 'Al Mafraq', 'Al Bahia',
+  'Al Samha', 'Al Shuwaib', 'Ruwais', 'Madinat Zayed', 'Al Mirfa',
+  'Ghayathi', 'Liwa',
+]
+
 const formSectionStyle = {
   padding: '18px 18px 16px',
   borderRadius: '14px',
@@ -299,28 +315,37 @@ export function PublicContactRegistrationPage() {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                      <label style={fieldLabelStyle}>
-                        City
-                      </label>
-                      <input
-                        className="form-input"
-                        type="text"
-                        value={form.city}
-                        onChange={(e) => setForm((prev) => ({ ...prev, city: e.target.value }))}
-                        placeholder="Abu Dhabi"
-                      />
+                      <label style={fieldLabelStyle}>City</label>
+                      {form.country === 'UAE' ? (
+                        <select
+                          className="form-input"
+                          value={form.city}
+                          onChange={(e) => setForm((prev) => ({ ...prev, city: e.target.value }))}
+                        >
+                          <option value="">— Select —</option>
+                          {UAE_CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      ) : (
+                        <input
+                          className="form-input"
+                          type="text"
+                          value={form.city}
+                          onChange={(e) => setForm((prev) => ({ ...prev, city: e.target.value }))}
+                          placeholder="City"
+                        />
+                      )}
                     </div>
                     <div>
-                      <label style={fieldLabelStyle}>
-                        Country
-                      </label>
-                      <input
+                      <label style={fieldLabelStyle}>Country</label>
+                      <select
                         className="form-input"
-                        type="text"
                         value={form.country}
-                        onChange={(e) => setForm((prev) => ({ ...prev, country: e.target.value }))}
-                        placeholder="UAE"
-                      />
+                        onChange={(e) => setForm((prev) => ({ ...prev, country: e.target.value, city: '' }))}
+                      >
+                        <option value="">— Select —</option>
+                        <option value="UAE">UAE</option>
+                        <option value="India">India</option>
+                      </select>
                     </div>
                   </div>
                 </section>
@@ -343,10 +368,16 @@ export function PublicContactRegistrationPage() {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                      <label style={fieldLabelStyle}>
-                        Family / Bachelor
-                      </label>
-                      <input className="form-input" type="text" value={form.familyOrBachelor} onChange={(e) => setForm((prev) => ({ ...prev, familyOrBachelor: e.target.value }))} />
+                      <label style={fieldLabelStyle}>Family / Bachelor</label>
+                      <select
+                        className="form-input"
+                        value={form.familyOrBachelor}
+                        onChange={(e) => setForm((prev) => ({ ...prev, familyOrBachelor: e.target.value }))}
+                      >
+                        <option value="">— Select —</option>
+                        <option value="Family">Family</option>
+                        <option value="Bachelor">Bachelor</option>
+                      </select>
                     </div>
                     <div>
                       <label style={fieldLabelStyle}>
@@ -404,10 +435,15 @@ export function PublicContactRegistrationPage() {
                       <input className="form-input" type="text" value={form.addressInUae} onChange={(e) => setForm((prev) => ({ ...prev, addressInUae: e.target.value }))} />
                     </div>
                     <div>
-                      <label style={fieldLabelStyle}>
-                        District
-                      </label>
-                      <input className="form-input" type="text" value={form.district} onChange={(e) => setForm((prev) => ({ ...prev, district: e.target.value }))} />
+                      <label style={fieldLabelStyle}>District / Area</label>
+                      <select
+                        className="form-input"
+                        value={form.district}
+                        onChange={(e) => setForm((prev) => ({ ...prev, district: e.target.value }))}
+                      >
+                        <option value="">— Select —</option>
+                        {ABU_DHABI_DISTRICTS.map((d) => <option key={d} value={d}>{d}</option>)}
+                      </select>
                     </div>
                   </div>
                   <div>

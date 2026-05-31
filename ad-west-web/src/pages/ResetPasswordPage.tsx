@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { backendApi } from '../utils/backendApi'
+import { AuthPageLayout } from '../components/common/AuthPageLayout'
 
 export const ResetPasswordPage: React.FC = () => {
   const token = new URLSearchParams(window.location.search).get('token') ?? ''
@@ -41,21 +42,21 @@ export const ResetPasswordPage: React.FC = () => {
 
   if (!token) {
     return (
-      <div className="login-shell flex-center" style={{ padding: '24px' }}>
-        <div className="login-card animate-slide-up" style={{ textAlign: 'center' }}>
+      <AuthPageLayout backgroundImage="/login-bg.webp" title="Reset Password">
+        <div className="login-card login-card--compact animate-slide-up" style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '2rem', marginBottom: '12px' }}>⚠️</div>
           <p style={{ color: 'var(--error)', marginBottom: '20px' }}>Invalid or missing reset token.</p>
           <a href="/forgot-password" style={{ color: '#a5b4fc', fontSize: '0.88rem', fontWeight: 600 }}>
             Request a new reset link
           </a>
         </div>
-      </div>
+      </AuthPageLayout>
     )
   }
 
   return (
-    <div className="login-shell flex-center" style={{ padding: '24px' }}>
-      <div className="login-card animate-slide-up">
+    <AuthPageLayout backgroundImage="/login-bg.webp" title="Set New Password">
+      <div className="login-card login-card--compact animate-slide-up">
         <div className="login-card-title-wrap">
           <h1 className="login-card-title">Set New Password</h1>
           <p className="login-card-copy">
@@ -128,16 +129,13 @@ export const ResetPasswordPage: React.FC = () => {
             </button>
 
             <div style={{ textAlign: 'center', marginTop: '16px' }}>
-              <a
-                href="/forgot-password"
-                style={{ color: '#a5b4fc', fontSize: '0.85rem', textDecoration: 'none', fontWeight: 500 }}
-              >
+              <a href="/forgot-password" style={{ color: '#a5b4fc', fontSize: '0.85rem', textDecoration: 'none', fontWeight: 500 }}>
                 Request a new link
               </a>
             </div>
           </form>
         )}
       </div>
-    </div>
+    </AuthPageLayout>
   )
 }

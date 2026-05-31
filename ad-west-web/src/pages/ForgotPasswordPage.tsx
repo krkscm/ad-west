@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { backendApi } from '../utils/backendApi'
+import { AuthPageLayout } from '../components/common/AuthPageLayout'
 
 export const ForgotPasswordPage: React.FC = () => {
   const [email, setEmail] = useState('')
@@ -23,8 +24,8 @@ export const ForgotPasswordPage: React.FC = () => {
   }
 
   return (
-    <div className="login-shell flex-center" style={{ padding: '24px' }}>
-      <div className="login-card animate-slide-up">
+    <AuthPageLayout title="Forgot Password" backgroundImage="/login-bg.webp">
+      <div className="login-card login-card--compact animate-slide-up">
         <div className="login-card-title-wrap">
           <h1 className="login-card-title">Forgot Password</h1>
           <p className="login-card-copy">
@@ -38,10 +39,7 @@ export const ForgotPasswordPage: React.FC = () => {
             <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 20px' }}>
               If <strong>{email}</strong> is registered, a password reset link has been sent. Check your inbox and spam folder.
             </p>
-            <a
-              href="/login"
-              style={{ color: '#a5b4fc', fontSize: '0.88rem', textDecoration: 'none', fontWeight: 600 }}
-            >
+            <a href="/login" style={{ color: '#a5b4fc', fontSize: '0.88rem', textDecoration: 'none', fontWeight: 600 }}>
               ← Back to Sign In
             </a>
           </div>
@@ -74,16 +72,13 @@ export const ForgotPasswordPage: React.FC = () => {
             </button>
 
             <div style={{ textAlign: 'center', marginTop: '16px' }}>
-              <a
-                href="/login"
-                style={{ color: '#a5b4fc', fontSize: '0.85rem', textDecoration: 'none', fontWeight: 500 }}
-              >
+              <a href="/login" style={{ color: '#a5b4fc', fontSize: '0.85rem', textDecoration: 'none', fontWeight: 500 }}>
                 ← Back to Sign In
               </a>
             </div>
           </form>
         )}
       </div>
-    </div>
+    </AuthPageLayout>
   )
 }
