@@ -4,6 +4,7 @@ import {
   Optional,
   UnauthorizedException,
 } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import { USER_STORE } from '../constants';
 import { AdminRole } from '../enums/admin-role.enum';
 import { AuthPrincipal } from '../interfaces/auth-principal.interface';
@@ -13,6 +14,7 @@ import { UserStore } from '../interfaces/user-store.interface';
 import { AuditService } from './audit.service';
 import { CryptoService } from './crypto.service';
 import { GoogleIntegrationConfigService } from './google-integration-config.service';
+import { MailService } from './mail.service';
 import { RoleAssignment } from '../interfaces/admin-user.interface';
 import { DataSource } from 'typeorm';
 
@@ -55,6 +57,7 @@ export class AuthService {
     private readonly cryptoService: CryptoService,
     private readonly auditService: AuditService,
     private readonly googleIntegrationConfigService: GoogleIntegrationConfigService,
+    private readonly mailService: MailService,
     @Optional() @Inject(DataSource) private readonly dataSource?: DataSource,
   ) {}
 
@@ -574,6 +577,86 @@ export class AuthService {
       roles: [],
       sessionId: payload.sid,
     };
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    if (!this.dataSource) return;
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const rows = await this.dataSource.query(
+      `SELECT id, active FROM adwest.auth_admin_users WHERE lower(email) = $1 LIMIT 1`,
+      [normalizedEmail],
+    ) as Array<{ id: string; active: boolean }>;
+
+    if (!rows[0] || !rows[0].active) return;
+
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    await this.dataSource.query(
+      `DELETE FROM adwest.admin_password_reset_tokens WHERE user_email = $1`,
+      [normalizedEmail],
+    );
+    await this.dataSource.query(
+      `INSERT INTO adwest.admin_password_reset_tokens (token, user_email, expires_at) VALUES ($1, $2, $3)`,
+      [token, normalizedEmail, expiresAt],
+    );
+
+    const webOrigin = process.env.WEB_APP_ORIGIN || 'http://localhost:3000';
+    const resetLink = `${webOrigin}/reset-password?token=${token}`;
+
+    await this.mailService.sendMail({
+      to: normalizedEmail,
+      subject: 'AD West — Password Reset Request',
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#f8f9fb;border-radius:10px;">
+          <h2 style="color:#1e293b;margin:0 0 8px;">Password Reset</h2>
+          <p style="color:#475569;margin:0 0 24px;">We received a request to reset your AD West admin account password. Click the button below to set a new password. This link expires in <strong>1 hour</strong>.</p>
+          <a href="${resetLink}" style="display:inline-block;padding:12px 28px;background:#6366f1;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">Reset Password</a>
+          <p style="color:#94a3b8;font-size:12px;margin:24px 0 0;">If you did not request this, you can safely ignore this email. Your password will not change.</p>
+          <p style="color:#94a3b8;font-size:12px;margin:8px 0 0;">Or copy this link: ${resetLink}</p>
+        </div>
+      `,
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    if (!this.dataSource) {
+      throw new UnauthorizedException('Password reset is not available.');
+    }
+
+    const rows = await this.dataSource.query(
+      `SELECT token, user_email, expires_at FROM adwest.admin_password_reset_tokens WHERE token = $1 LIMIT 1`,
+      [token],
+    ) as Array<{ token: string; user_email: string; expires_at: string }>;
+
+    const record = rows[0];
+    if (!record || new Date(record.expires_at) < new Date()) {
+      throw new UnauthorizedException('This reset link is invalid or has expired.');
+    }
+
+    const userRows = await this.dataSource.query(
+      `SELECT id, active FROM adwest.auth_admin_users WHERE lower(email) = $1 LIMIT 1`,
+      [record.user_email],
+    ) as Array<{ id: string; active: boolean }>;
+
+    if (!userRows[0] || !userRows[0].active) {
+      throw new UnauthorizedException('Account not found or inactive.');
+    }
+
+    const passwordHash = this.cryptoService.hashPassword(newPassword);
+
+    await this.dataSource.query(
+      `UPDATE adwest.auth_admin_users
+       SET password_hash = $1, must_reset_password = FALSE, failed_attempts = 0, locked_until = NULL
+       WHERE lower(email) = $2`,
+      [passwordHash, record.user_email],
+    );
+
+    await this.dataSource.query(
+      `DELETE FROM adwest.admin_password_reset_tokens WHERE token = $1`,
+      [token],
+    );
   }
 
   async adminLogout(principal: AuthPrincipal): Promise<void> {

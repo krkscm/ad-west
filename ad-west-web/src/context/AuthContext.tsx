@@ -249,7 +249,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }, 400)
 
       const onMessage = (event: MessageEvent<GoogleAuthMessage>) => {
-        if (event.origin !== window.location.origin) {
+        const apiProxyTarget = import.meta.env.VITE_API_PROXY_TARGET as string | undefined
+        const apiOrigin = apiProxyTarget ? new URL(apiProxyTarget).origin : null
+        const isAllowedOrigin =
+          event.origin === window.location.origin ||
+          (apiOrigin !== null && event.origin === apiOrigin)
+        if (!isAllowedOrigin) {
           return
         }
 

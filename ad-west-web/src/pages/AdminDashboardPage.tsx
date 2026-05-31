@@ -29,6 +29,7 @@ import { AttendanceMetricsPage } from './settings/AttendanceMetricsPage';
 import { ReportConfigSettingsPage } from './settings/ReportConfigSettingsPage';
 import { ResponsibilityChartPage } from './settings/ResponsibilityChartPage';
 import { GoogleIntegrationSettingsPage } from './settings/GoogleIntegrationSettingsPage';
+import { SmtpIntegrationSettingsPage } from './settings/SmtpIntegrationSettingsPage';
 import { HelpdeskTicketsPage } from './helpdesk/HelpdeskTicketsPage';
 import { JobPostingsPage } from './helpdesk/JobPostingsPage';
 import { JobApplicationsPage } from './helpdesk/JobApplicationsPage';
@@ -111,6 +112,7 @@ type ActiveTab =
   | 'settings-responsibility-chart'
   | 'settings-report-config'
   | 'settings-google-integration'
+  | 'settings-smtp-integration'
   | 'insights'
   | 'ai-chatbot'
   | 'helpdesk-tickets'
@@ -137,7 +139,7 @@ const ALL_TABS: ActiveTab[] = [
   'settings-sreni-definition', 'settings-permissions', 'settings-permission-sets', 'settings-enum-values',
   'settings-users', 'settings-approval-workflows', 'settings-approval-workflows-form', 'settings-attendance-metrics',
   'settings-responsibility-chart', 'settings-report-config',
-  'settings-google-integration',
+  'settings-google-integration', 'settings-smtp-integration',
   'insights', 'ai-chatbot',
   'helpdesk-tickets', 'job-postings', 'job-applications',
   'member-services-reimbursements', 'member-services-events', 'member-services-notifications', 'member-services-gmail',
@@ -189,6 +191,7 @@ const TAB_METADATA: { [key: string]: { label: string; parent?: 'settings' | 'gov
   'settings-responsibility-chart': { label: 'Responsibility Chart', parent: 'governance' },
   'settings-report-config': { label: 'Report Config', parent: 'settings' },
   'settings-google-integration': { label: 'Google Integration', parent: 'settings' },
+  'settings-smtp-integration': { label: 'Email Integration', parent: 'settings' },
   'insights': { label: 'Insights', parent: 'governance' },
   'ai-chatbot': { label: 'AI Chatbot', parent: 'governance' },
   'helpdesk-tickets': { label: 'Helpdesk Tickets' },
@@ -1628,6 +1631,23 @@ export const AdminDashboardPage: React.FC = () => {
                 </button>
               )}
 
+              {showAdminsTab && (
+                <button
+                  onClick={() => setActiveTab('settings-smtp-integration')}
+                  className={`btn ${activeTab === 'settings-smtp-integration' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{
+                    justifyContent: 'flex-start',
+                    padding: '8px 14px',
+                    fontSize: '0.84rem',
+                    background: activeTab === 'settings-smtp-integration' ? '' : 'transparent',
+                    border: 'none',
+                    color: activeTab === 'settings-smtp-integration' ? '#fff' : 'var(--text-secondary-dark)'
+                  }}
+                >
+                  📧 Email Integration
+                </button>
+              )}
+
             </div>
           )}
         </nav>
@@ -2133,6 +2153,8 @@ export const AdminDashboardPage: React.FC = () => {
           {activeTab === 'settings-report-config' && <ReportConfigSettingsPage />}
 
           {activeTab === 'settings-google-integration' && showAdminsTab && <GoogleIntegrationSettingsPage />}
+
+          {activeTab === 'settings-smtp-integration' && showAdminsTab && <SmtpIntegrationSettingsPage />}
 
           {activeTab === 'settings-responsibility-chart' && <ResponsibilityChartPage />}
 

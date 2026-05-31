@@ -521,6 +521,19 @@ export interface GoogleIntegrationConfigApi {
   updatedAt?: string
 }
 
+export interface SmtpIntegrationConfigApi {
+  host: string
+  port: number
+  username: string
+  fromName: string
+  encryption: string
+  imapHost: string
+  imapPort: number
+  enabled: boolean
+  hasPassword: boolean
+  updatedAt?: string
+}
+
 export interface CaptchaChallengeResponse {
   captchaToken: string
   captchaImage: string
@@ -758,6 +771,12 @@ export const backendApi = {
 
   login: (identifier: string, password: string, captchaToken: string, captchaAnswer: string) =>
     api.post<AdminLoginResponse>('/auth/login', { identifier, password, captchaToken, captchaAnswer }),
+
+  forgotPassword: (email: string) =>
+    api.post<{ success: boolean }>('/auth/forgot-password', { email }),
+
+  resetPassword: (token: string, newPassword: string) =>
+    api.post<{ success: boolean }>('/auth/reset-password', { token, newPassword }),
 
   buildGoogleStartUrl: (returnOrigin: string) =>
     `${import.meta.env.VITE_API_URL || '/api/v1'}/auth/google/start?returnOrigin=${encodeURIComponent(returnOrigin)}`,
@@ -1231,6 +1250,24 @@ export const backendApi = {
     clearClientSecret?: boolean
   }) =>
     api.patch<GoogleIntegrationConfigApi>('/settings/google-integration-config', payload),
+
+  // SMTP / Email Integration Settings
+  getSmtpIntegrationConfig: () =>
+    api.get<SmtpIntegrationConfigApi>('/settings/smtp-integration-config'),
+
+  updateSmtpIntegrationConfig: (payload: {
+    host?: string
+    port?: number
+    username?: string
+    password?: string
+    fromName?: string
+    encryption?: string
+    imapHost?: string
+    imapPort?: number
+    enabled?: boolean
+    clearPassword?: boolean
+  }) =>
+    api.patch<SmtpIntegrationConfigApi>('/settings/smtp-integration-config', payload),
 
   // Sreni Contact List
   listSreniContacts: (sreniId: string, page = 1, pageSize = 50) =>

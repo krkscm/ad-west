@@ -11,6 +11,8 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { CurrentUser } from '../decorators/current-user.decorator';
+import { ForgotPasswordDto } from '../dto/forgot-password.dto';
+import { ResetPasswordDto } from '../dto/reset-password.dto';
 import { MemberLoginDto } from '../dto/member-login.dto';
 import { AuthGuard } from '../guards/auth.guard';
 import { AuthPrincipal } from '../interfaces/auth-principal.interface';
@@ -78,6 +80,20 @@ export class AuthController {
       ...bootstrap,
       roles: bootstrap.roles,
     };
+  }
+
+  @Post('forgot-password')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<{ success: boolean }> {
+    await this.authService.forgotPassword(dto.email);
+    return { success: true };
+  }
+
+  @Post('reset-password')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ success: boolean }> {
+    await this.authService.resetPassword(dto.token, dto.newPassword);
+    return { success: true };
   }
 
   @Get('google/start')

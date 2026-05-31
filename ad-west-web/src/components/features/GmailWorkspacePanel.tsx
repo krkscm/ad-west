@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { useAuth } from '../../context/auth-context'
 import { backendApi, GmailInboxEmailApi } from '../../utils/backendApi'
 import { useToast } from '../common/Toast'
 import { HtmlEditor } from '../common/HtmlEditor'
@@ -10,7 +9,6 @@ const labelStyle: React.CSSProperties = {
 }
 
 export const GmailWorkspacePanel: React.FC = () => {
-  const { adminUser, loginWithGoogle } = useAuth()
   const { addToast } = useToast()
 
   const [to, setTo] = useState('')
@@ -22,10 +20,7 @@ export const GmailWorkspacePanel: React.FC = () => {
   const [emails, setEmails] = useState<GmailInboxEmailApi[]>([])
   const [selectedEmail, setSelectedEmail] = useState<GmailInboxEmailApi | null>(null)
 
-  const isGoogleSession = adminUser?.authProvider === 'google'
-
   const loadInbox = useCallback(async () => {
-    if (!isGoogleSession) { setEmails([]); setInboxError(null); return }
     setLoadingInbox(true)
     setInboxError(null)
     try {
@@ -36,15 +31,9 @@ export const GmailWorkspacePanel: React.FC = () => {
     } finally {
       setLoadingInbox(false)
     }
-  }, [isGoogleSession])
+  }, [])
 
   useEffect(() => { void loadInbox() }, [loadInbox])
-
-  const handleGoogleConnect = async () => {
-    const result = await loginWithGoogle()
-    if (!result.success) { addToast(result.error || 'Google sign-in failed.', 'error'); return }
-    addToast('Google account connected.', 'success')
-  }
 
   const handleSend = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -73,56 +62,22 @@ export const GmailWorkspacePanel: React.FC = () => {
       {/* Page header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>Gmail Workspace</h2>
+          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>Email Workspace</h2>
           <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.9rem', margin: '6px 0 0' }}>
-            Compose and send Gmail messages from the current admin session.
+            Compose and send emails, and view the inbox via IMAP.
           </p>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px',
-              borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600,
-              background: isGoogleSession ? 'rgba(16,185,129,0.1)' : 'rgba(148,163,184,0.1)',
-              color: isGoogleSession ? '#10b981' : 'var(--text-secondary-dark)',
-              border: `1px solid ${isGoogleSession ? 'rgba(16,185,129,0.25)' : 'var(--border-dark)'}`,
-            }}>
-              {isGoogleSession ? '● Connected' : '○ Not connected'}
-            </span>
-            {isGoogleSession && emails.length > 0 && (
+          {emails.length > 0 && (
+            <div style={{ marginTop: '10px' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
                 <span style={{ fontWeight: 800 }}>{emails.length}</span>Inbox
               </span>
-            )}
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-          {isGoogleSession && (
-            <button className="btn btn-secondary" onClick={() => void loadInbox()} disabled={loadingInbox}>
-              {loadingInbox ? 'Refreshing…' : 'Refresh Inbox'}
-            </button>
-          )}
-          {!isGoogleSession && (
-            <button className="btn btn-primary" onClick={() => void handleGoogleConnect()}>
-              Connect Google Account
-            </button>
+            </div>
           )}
         </div>
+        <button className="btn btn-secondary" onClick={() => void loadInbox()} disabled={loadingInbox}>
+          {loadingInbox ? 'Refreshing…' : 'Refresh Inbox'}
+        </button>
       </div>
-
-      {/* Connected account banner */}
-      {isGoogleSession && adminUser && (
-        <div className="glass-panel" style={{ padding: '12px 18px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center' }}>
-          {adminUser.picture ? (
-            <img src={adminUser.picture} alt={adminUser.name} style={{ width: '36px', height: '36px', borderRadius: '50%', border: '2px solid var(--border-dark)', flexShrink: 0 }} />
-          ) : (
-            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(99,102,241,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>👤</div>
-          )}
-          <div>
-            <div style={{ fontSize: '0.88rem', fontWeight: 700 }}>{adminUser.name}</div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>{adminUser.email}</div>
-          </div>
-          <span className="badge badge-success" style={{ marginLeft: 'auto' }}>Google Connected</span>
-        </div>
-      )}
 
       {/* Main layout: compose + inbox */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', alignItems: 'start' }}>
@@ -139,7 +94,7 @@ export const GmailWorkspacePanel: React.FC = () => {
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
                 placeholder="recipient@example.com"
-                disabled={!isGoogleSession || sending}
+                disabled={sending}
                 required
               />
             </div>
@@ -150,7 +105,7 @@ export const GmailWorkspacePanel: React.FC = () => {
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="Email subject"
-                disabled={!isGoogleSession || sending}
+                disabled={sending}
                 required
               />
             </div>
@@ -159,16 +114,11 @@ export const GmailWorkspacePanel: React.FC = () => {
               <HtmlEditor
                 value={body}
                 onChange={setBody}
-                disabled={!isGoogleSession || sending}
+                disabled={sending}
                 minHeight={220}
               />
             </div>
-            {!isGoogleSession && (
-              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>
-                Connect your Google account to send emails.
-              </p>
-            )}
-            <button type="submit" className="btn btn-primary" disabled={!isGoogleSession || sending} style={{ marginTop: '4px' }}>
+            <button type="submit" className="btn btn-primary" disabled={sending} style={{ marginTop: '4px' }}>
               {sending ? 'Sending…' : 'Send Email'}
             </button>
           </form>
@@ -178,30 +128,24 @@ export const GmailWorkspacePanel: React.FC = () => {
         <div>
           <h3 style={{ margin: '0 0 12px', fontSize: '1rem', fontWeight: 700 }}>Inbox <span style={{ fontSize: '0.82rem', fontWeight: 400, color: 'var(--text-secondary-dark)' }}>(latest 10)</span></h3>
 
-          {!isGoogleSession && (
-            <div className="glass-panel" style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary-dark)' }}>
-              Connect Google to read inbox messages.
-            </div>
-          )}
-
-          {isGoogleSession && loadingInbox && (
+          {loadingInbox && (
             <div style={{ color: 'var(--text-secondary-dark)', padding: '20px' }}>Loading inbox…</div>
           )}
 
-          {isGoogleSession && inboxError && (
+          {inboxError && (
             <div className="glass-panel" style={{ padding: '16px', borderLeft: '3px solid var(--error)', color: 'var(--error)', fontSize: '0.85rem' }}>
               {inboxError}
             </div>
           )}
 
-          {isGoogleSession && !inboxError && !loadingInbox && emails.length === 0 && (
+          {!inboxError && !loadingInbox && emails.length === 0 && (
             <div className="glass-panel" style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary-dark)' }}>
               No inbox messages found.
             </div>
           )}
 
-          {isGoogleSession && emails.length > 0 && (
-            <div style={{ display: 'grid', gap: '8px', gridTemplateColumns: selectedEmail ? '1fr' : '1fr' }}>
+          {emails.length > 0 && (
+            <div>
               {selectedEmail ? (
                 <div className="glass-panel" style={{ padding: '20px', borderLeft: '3px solid var(--primary)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
@@ -218,7 +162,9 @@ export const GmailWorkspacePanel: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
-                  <p style={{ margin: 0, fontSize: '0.83rem', color: 'var(--text-secondary-dark)', lineHeight: 1.6 }}>{selectedEmail.snippet}</p>
+                  {selectedEmail.snippet && (
+                    <p style={{ margin: 0, fontSize: '0.83rem', color: 'var(--text-secondary-dark)', lineHeight: 1.6 }}>{selectedEmail.snippet}</p>
+                  )}
                 </div>
               ) : (
                 <div className="table-container">

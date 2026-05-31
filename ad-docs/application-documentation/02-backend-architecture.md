@@ -36,16 +36,22 @@ Primary business orchestration, including:
 - Roles and menu management
 - Menu definitions and grants are DB-driven for sidebar access control, including Governance parent/child menus (`governance`, `insights`, `my-approvals`, `ai-chatbot`, `settings-responsibility-chart`)
 - Audit logs
-- Google OAuth and Gmail integration endpoints
+- Google OAuth integration for admin login
 - Google integration settings endpoint (DB-backed with env fallback resolution)
+- SMTP email sending via `MailService` (nodemailer, credentials from `adwest.integration_smtp_config`)
+- IMAP inbox reading via `ImapService` (imapflow, reuses SMTP credentials)
+- SMTP/IMAP integration settings endpoint (DB-backed)
 - Authenticated AI chat endpoint (`POST /api/v1/ai-chat/query`) with provider-based runtime integration (Ollama/OpenAI)
 
-Implemented Google/Gmail routes include:
+Implemented auth/email routes:
 - `/api/v1/auth/google/start`
 - `/api/v1/auth/google/callback`
-- `/api/v1/gmail/inbox`
-- `/api/v1/gmail/send`
+- `/api/v1/auth/forgot-password` — public, rate-limited; generates reset token and sends email
+- `/api/v1/auth/reset-password` — public, rate-limited; validates token and updates password
+- `/api/v1/gmail/send` — sends via SMTP (nodemailer), no Google OAuth required
+- `/api/v1/gmail/inbox` — reads via IMAP (imapflow), no Google OAuth required
 - `/api/v1/settings/google-integration-config`
+- `/api/v1/settings/smtp-integration-config`
 
 ### Public Gateway Module
 Unauthenticated/public flows:

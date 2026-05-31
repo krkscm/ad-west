@@ -25,9 +25,9 @@ INSERT INTO adwest.integration_google_config (
 )
 VALUES (
   'default',
-  NULL,
-  NULL,
-  NULL,
+  '653659463926-tt1k4egcm66j5d2k5r4sc47m8sdjipmg.apps.googleusercontent.com',
+  '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',
+  'http://localhost:3001/api/v1/auth/google/callback',
   'openid email profile https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly',
   'http://localhost:3000',
   TRUE,

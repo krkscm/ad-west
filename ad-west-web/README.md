@@ -110,7 +110,10 @@ If your backend runs on a different port, set `VITE_API_PROXY_TARGET` before sta
 - The sign-in page uses a premium hero layout with a glassmorphic form shell, supportive copy, and subtle motion.
 - The current presentation uses a centered premium sign-in card with a subtle gradient shell and concise supporting copy.
 - The login background now uses the user-selected image asset at `public/login-bg.jpg`.
-- The login card styling is tuned to the background art with warm glass gradients, softer field surfaces, and a stronger primary action button.
+- Optimized login background derivatives are kept in sync at `public/login-bg-opt.jpg` (JPEG fallback) and `public/login-bg.webp` (preferred format).
+- The login shell now applies a stronger background overlay to preserve readability with brighter hero images.
+- The login card now uses a matte dark-glass surface with light typography/fields so form readability stays consistent across bright hero images.
+- The login card surface keeps balanced border/shadow contrast and a calmer primary action treatment for clearer visual focus.
 - The login card header badges were removed to keep the sign-in panel minimal and neutral.
 - Form placeholders use generic sample names/emails (no personal identifiers).
 - The theme switch is shown only after authentication; it is hidden on the login page.

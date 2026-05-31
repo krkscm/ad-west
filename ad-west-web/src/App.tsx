@@ -7,6 +7,8 @@ import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { MemberPortalPage } from './pages/MemberPortalPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { ForcePasswordChangePage } from './pages/ForcePasswordChangePage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { PublicHelpdeskPage } from './pages/public/PublicHelpdeskPage';
 import { PublicJobsPage } from './pages/public/PublicJobsPage';
 import { PublicEventRegistrationPage } from './pages/public/PublicEventRegistrationPage';
@@ -37,6 +39,14 @@ function PublicRouteContent() {
     return <PublicJobsPage />;
   }
 
+  if (pathname === '/forgot-password') {
+    return <ForgotPasswordPage />;
+  }
+
+  if (pathname === '/reset-password') {
+    return <ResetPasswordPage />;
+  }
+
   return null;
 }
 
@@ -49,6 +59,7 @@ function AppContent() {
   // Only show public routes if the user is not authenticated (or the path is a known public path)
   const isPublicOnlyPath = pathname === '/helpdesk' || pathname === '/join-us' || pathname === '/jobs'
     || pathname === '/jobs/apply' || pathname === '/jobs/post'
+    || pathname === '/forgot-password' || pathname === '/reset-password'
     || /^\/events\/[^/]+\/register$/.test(pathname);
 
   const isPortalPath = pathname === '/' || pathname === '/portal';

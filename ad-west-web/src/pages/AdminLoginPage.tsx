@@ -86,7 +86,12 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = () => {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Password</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <label className="form-label" style={{ margin: 0 }}>Password</label>
+              <a href="/forgot-password" style={{ fontSize: '0.78rem', color: '#a5b4fc', textDecoration: 'none', fontWeight: 500 }}>
+                Forgot password?
+              </a>
+            </div>
             <input
               type="password"
               className="form-input"
@@ -101,11 +106,11 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = () => {
             <label className="form-label">Security Check</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
               {captchaImage ? (
-                <img src={captchaImage} alt="Captcha" style={{ borderRadius: '6px', border: '1px solid #dde', display: 'block' }} />
+                <img src={captchaImage} alt="Captcha" style={{ borderRadius: '6px', border: '1px solid rgba(148, 163, 184, 0.5)', display: 'block' }} />
               ) : (
-                <div style={{ width: '200px', height: '60px', background: '#eef0f8', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '13px' }}>Loading...</div>
+                <div style={{ width: '200px', height: '60px', background: 'rgba(15, 23, 42, 0.52)', border: '1px solid rgba(148, 163, 184, 0.4)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1', fontSize: '13px' }}>Loading...</div>
               )}
-              <button type="button" onClick={() => void loadCaptcha()} title="Get a new captcha" style={{ padding: '6px 10px', background: 'none', border: '1px solid #ccd', borderRadius: '6px', cursor: 'pointer', color: '#555', fontSize: '18px', lineHeight: 1 }}>↺</button>
+              <button type="button" onClick={() => void loadCaptcha()} title="Get a new captcha" style={{ padding: '6px 10px', background: 'rgba(15, 23, 42, 0.34)', border: '1px solid rgba(148, 163, 184, 0.48)', borderRadius: '6px', cursor: 'pointer', color: '#e2e8f0', fontSize: '18px', lineHeight: 1 }}>↺</button>
             </div>
             <input
               type="text"
@@ -124,9 +129,9 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = () => {
           </button>
 
           <div style={{ margin: '12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ height: '1px', flex: 1, background: 'rgba(148,163,184,0.35)' }} />
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>OR</span>
-            <div style={{ height: '1px', flex: 1, background: 'rgba(148,163,184,0.35)' }} />
+            <div style={{ height: '1px', flex: 1, background: 'rgba(148,163,184,0.5)' }} />
+            <span style={{ fontSize: '0.78rem', color: 'rgba(226, 232, 240, 0.76)' }}>OR</span>
+            <div style={{ height: '1px', flex: 1, background: 'rgba(148,163,184,0.5)' }} />
           </div>
 
           <button

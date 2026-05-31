@@ -7,6 +7,7 @@ import { AuditController } from './controllers/audit.controller';
 import { AiChatController } from './controllers/ai-chat.controller';
 import { GmailController } from './controllers/gmail.controller';
 import { GoogleIntegrationConfigController } from './controllers/google-integration-config.controller';
+import { SmtpIntegrationConfigController } from './controllers/smtp-integration-config.controller';
 import { MenuManagementController } from './controllers/menu-management.controller';
 import { RoleDefinitionsController } from './controllers/role-definitions.controller';
 import { AdminMenuGrantEntity } from './entities/admin-menu-grant.entity';
@@ -27,6 +28,9 @@ import { CryptoService } from './services/crypto.service';
 import { InMemoryRoleDefinitionStoreService } from './services/in-memory-role-definition-store.service';
 import { InMemoryStoreService } from './services/in-memory-store.service';
 import { GoogleIntegrationConfigService } from './services/google-integration-config.service';
+import { SmtpIntegrationConfigService } from './services/smtp-integration-config.service';
+import { MailService } from './services/mail.service';
+import { ImapService } from './services/imap.service';
 import { MenuManagementService } from './services/menu-management.service';
 import { PostgresRoleDefinitionStoreService } from './services/postgres-role-definition-store.service';
 import { PostgresStoreService } from './services/postgres-store.service';
@@ -86,6 +90,9 @@ export class UserManagementModule {
       AuditService,
       AiChatService,
       GoogleIntegrationConfigService,
+      SmtpIntegrationConfigService,
+      MailService,
+      ImapService,
       AuthService,
       AdminUsersService,
       RoleDefinitionsService,
@@ -98,7 +105,7 @@ export class UserManagementModule {
     return {
       module: UserManagementModule,
       imports,
-      controllers: [AuthController, AdminUsersController, AuditController, AiChatController, GmailController, GoogleIntegrationConfigController, RoleDefinitionsController, MenuManagementController],
+      controllers: [AuthController, AdminUsersController, AuditController, AiChatController, GmailController, GoogleIntegrationConfigController, SmtpIntegrationConfigController, RoleDefinitionsController, MenuManagementController],
       providers,
       exports: [USER_STORE, ROLE_DEFINITION_STORE, AuthService, AuthGuard, MemberAuthGuard, RolesGuard],
     };
