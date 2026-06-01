@@ -1,11 +1,8 @@
 # ADWest Application Documentation
 
-This documentation set is generated from the currently implemented code in:
-- `ad-west-api`
-- `ad-west-web`
-- `ad-docs/database-script`
+This directory is the architecture and runtime reference for the live ADWest implementation.
 
-Prepared on: 2026-05-29
+Prepared on: 2026-06-01
 
 ## Document Index
 
@@ -16,14 +13,23 @@ Prepared on: 2026-05-29
 5. [05-public-gateway-and-member-services.md](./05-public-gateway-and-member-services.md)
 6. [06-data-and-migrations.md](./06-data-and-migrations.md)
 7. [07-runtime-and-deployment.md](./07-runtime-and-deployment.md)
-8. [diagrams/adwest-architecture.svg](./diagrams/adwest-architecture.svg)
+8. [08-performance-and-security-baselines.md](./08-performance-and-security-baselines.md)
+9. [diagrams/adwest-architecture.svg](./diagrams/adwest-architecture.svg)
 
-## Scope
+## Source Inputs
 
-This set covers the live runtime architecture, module boundaries, auth/session behavior, public gateway behavior, and deployment/runtime configuration as currently implemented.
+- API implementation: `ad-west-api`
+- Web implementation: `ad-west-web`
+- Database migrations: `ad-docs/database-script`
+
+## Documentation Intent
+
+- Describe current architecture and runtime behavior, not planned ideas.
+- Keep module boundaries explicit and maintain anti-monolith service composition.
+- Preserve parity with code and migrations.
 
 ## Source-of-Truth Policy
 
-- Runtime behavior is defined by code in `ad-west-api` and `ad-west-web`.
-- Database behavior is defined by ordered scripts in `ad-docs/database-script`.
-- If this documentation conflicts with code, update documentation from code again.
+- Runtime behavior is owned by code in `ad-west-api` and `ad-west-web`.
+- Data model behavior is owned by ordered SQL scripts in `ad-docs/database-script`.
+- If code and docs diverge, update docs from code immediately.

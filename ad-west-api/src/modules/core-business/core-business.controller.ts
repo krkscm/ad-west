@@ -39,6 +39,7 @@ import {
   UpdatePermissionSetDto,
   SetPermissionSetItemsDto,
   CreateSreniDefinitionDto,
+  CreateAnalyticsStudioLayoutDto,
   CreateCalendarEventDto,
   CreateAttendanceMetricDto,
   ChangeOwnPasswordDto,
@@ -71,6 +72,10 @@ import {
   SubmitSthanReportDto,
   CreateLocationReportMetricDto,
   UpdateLocationReportMetricDto,
+  CreateSreniDivisionDto,
+  UpdateSreniDivisionDto,
+  AssignContactDivisionDto,
+  AssignContactSthanDto,
 } from './dto/core-business.dto';
 import { CoreBusinessService } from './core-business.service';
 
@@ -424,7 +429,7 @@ export class CoreBusinessController {
 
   @Get('org/sthans')
   @UseGuards(CoreAdminAuthGuard)
-  listSthans(@Query('srenyId') srenyId?: string) {
+  async listSthans(@Query('srenyId') srenyId?: string) {
     return this.service.listSthans(srenyId);
   }
 
@@ -696,6 +701,36 @@ export class CoreBusinessController {
     return this.service.listSreniAttendanceListing(sreniId, actor, sthanIds);
   }
 
+  @Get('programs/sreni-definitions/:sreniId/analytics-layouts')
+  @UseGuards(CoreAdminAuthGuard)
+  listAnalyticsStudioLayouts(
+    @Param('sreniId') sreniId: string,
+    @CurrentUser() actor: AuthPrincipal,
+    @Query('layoutType') layoutType?: string,
+  ) {
+    return this.service.listAnalyticsStudioLayouts(sreniId, actor, layoutType);
+  }
+
+  @Post('programs/sreni-definitions/:sreniId/analytics-layouts')
+  @UseGuards(CoreAdminAuthGuard)
+  saveAnalyticsStudioLayout(
+    @Param('sreniId') sreniId: string,
+    @Body() dto: CreateAnalyticsStudioLayoutDto,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.saveAnalyticsStudioLayout(sreniId, actor, dto);
+  }
+
+  @Delete('programs/sreni-definitions/:sreniId/analytics-layouts/:layoutId')
+  @UseGuards(CoreAdminAuthGuard)
+  deleteAnalyticsStudioLayout(
+    @Param('sreniId') sreniId: string,
+    @Param('layoutId') layoutId: string,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.deleteAnalyticsStudioLayout(sreniId, layoutId, actor);
+  }
+
   @Put('programs/sreni-definitions/:sreniId/calendar-events/:eventId/attendance-capture')
   @UseGuards(CoreAdminAuthGuard)
   upsertEventAttendanceCapture(
@@ -711,7 +746,7 @@ export class CoreBusinessController {
 
   @Get('org/sreni-definitions/:sreniId/contacts')
   @UseGuards(CoreAdminAuthGuard)
-  listSreniContacts(
+  async listSreniContacts(
     @Param('sreniId') sreniId: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
@@ -747,6 +782,72 @@ export class CoreBusinessController {
   @UseGuards(CoreAdminAuthGuard)
   async clearSreniContacts(@Param('sreniId') sreniId: string) {
     return this.service.clearSreniContacts(sreniId);
+  }
+
+  @Get('org/contacts')
+  @UseGuards(CoreAdminAuthGuard)
+  listAllContacts(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.service.listAllContacts(
+      page ? parseInt(page, 10) : 1,
+      pageSize ? parseInt(pageSize, 10) : 50,
+    );
+  }
+
+  @Patch('org/sreni-definitions/:sreniId/contacts/:contactId/division')
+  @UseGuards(CoreAdminAuthGuard)
+  async assignContactDivision(
+    @Param('sreniId') sreniId: string,
+    @Param('contactId') contactId: string,
+    @Body() dto: AssignContactDivisionDto,
+  ) {
+    return this.service.assignContactDivision(sreniId, contactId, dto);
+  }
+
+  @Patch('org/sreni-definitions/:sreniId/contacts/:contactId/sthan')
+  @UseGuards(CoreAdminAuthGuard)
+  async assignContactSthan(
+    @Param('sreniId') sreniId: string,
+    @Param('contactId') contactId: string,
+    @Body() dto: AssignContactSthanDto,
+  ) {
+    return this.service.assignContactSthan(sreniId, contactId, dto);
+  }
+
+  // ── Sreni Divisions ────────────────────────────────────────────────────────
+
+  @Get('org/sreni-definitions/:sreniId/divisions')
+  @UseGuards(CoreAdminAuthGuard)
+  listSreniDivisions(@Param('sreniId') sreniId: string) {
+    return this.service.listSreniDivisions(sreniId);
+  }
+
+  @Post('org/sreni-definitions/:sreniId/divisions')
+  @UseGuards(CoreAdminAuthGuard)
+  createSreniDivision(@Param('sreniId') sreniId: string, @Body() dto: CreateSreniDivisionDto) {
+    return this.service.createSreniDivision(sreniId, dto);
+  }
+
+  @Patch('org/sreni-definitions/:sreniId/divisions/:divisionId')
+  @UseGuards(CoreAdminAuthGuard)
+  updateSreniDivision(
+    @Param('sreniId') sreniId: string,
+    @Param('divisionId') divisionId: string,
+    @Body() dto: UpdateSreniDivisionDto,
+  ) {
+    return this.service.updateSreniDivision(sreniId, divisionId, dto);
+  }
+
+  @Delete('org/sreni-definitions/:sreniId/divisions/:divisionId')
+  @UseGuards(CoreAdminAuthGuard)
+  async deleteSreniDivision(
+    @Param('sreniId') sreniId: string,
+    @Param('divisionId') divisionId: string,
+  ) {
+    await this.service.deleteSreniDivision(sreniId, divisionId);
+    return { deleted: true };
   }
 
   // ── Report Metric Definitions (Settings) ───────────────────────────────────

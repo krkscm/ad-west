@@ -1,36 +1,40 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ResponsiveContainer,
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
+  Cell,
+  ComposedChart,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  PolarAngleAxis,
+  PolarGrid,
+  PolarRadiusAxis,
+  Radar,
+  RadarChart,
+  ResponsiveContainer,
   XAxis,
   YAxis,
   Tooltip,
-  Legend,
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  AreaChart,
-  Area,
-  ComposedChart,
-  PieChart,
-  Pie,
-  Cell,
-  RadarChart,
-  Radar,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
 } from 'recharts';
-import {
-  backendApi,
+import { backendApi } from '../utils/backendApi';
+import type {
+  AnalyticsStudioLayoutApi,
   CalendarEventApi,
   SreniAttendanceListingItemApi,
   SreniContactRowApi,
 } from '../utils/backendApi';
 import { useToast } from '../components/common/Toast';
+import { useConfirm } from '../components/common/ConfirmDialog';
 import { SwitchToggle } from '../components/common/SwitchToggle';
 import { DateField } from '../components/common/DateFields';
+import { TableLayoutModal } from '../components/common/TableLayoutModal';
+import { ColumnItem, buildColumnItems, useTableLayout } from '../hooks/useTableLayout';
 
 interface Props {
   sreniId: string;
@@ -42,9 +46,28 @@ type DatasetKey = 'all' | 'contacts' | 'events' | 'attendance';
 type SortDirection = 'asc' | 'desc';
 type Aggregation = 'sum' | 'avg' | 'min' | 'max' | 'count';
 type GraphType = 'line' | 'bar' | 'area' | 'composed' | 'pie' | 'radar';
+type SavedLayoutType = 'details' | 'pivot';
 
 type ScalarValue = string | number | boolean | null | undefined;
 type StudioRecord = Record<string, ScalarValue> & { id: string };
+type SharedLayoutConfig = {
+  dataset?: DatasetKey;
+  searchText?: string;
+  dateFrom?: string;
+  dateTo?: string;
+};
+type DetailsLayoutConfig = SharedLayoutConfig & {
+  selectedColumns?: string[];
+  sortKey?: string;
+  sortDirection?: SortDirection;
+  pageSize?: number;
+};
+type PivotLayoutConfig = SharedLayoutConfig & {
+  pivotRowDim?: string;
+  pivotColDim?: string;
+  pivotMeasure?: string;
+  pivotAggregation?: Aggregation;
+};
 
 const PALETTE = ['#4f46e5', '#0ea5e9', '#14b8a6', '#f59e0b', '#ef4444', '#8b5cf6', '#22c55e'];
 
@@ -68,6 +91,23 @@ const DATASET_OPTIONS: Array<{ key: DatasetKey; label: string }> = [
   { key: 'attendance', label: 'Attendance' },
 ];
 
+const PAGE_SIZE_OPTIONS = [10, 12, 25, 50];
+
+const savedLayoutPanelStyle: React.CSSProperties = {
+  display: 'grid',
+  gap: '12px',
+  padding: '14px',
+  border: '1px solid var(--border-dark)',
+  borderRadius: '12px',
+  background: 'var(--surface-dark-elevated)',
+};
+
+const savedLayoutButtonRowStyle: React.CSSProperties = {
+  display: 'flex',
+  gap: '8px',
+  flexWrap: 'wrap',
+};
+
 const normalizeFieldKey = (value: string): string => {
   const cleaned = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   return cleaned || 'field';
@@ -89,77 +129,48 @@ const parseNumberSafe = (value: ScalarValue): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-const toText = (value: ScalarValue): string => {
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'boolean') return value ? 'true' : 'false';
-  return String(value);
-};
+const isDatasetKey = (value: unknown): value is DatasetKey =>
+  value === 'all' || value === 'contacts' || value === 'events' || value === 'attendance';
 
-const aggregateValues = (values: number[], mode: Aggregation): number => {
-  if (mode === 'count') return values.length;
-  if (!values.length) return 0;
-  if (mode === 'sum') return values.reduce((acc, value) => acc + value, 0);
-  if (mode === 'avg') return values.reduce((acc, value) => acc + value, 0) / values.length;
-  if (mode === 'min') return Math.min(...values);
-  return Math.max(...values);
-};
+const isSortDirection = (value: unknown): value is SortDirection => value === 'asc' || value === 'desc';
 
-const csvEscape = (value: ScalarValue): string => {
-  const text = toText(value);
-  if (!/[",\n]/.test(text)) return text;
-  return `"${text.replace(/"/g, '""')}"`;
-};
+const isAggregation = (value: unknown): value is Aggregation =>
+  value === 'sum' || value === 'avg' || value === 'min' || value === 'max' || value === 'count';
 
-const tryParseDateMs = (value: ScalarValue): number | null => {
-  if (!value) return null;
-  const parsed = Date.parse(String(value));
-  return Number.isFinite(parsed) ? parsed : null;
-};
-
-const formatDateCell = (value: ScalarValue): string => {
-  const ts = tryParseDateMs(value);
-  if (ts === null) return toText(value) || '-';
-  return new Date(ts).toLocaleString('en-AE');
-};
-
-const loadAllContacts = async (sreniId: string): Promise<SreniContactRowApi[]> => {
-  const pageSize = 200;
-  let page = 1;
-  const all: SreniContactRowApi[] = [];
-
-  while (true) {
-    const batch = await backendApi.listSreniContacts(sreniId, page, pageSize);
-    all.push(...batch.items);
-    if (page >= batch.totalPages) break;
-    page += 1;
-  }
-
-  return all;
-};
-
-const toIsoFromEvent = (event: CalendarEventApi): string => {
-  const raw = `${event.date}T${event.startTime}`;
-  const parsed = Date.parse(raw);
-  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : event.updatedAt;
-};
-
-const durationMinutes = (startTime: string, endTime: string): number => {
-  const start = Date.parse(`1970-01-01T${startTime}`);
-  const end = Date.parse(`1970-01-01T${endTime}`);
-  if (!Number.isFinite(start) || !Number.isFinite(end)) return 0;
-  const diff = Math.max(0, Math.round((end - start) / 60000));
-  return diff;
+const mergeSavedLayout = (
+  current: AnalyticsStudioLayoutApi[],
+  saved: AnalyticsStudioLayoutApi,
+): AnalyticsStudioLayoutApi[] => {
+  const next = [saved, ...current.filter((layout) => layout.id !== saved.id)];
+  next.sort((left, right) => {
+    const updatedDelta = Date.parse(right.updatedAt) - Date.parse(left.updatedAt);
+    if (updatedDelta !== 0) return updatedDelta;
+    return left.name.localeCompare(right.name);
+  });
+  return next;
 };
 
 export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }) => {
   const { addToast } = useToast();
+  const confirm = useConfirm();
+  const detailTableLayout = useTableLayout(`sreni-analytics-details-${sreniId}`);
 
   const [tab, setTab] = useState<StudioTab>('details');
   const [loading, setLoading] = useState(false);
+  const [layoutsLoading, setLayoutsLoading] = useState(false);
+  const [savingLayoutType, setSavingLayoutType] = useState<SavedLayoutType | null>(null);
+  const [deletingLayoutId, setDeletingLayoutId] = useState<string | null>(null);
 
   const [contacts, setContacts] = useState<SreniContactRowApi[]>([]);
   const [events, setEvents] = useState<CalendarEventApi[]>([]);
   const [attendance, setAttendance] = useState<SreniAttendanceListingItemApi[]>([]);
+
+  const [detailsLayouts, setDetailsLayouts] = useState<AnalyticsStudioLayoutApi[]>([]);
+  const [pivotLayouts, setPivotLayouts] = useState<AnalyticsStudioLayoutApi[]>([]);
+  const [selectedDetailsLayoutId, setSelectedDetailsLayoutId] = useState('');
+  const [selectedPivotLayoutId, setSelectedPivotLayoutId] = useState('');
+  const [detailsLayoutName, setDetailsLayoutName] = useState('');
+  const [pivotLayoutName, setPivotLayoutName] = useState('');
 
   const [dataset, setDataset] = useState<DatasetKey>('all');
   const [searchText, setSearchText] = useState('');
@@ -182,6 +193,47 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
   const [graphMeasures, setGraphMeasures] = useState<string[]>([]);
   const [graphAggregation, setGraphAggregation] = useState<Aggregation>('sum');
   const [graphStacked, setGraphStacked] = useState(false);
+  const [showTableLayoutModal, setShowTableLayoutModal] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      setLayoutsLoading(true);
+      const [detailsResult, pivotResult] = await Promise.allSettled([
+        backendApi.listAnalyticsStudioLayouts(sreniId, 'details'),
+        backendApi.listAnalyticsStudioLayouts(sreniId, 'pivot'),
+      ]);
+
+      if (cancelled) return;
+
+      if (detailsResult.status === 'fulfilled') {
+        setDetailsLayouts(detailsResult.value);
+      } else {
+        setDetailsLayouts([]);
+        addToast('Could not load saved detail layouts.', 'warning');
+      }
+
+      if (pivotResult.status === 'fulfilled') {
+        setPivotLayouts(pivotResult.value);
+      } else {
+        setPivotLayouts([]);
+        addToast('Could not load saved pivot layouts.', 'warning');
+      }
+
+      setSelectedDetailsLayoutId('');
+      setSelectedPivotLayoutId('');
+      setDetailsLayoutName('');
+      setPivotLayoutName('');
+      setLayoutsLoading(false);
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sreniId, addToast]);
 
   useEffect(() => {
     let cancelled = false;
@@ -364,6 +416,11 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
     return Array.from(keys.values()).sort((a, b) => a.localeCompare(b));
   }, [activeRecords]);
 
+  const detailColumnDefs = useMemo(
+    () => allColumns.map((key) => ({ key, label: prettyLabel(key) })),
+    [allColumns],
+  );
+
   useEffect(() => {
     const defaults = allColumns.slice(0, Math.min(8, allColumns.length));
     setSelectedColumns((prev) => {
@@ -376,6 +433,26 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
       setSortKey(allColumns[0] || 'recorded_at');
     }
   }, [allColumns, sortKey]);
+
+  useEffect(() => {
+    if (!allColumns.length) return;
+    if (!detailTableLayout.activeId) return;
+
+    const active = detailTableLayout.layouts.find((layout) => layout.id === detailTableLayout.activeId);
+    if (!active) return;
+
+    const cols = buildColumnItems(detailColumnDefs, active.columns)
+      .filter((item) => item.visible)
+      .map((item) => item.key)
+      .filter((key) => allColumns.includes(key));
+
+    if (!cols.length) return;
+
+    setSelectedColumns((prev) => {
+      if (prev.length === cols.length && prev.every((value, index) => value === cols[index])) return prev;
+      return cols;
+    });
+  }, [allColumns, detailColumnDefs, detailTableLayout.activeId, detailTableLayout.layouts]);
 
   const filteredRecords = useMemo(() => {
     const fromMs = dateFrom ? Date.parse(`${dateFrom}T00:00:00`) : null;
@@ -563,6 +640,135 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
 
   const supportsStacking = graphType === 'bar' || graphType === 'area' || graphType === 'composed';
 
+  const applySharedLayoutConfig = (config: SharedLayoutConfig) => {
+    if (isDatasetKey(config.dataset)) setDataset(config.dataset);
+    if (typeof config.searchText === 'string') setSearchText(config.searchText);
+    if (typeof config.dateFrom === 'string') setDateFrom(config.dateFrom);
+    if (typeof config.dateTo === 'string') setDateTo(config.dateTo);
+    setPage(1);
+  };
+
+  const buildDetailsLayoutConfig = (): DetailsLayoutConfig => ({
+    dataset,
+    searchText,
+    dateFrom,
+    dateTo,
+    selectedColumns,
+    sortKey,
+    sortDirection,
+    pageSize,
+  });
+
+  const buildPivotLayoutConfig = (): PivotLayoutConfig => ({
+    dataset,
+    searchText,
+    dateFrom,
+    dateTo,
+    pivotRowDim,
+    pivotColDim,
+    pivotMeasure,
+    pivotAggregation,
+  });
+
+  const applyDetailsLayout = (layout: AnalyticsStudioLayoutApi) => {
+    const config = layout.config as DetailsLayoutConfig;
+    applySharedLayoutConfig(config);
+    if (Array.isArray(config.selectedColumns)) {
+      setSelectedColumns(config.selectedColumns.filter((value): value is string => typeof value === 'string'));
+    }
+    if (typeof config.sortKey === 'string') setSortKey(config.sortKey);
+    if (isSortDirection(config.sortDirection)) setSortDirection(config.sortDirection);
+    if (typeof config.pageSize === 'number' && PAGE_SIZE_OPTIONS.includes(config.pageSize)) {
+      setPageSize(config.pageSize);
+    }
+    setSelectedDetailsLayoutId(layout.id);
+    setDetailsLayoutName(layout.name);
+    setTab('details');
+  };
+
+  const applyPivotLayout = (layout: AnalyticsStudioLayoutApi) => {
+    const config = layout.config as PivotLayoutConfig;
+    applySharedLayoutConfig(config);
+    if (typeof config.pivotRowDim === 'string') setPivotRowDim(config.pivotRowDim);
+    if (typeof config.pivotColDim === 'string') setPivotColDim(config.pivotColDim);
+    if (typeof config.pivotMeasure === 'string') setPivotMeasure(config.pivotMeasure);
+    if (isAggregation(config.pivotAggregation)) setPivotAggregation(config.pivotAggregation);
+    setSelectedPivotLayoutId(layout.id);
+    setPivotLayoutName(layout.name);
+    setTab('pivot');
+  };
+
+  const handleSaveLayout = async (layoutType: SavedLayoutType) => {
+    const name = (layoutType === 'details' ? detailsLayoutName : pivotLayoutName).trim();
+    if (!name) {
+      addToast('Layout name is required.', 'warning');
+      return;
+    }
+
+    setSavingLayoutType(layoutType);
+    try {
+      const saved = await backendApi.saveAnalyticsStudioLayout(sreniId, {
+        layoutType,
+        name,
+        config: layoutType === 'details' ? buildDetailsLayoutConfig() : buildPivotLayoutConfig(),
+      });
+
+      if (layoutType === 'details') {
+        setDetailsLayouts((current) => mergeSavedLayout(current, saved));
+        setSelectedDetailsLayoutId(saved.id);
+        setDetailsLayoutName(saved.name);
+      } else {
+        setPivotLayouts((current) => mergeSavedLayout(current, saved));
+        setSelectedPivotLayoutId(saved.id);
+        setPivotLayoutName(saved.name);
+      }
+
+      addToast(`${layoutType === 'details' ? 'Detail' : 'Pivot'} layout saved to DB.`, 'success');
+    } catch (error) {
+      addToast(`Could not save ${layoutType} layout.`, 'error');
+    } finally {
+      setSavingLayoutType(null);
+    }
+  };
+
+  const handleDeleteLayout = async (layoutType: SavedLayoutType) => {
+    const selectedId = layoutType === 'details' ? selectedDetailsLayoutId : selectedPivotLayoutId;
+    const layouts = layoutType === 'details' ? detailsLayouts : pivotLayouts;
+    const selected = layouts.find((layout) => layout.id === selectedId);
+
+    if (!selected) {
+      addToast('Choose a saved layout first.', 'warning');
+      return;
+    }
+
+    const ok = await confirm({
+      title: 'Delete Saved Layout',
+      message: `Delete the saved ${layoutType} layout "${selected.name}"?`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+
+    setDeletingLayoutId(selected.id);
+    try {
+      await backendApi.deleteAnalyticsStudioLayout(sreniId, selected.id);
+      if (layoutType === 'details') {
+        setDetailsLayouts((current) => current.filter((layout) => layout.id !== selected.id));
+        setSelectedDetailsLayoutId('');
+        setDetailsLayoutName('');
+      } else {
+        setPivotLayouts((current) => current.filter((layout) => layout.id !== selected.id));
+        setSelectedPivotLayoutId('');
+        setPivotLayoutName('');
+      }
+      addToast('Saved layout deleted.', 'success');
+    } catch {
+      addToast('Could not delete saved layout.', 'error');
+    } finally {
+      setDeletingLayoutId(null);
+    }
+  };
+
   const toggleColumn = (key: string) => {
     setSelectedColumns((prev) => {
       if (prev.includes(key)) return prev.filter((value) => value !== key);
@@ -594,8 +800,50 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
     URL.revokeObjectURL(url);
   };
 
+  const applyColumnsFromColumnItems = (cols: ColumnItem[]) => {
+    const next = cols.filter((item) => item.visible).map((item) => item.key).filter((key) => allColumns.includes(key));
+    setSelectedColumns(next.length ? next : allColumns);
+    setPage(1);
+  };
+
+  const handleCreateTableLayout = async (name: string, cols: ColumnItem[]) => {
+    const created = await detailTableLayout.createLayout(name, cols);
+    applyColumnsFromColumnItems(cols);
+    return created;
+  };
+
+  const handleUpdateTableLayout = async (id: string, cols: ColumnItem[], name?: string) => {
+    const updated = await detailTableLayout.updateLayout(id, cols, name);
+    applyColumnsFromColumnItems(cols);
+    return updated;
+  };
+
+  const handleActivateTableLayout = async (id: string | null) => {
+    await detailTableLayout.activateLayout(id);
+    if (!id) {
+      setSelectedColumns(allColumns);
+      setPage(1);
+      return;
+    }
+    const active = detailTableLayout.layouts.find((layout) => layout.id === id);
+    const cols = buildColumnItems(detailColumnDefs, active?.columns ?? null);
+    applyColumnsFromColumnItems(cols);
+  };
+
   return (
     <div className="animate-slide-up" style={{ display: 'grid', gap: '16px' }}>
+      <TableLayoutModal
+        isOpen={showTableLayoutModal}
+        onClose={() => setShowTableLayoutModal(false)}
+        tableTitle={`${sreniName} Analytics Detail Table`}
+        allColumns={detailColumnDefs}
+        layouts={detailTableLayout.layouts}
+        activeId={detailTableLayout.activeId}
+        onActivate={handleActivateTableLayout}
+        onCreate={handleCreateTableLayout}
+        onUpdate={handleUpdateTableLayout}
+        onDelete={detailTableLayout.deleteLayout}
+      />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
         <div>
           <h2 style={{ fontSize: '1.55rem', fontWeight: 800, margin: 0 }}>📈 {sreniName} - Analytics Studio</h2>
@@ -649,9 +897,93 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
         <>
           {tab === 'details' && (
             <div className="glass-panel" style={{ padding: '16px', display: 'grid', gap: '12px' }}>
-              <div style={{ display: 'grid', gap: '10px', gridTemplateColumns: '2fr 1fr 1fr 1fr' }}>
+              <div style={savedLayoutPanelStyle}>
                 <div>
-                  <div className="form-label" style={{ marginBottom: '6px' }}>Visible Columns</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary-dark)' }}>Saved Detail Layouts</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)', marginTop: '2px' }}>
+                    Save your current filters and column choices as reusable detail presets.
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gap: '10px', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                  <label style={{ display: 'grid', gap: '4px' }}>
+                    <span className="form-label" style={{ margin: 0 }}>Layout Name</span>
+                    <input
+                      className="form-input"
+                      value={detailsLayoutName}
+                      onChange={(event) => setDetailsLayoutName(event.target.value)}
+                      placeholder="e.g. Attendance overview"
+                    />
+                  </label>
+                  <label style={{ display: 'grid', gap: '4px' }}>
+                    <span className="form-label" style={{ margin: 0 }}>Saved Layouts</span>
+                    <select
+                      className="form-input"
+                      value={selectedDetailsLayoutId}
+                      onChange={(event) => {
+                        const nextId = event.target.value;
+                        setSelectedDetailsLayoutId(nextId);
+                        const layout = detailsLayouts.find((item) => item.id === nextId);
+                        if (layout) setDetailsLayoutName(layout.name);
+                      }}
+                    >
+                      <option value="">Select a saved layout</option>
+                      {detailsLayouts.map((layout) => (
+                        <option key={layout.id} value={layout.id}>{layout.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div style={savedLayoutButtonRowStyle}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      const layout = detailsLayouts.find((item) => item.id === selectedDetailsLayoutId);
+                      if (!layout) {
+                        addToast('Choose a saved detail layout first.', 'warning');
+                        return;
+                      }
+                      applyDetailsLayout(layout);
+                    }}
+                    disabled={!selectedDetailsLayoutId || layoutsLoading}
+                  >
+                    Load Layout
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => void handleSaveLayout('details')}
+                    disabled={savingLayoutType === 'details'}
+                  >
+                    {savingLayoutType === 'details' ? 'Saving...' : 'Save Layout'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => void handleDeleteLayout('details')}
+                    disabled={!selectedDetailsLayoutId || deletingLayoutId === selectedDetailsLayoutId}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gap: '10px', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                    <div className="form-label" style={{ margin: 0 }}>Visible Columns</div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setShowTableLayoutModal(true)}
+                      style={{ fontSize: '0.82rem' }}
+                    >
+                      Table Customization
+                      {detailTableLayout.activeLayoutName ? `: ${detailTableLayout.activeLayoutName}` : ''}
+                    </button>
+                  </div>
                   <div style={{ display: 'grid', gap: '4px', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', maxHeight: '150px', overflowY: 'auto', paddingRight: '6px' }}>
                     {allColumns.map((column) => (
                       <button
@@ -682,10 +1014,7 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
                 <label style={{ display: 'grid', gap: '4px' }}>
                   <span className="form-label" style={{ margin: 0 }}>Rows Per Page</span>
                   <select className="form-input" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
-                    <option value={10}>10</option>
-                    <option value={12}>12</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
+                    {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
                   </select>
                 </label>
               </div>
@@ -730,6 +1059,84 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
 
           {tab === 'pivot' && (
             <div className="glass-panel" style={{ padding: '16px', display: 'grid', gap: '12px' }}>
+              <div style={savedLayoutPanelStyle}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'baseline', flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Saved layouts</div>
+                    <div style={{ color: 'var(--text-secondary-dark)', fontSize: '0.78rem' }}>
+                      Reuse pivot setups for this Sreni. Stored per admin in DB.
+                    </div>
+                  </div>
+                  <span style={{ color: 'var(--text-secondary-dark)', fontSize: '0.78rem' }}>
+                    {pivotLayouts.length} saved
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gap: '10px', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+                  <label style={{ display: 'grid', gap: '4px' }}>
+                    <span className="form-label" style={{ margin: 0 }}>Layout Name</span>
+                    <input
+                      className="form-input"
+                      value={pivotLayoutName}
+                      onChange={(event) => setPivotLayoutName(event.target.value)}
+                      placeholder="Events by month"
+                    />
+                  </label>
+                  <label style={{ display: 'grid', gap: '4px' }}>
+                    <span className="form-label" style={{ margin: 0 }}>Saved Layouts</span>
+                    <select
+                      className="form-input"
+                      value={selectedPivotLayoutId}
+                      onChange={(event) => {
+                        const nextId = event.target.value;
+                        setSelectedPivotLayoutId(nextId);
+                        const layout = pivotLayouts.find((item) => item.id === nextId);
+                        if (layout) setPivotLayoutName(layout.name);
+                      }}
+                    >
+                      <option value="">Select a saved layout</option>
+                      {pivotLayouts.map((layout) => (
+                        <option key={layout.id} value={layout.id}>{layout.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => void handleSaveLayout('pivot')}
+                    disabled={savingLayoutType === 'pivot'}
+                  >
+                    {savingLayoutType === 'pivot' ? 'Saving...' : 'Save Layout'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      const layout = pivotLayouts.find((item) => item.id === selectedPivotLayoutId);
+                      if (!layout) {
+                        addToast('Choose a saved pivot layout first.', 'warning');
+                        return;
+                      }
+                      applyPivotLayout(layout);
+                    }}
+                    disabled={!selectedPivotLayoutId || layoutsLoading}
+                  >
+                    Load
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => void handleDeleteLayout('pivot')}
+                    disabled={!selectedPivotLayoutId || deletingLayoutId === selectedPivotLayoutId}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '10px' }}>
                 <label style={{ display: 'grid', gap: '4px' }}>
                   <span className="form-label" style={{ margin: 0 }}>Row Dimension</span>

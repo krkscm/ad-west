@@ -107,6 +107,24 @@ export class CoreBusinessDbBootstrapService {
           UNIQUE(sreni_id, submission_type, period_year, period_value)
         )
       `);
+      await this.dataSource.query(`
+        CREATE TABLE IF NOT EXISTS adwest.analytics_studio_layouts (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          sreni_id VARCHAR(100) NOT NULL,
+          user_id VARCHAR(100) NOT NULL,
+          layout_type VARCHAR(20) NOT NULL,
+          name VARCHAR(160) NOT NULL,
+          config_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          CONSTRAINT chk_analytics_studio_layouts_type CHECK (layout_type IN ('details', 'pivot')),
+          UNIQUE(sreni_id, user_id, layout_type, name)
+        )
+      `);
+      await this.dataSource.query(`
+        CREATE INDEX IF NOT EXISTS idx_analytics_studio_layouts_owner
+        ON adwest.analytics_studio_layouts (sreni_id, user_id, layout_type, updated_at DESC)
+      `);
       // Add Reports menu for any existing srenies that don't yet have one.
       await this.dataSource.query(`
         INSERT INTO adwest.menu_items (id, key, label, parent_key, icon, sort_order, active, created_at, updated_at)

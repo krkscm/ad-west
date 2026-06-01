@@ -56,6 +56,26 @@ export interface AuditLogApi {
   timestamp: string
 }
 
+export interface TableLayoutColumnConfig {
+  key: string
+  visible: boolean
+}
+
+export interface TableLayoutApi {
+  id: string
+  tableKey: string
+  name: string
+  columns: TableLayoutColumnConfig[]
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TableLayoutsResponseApi {
+  layouts: TableLayoutApi[]
+  activeId: string | null
+}
+
 export interface ContactApi {
   id: string
   firstName: string
@@ -148,12 +168,30 @@ export interface SreniDefinitionApi {
   updatedAt: string
 }
 
+export interface SthanBasicApi {
+  id: string
+  name: string
+}
+
+export interface SreniDivisionApi {
+  id: string
+  sreniId: string
+  name: string
+  displayOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
 export interface SreniContactRowApi {
   id: string
   sreniId: string
+  /** Populated in the "all contacts" endpoint */
+  sreniName?: string
   rowIndex: number
   /** All columns from the uploaded Excel sheet as key/value pairs */
   data: Record<string, string | number | boolean | null>
+  divisionId?: string
+  sthanId?: string
   sourceFile?: string
   uploadedBy?: string
   createdAt: string
@@ -207,6 +245,17 @@ export interface SreniAttendanceListingItemApi {
     metric: AttendanceMetricApi
     capture?: EventAttendanceCaptureApi
   }>
+}
+
+export interface AnalyticsStudioLayoutApi {
+  id: string
+  sreniId: string
+  userId: string
+  layoutType: 'details' | 'pivot'
+  name: string
+  config: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
 }
 
 export interface UserApi {
@@ -1269,6 +1318,12 @@ export const backendApi = {
   }) =>
     api.patch<SmtpIntegrationConfigApi>('/settings/smtp-integration-config', payload),
 
+  // All contacts (across all Srenis)
+  listAllContacts: (page = 1, pageSize = 50) =>
+    api.get<PaginatedResponse<SreniContactRowApi>>(
+      `/org/contacts?page=${page}&pageSize=${pageSize}`,
+    ),
+
   // Sreni Contact List
   listSreniContacts: (sreniId: string, page = 1, pageSize = 50) =>
     api.get<PaginatedResponse<SreniContactRowApi>>(
@@ -1287,6 +1342,39 @@ export const backendApi = {
   clearSreniContacts: (sreniId: string) =>
     api.delete<{ deleted: number; sreniId: string }>(
       `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts`,
+    ),
+
+  assignContactDivision: (sreniId: string, contactId: string, divisionId: string | null) =>
+    api.patch<SreniContactRowApi>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}/division`,
+      { divisionId },
+    ),
+
+  assignContactSthan: (sreniId: string, contactId: string, sthanId: string | null) =>
+    api.patch<SreniContactRowApi>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}/sthan`,
+      { sthanId },
+    ),
+
+  listSthans: (srenyId?: string) =>
+    api.get<SthanBasicApi[]>(`/org/sthans${srenyId ? `?srenyId=${encodeURIComponent(srenyId)}` : ''}`),
+
+  // Sreni Divisions
+  listSreniDivisions: (sreniId: string) =>
+    api.get<SreniDivisionApi[]>(`/org/sreni-definitions/${encodeURIComponent(sreniId)}/divisions`),
+
+  createSreniDivision: (sreniId: string, payload: { name: string; displayOrder?: number }) =>
+    api.post<SreniDivisionApi>(`/org/sreni-definitions/${encodeURIComponent(sreniId)}/divisions`, payload),
+
+  updateSreniDivision: (sreniId: string, divisionId: string, payload: { name?: string; displayOrder?: number }) =>
+    api.patch<SreniDivisionApi>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/divisions/${encodeURIComponent(divisionId)}`,
+      payload,
+    ),
+
+  deleteSreniDivision: (sreniId: string, divisionId: string) =>
+    api.delete<{ deleted: boolean }>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/divisions/${encodeURIComponent(divisionId)}`,
     ),
 
   // Sreni Calendar Events
@@ -1367,6 +1455,29 @@ export const backendApi = {
       `/programs/sreni-definitions/${encodeURIComponent(sreniId)}/attendance-listing${q ? `?${q}` : ''}`,
     )
   },
+
+  listAnalyticsStudioLayouts: (sreniId: string, layoutType?: 'details' | 'pivot') => {
+    const qs = new URLSearchParams()
+    if (layoutType) qs.set('layoutType', layoutType)
+    const q = qs.toString()
+    return api.get<AnalyticsStudioLayoutApi[]>(
+      `/programs/sreni-definitions/${encodeURIComponent(sreniId)}/analytics-layouts${q ? `?${q}` : ''}`,
+    )
+  },
+
+  saveAnalyticsStudioLayout: (sreniId: string, payload: {
+    layoutType: 'details' | 'pivot'
+    name: string
+    config: Record<string, unknown>
+  }) => api.post<AnalyticsStudioLayoutApi>(
+    `/programs/sreni-definitions/${encodeURIComponent(sreniId)}/analytics-layouts`,
+    payload,
+  ),
+
+  deleteAnalyticsStudioLayout: (sreniId: string, layoutId: string) =>
+    api.delete<{ success: boolean }>(
+      `/programs/sreni-definitions/${encodeURIComponent(sreniId)}/analytics-layouts/${encodeURIComponent(layoutId)}`,
+    ),
 
   upsertEventAttendanceCapture: (sreniId: string, eventId: string, payload: {
     metricId: string
@@ -1570,6 +1681,22 @@ export const backendApi = {
   },
   clearSthanContacts: (locationId: string) =>
     api.delete<{ deleted: number }>(`/org/locations/${encodeURIComponent(locationId)}/contacts`),
+
+  // ─── Table Layouts ────────────────────────────────────────────────────────
+  listTableLayouts: (tableKey: string) =>
+    api.get<TableLayoutsResponseApi>(`/settings/table-layouts?tableKey=${encodeURIComponent(tableKey)}`),
+
+  createTableLayout: (payload: { tableKey: string; name: string; columns: TableLayoutColumnConfig[]; setActive?: boolean }) =>
+    api.post<TableLayoutApi>('/settings/table-layouts', payload),
+
+  updateTableLayout: (id: string, payload: { name?: string; columns?: TableLayoutColumnConfig[] }) =>
+    api.patch<TableLayoutApi>(`/settings/table-layouts/${encodeURIComponent(id)}`, payload),
+
+  deleteTableLayout: (id: string) =>
+    api.delete<{ success: boolean }>(`/settings/table-layouts/${encodeURIComponent(id)}`),
+
+  setActiveTableLayout: (tableKey: string, layoutId: string | null) =>
+    api.put<void>(`/settings/table-layouts/active?tableKey=${encodeURIComponent(tableKey)}`, { layoutId }),
 }
 
 export function toUiRole(role: AdminRoleAssignment['role']): 'Super Admin' | 'Zone Admin' | 'Sreny Admin' {

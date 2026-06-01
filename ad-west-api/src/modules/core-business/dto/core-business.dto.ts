@@ -106,6 +106,19 @@ export class UpdateSreniDefinitionDto {
   joinUsVisible?: boolean;
 }
 
+export class CreateAnalyticsStudioLayoutDto {
+  @IsIn(['details', 'pivot'])
+  layoutType!: 'details' | 'pivot';
+
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(2)
+  name!: string;
+
+  @IsObject()
+  config!: Record<string, unknown>;
+}
+
 export class CreateSthanDto {
   @IsString()
   @IsNotEmpty()
@@ -1124,4 +1137,39 @@ export class ReviewSthanExpenseDto {
   @IsOptional()
   @IsString()
   reviewerNotes?: string;
+}
+
+// ── Sreni Divisions ───────────────────────────────────────────────────────────
+
+export class CreateSreniDivisionDto {
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @IsOptional()
+  @IsInt()
+  displayOrder?: number;
+}
+
+export class UpdateSreniDivisionDto {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  name?: string;
+
+  @IsOptional()
+  @IsInt()
+  displayOrder?: number;
+}
+
+export class AssignContactDivisionDto {
+  @IsOptional()
+  @IsString()
+  divisionId?: string | null;
+}
+
+export class AssignContactSthanDto {
+  @IsOptional()
+  @IsString()
+  sthanId?: string | null;
 }

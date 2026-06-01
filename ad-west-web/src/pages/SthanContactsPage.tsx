@@ -1,7 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../components/common/Toast';
 import { useConfirm } from '../components/common/ConfirmDialog';
+import { TableLayoutModal } from '../components/common/TableLayoutModal';
 import { backendApi, SthanContactRowApi } from '../utils/backendApi';
+import { useTableLayout } from '../hooks/useTableLayout';
 
 interface Props {
   locationId: string;
@@ -57,6 +59,15 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [sourceFile, setSourceFile] = useState<string | null>(null);
+  const [showLayoutModal, setShowLayoutModal] = useState(false);
+
+  const layout = useTableLayout('sthan-contacts');
+
+  const colDefs = useMemo(
+    () => columns.filter((k) => k !== 'name').map((k) => ({ key: k, label: MASTER_LABEL_MAP.get(k) ?? k })),
+    [columns],
+  );
+  const visibleCols = layout.visibleKeys(colDefs);
 
   const load = useCallback((p: number) => {
     setIsLoading(true);
@@ -131,6 +142,18 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
 
   return (
     <div className="animate-slide-up">
+      <TableLayoutModal
+        isOpen={showLayoutModal}
+        onClose={() => setShowLayoutModal(false)}
+        tableTitle={`${locationName} Contacts`}
+        allColumns={colDefs}
+        layouts={layout.layouts}
+        activeId={layout.activeId}
+        onActivate={layout.activateLayout}
+        onCreate={(name, cols) => layout.createLayout(name, cols)}
+        onUpdate={(id, cols, nm) => layout.updateLayout(id, cols, nm)}
+        onDelete={layout.deleteLayout}
+      />
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
         <div>
@@ -152,6 +175,22 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
           </div>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {columns.length > 0 && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+              onClick={() => setShowLayoutModal(true)}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              Columns
+              {layout.activeLayoutName && (
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, background: 'rgba(99,102,241,0.15)', color: 'var(--primary)', padding: '1px 6px', borderRadius: '4px' }}>
+                  {layout.activeLayoutName}
+                </span>
+              )}
+            </button>
+          )}
           {total > 0 && (
             <button type="button" className="btn btn-secondary" onClick={handleClear}
               style={{ fontSize: '0.875rem', color: 'var(--error)', borderColor: 'var(--error)' }}>
@@ -208,9 +247,12 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
                   <th style={{ width: '48px', textAlign: 'center' }}>#</th>
                   {isLoading && columns.length === 0
                     ? <th>Loading…</th>
-                    : columns.map((col) => (
-                        <th key={col} style={{ whiteSpace: 'nowrap' }}>{MASTER_LABEL_MAP.get(col) ?? col}</th>
-                      ))
+                    : <>
+                        <th style={{ whiteSpace: 'nowrap' }}>Name</th>
+                        {visibleCols.map((col) => (
+                          <th key={col} style={{ whiteSpace: 'nowrap' }}>{MASTER_LABEL_MAP.get(col) ?? col}</th>
+                        ))}
+                      </>
                   }
                 </tr>
               </thead>
@@ -219,7 +261,7 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
                   Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i}>
                       <td>{i + 1}</td>
-                      {Array.from({ length: Math.max(columns.length, 3) }).map((__, j) => (
+                      {Array.from({ length: Math.max(visibleCols.length + 1, 3) }).map((__, j) => (
                         <td key={j}>
                           <div style={{ height: '12px', borderRadius: '4px', background: 'var(--border-dark)', width: '60%', animation: 'pulse 1.4s ease-in-out infinite' }} />
                         </td>
@@ -228,7 +270,7 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
                   ))
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={columns.length + 1} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary-dark)' }}>
+                    <td colSpan={visibleCols.length + 2} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary-dark)' }}>
                       No contacts on this page.
                     </td>
                   </tr>
@@ -236,7 +278,10 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
                   rows.map((row) => (
                     <tr key={row.id}>
                       <td style={{ textAlign: 'center', color: 'var(--text-secondary-dark)', fontSize: '0.8rem' }}>{row.rowIndex}</td>
-                      {columns.map((col) => {
+                      <td style={{ fontWeight: 600, whiteSpace: 'nowrap', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {row.data['name'] != null ? String(row.data['name']) : <span style={{ color: 'var(--text-secondary-dark)', opacity: 0.45 }}>—</span>}
+                      </td>
+                      {visibleCols.map((col) => {
                         const val = row.data[col];
                         return (
                           <td key={col} style={{ maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={val !== null && val !== undefined ? String(val) : undefined}>

@@ -28,7 +28,24 @@
       "PowerShell(Stop-Process -Id 34760 -Force)",
       "Bash(curl -s \"http://localhost:3001/api/v1/settings/approval-workflows?page=1&pageSize=20\" -H \"Authorization: Bearer eyJzdWIiOiJhZG1pbl9zdXBlcl8wMDEiLCJ0eXBlIjoiYWRtaW4iLCJyb2xlcyI6WyJTVVBFUl9BRE1JTiJdLCJyb2xlQXNzaWdubWVudHMiOlt7InJvbGUiOiJTVVBFUl9BRE1JTiIsInNjb3BlVHlwZSI6Imdsb2JhbCJ9XSwic2lkIjoic2Vzc19hMjU3ZGZjZDIxMDZhYWFhIiwiZW1haWwiOiJzdXBlci5hZG1pbkBhZHdlc3QubG9jYWwiLCJleHAiOjE3Nzk4NjkyMzJ9.ikyM1w2tx8e22TXSD5xb2PdjDpFI2vXZ6f4l8GdfCVg\")",
       "Bash(node dist/main.js)",
-      "Bash(curl -s 'http://localhost:3001/api/v1/settings/approval-workflows?page=1&pageSize=20' -H 'Authorization: Bearer eyJzdWIiOiJhZG1pbl9zdXBlcl8wMDEiLCJ0eXBlIjoiYWRtaW4iLCJyb2xlcyI6WyJTVVBFUl9BRE1JTiJdLCJyb2xlQXNzaWdubWVudHMiOlt7InJvbGUiOiJTVVBFUl9BRE1JTiIsInNjb3BlVHlwZSI6Imdsb2JhbCJ9XSwic2lkIjoic2Vzc19hMjU3ZGZjZDIxMDZhYWFhIiwiZW1haWwiOiJzdXBlci5hZG1pbkBhZHdlc3QubG9jYWwiLCJleHAiOjE3Nzk4NjkyMzJ9.ikyM1w2tx8e22TXSD5xb2PdjDpFI2vXZ6f4l8GdfCVg')"
+      "Bash(curl -s 'http://localhost:3001/api/v1/settings/approval-workflows?page=1&pageSize=20' -H 'Authorization: Bearer eyJzdWIiOiJhZG1pbl9zdXBlcl8wMDEiLCJ0eXBlIjoiYWRtaW4iLCJyb2xlcyI6WyJTVVBFUl9BRE1JTiJdLCJyb2xlQXNzaWdubWVudHMiOlt7InJvbGUiOiJTVVBFUl9BRE1JTiIsInNjb3BlVHlwZSI6Imdsb2JhbCJ9XSwic2lkIjoic2Vzc19hMjU3ZGZjZDIxMDZhYWFhIiwiZW1haWwiOiJzdXBlci5hZG1pbkBhZHdlc3QubG9jYWwiLCJleHAiOjE3Nzk4NjkyMzJ9.ikyM1w2tx8e22TXSD5xb2PdjDpFI2vXZ6f4l8GdfCVg')",
+      "PowerShell($f = \"d:\\\\Projects\\\\ADWest\\\\ad-west\\\\ad-west-api\\\\src\\\\modules\\\\core-business\\\\core-business.service.ts\"; \\(Get-Item $f\\).LastWriteTime = Get-Date)",
+      "PowerShell($env:PGPASSWORD = '24may1990'; $tok = \\(psql -h localhost -U kiran -d \"ifca-auhwest\" -A -t -c \"SELECT token_id FROM adwest.auth_sessions LIMIT 1;\" 2>&1\\)[0]; Write-Host \"Using token: $tok\"; $r = Invoke-WebRequest -Uri \"http://localhost:3001/api/v1/core/persistence/readiness\" -Headers @{Authorization=\"Bearer $tok\"} -UseBasicParsing -ErrorAction SilentlyContinue; if \\($r\\) { $r.Content } else { \"Request failed\" })",
+      "PowerShell($env:PGPASSWORD = '24may1990'; psql -h localhost -U kiran -d \"ifca-auhwest\" -A -t -c \"SELECT token_id FROM adwest.auth_sessions;\" 2>&1)",
+      "PowerShell($r = Invoke-WebRequest -Uri \"http://localhost:3001/api/v1/org/sreni-definitions/659acda4-81a8-4914-aa66-ebb44c16587b/contacts?page=1&pageSize=5\" -Headers @{Authorization=\"Bearer sess_b6a32ddaa71a12e2\"} -UseBasicParsing -ErrorAction SilentlyContinue; if \\($r\\) { $r.Content } else { \"Failed\" })",
+      "PowerShell($env:PGPASSWORD = '24may1990'; psql -h localhost -U kiran -d \"ifca-auhwest\" -c \"\\\\d adwest.srenies\" 2>&1 | Select-String \"Column|id|name|zone|active|join|service\")",
+      "PowerShell($env:PGPASSWORD = '24may1990'; psql -h localhost -U kiran -d \"ifca-auhwest\" -c \"\\\\d adwest.gov_body_structures\" 2>&1 | Select-String \"Column|id|sreny|year|pos|arch\")",
+      "PowerShell($env:PGPASSWORD = '24may1990'; psql -h localhost -U kiran -d \"ifca-auhwest\" -c \"SELECT id, name FROM adwest.srenies;\" 2>&1)",
+      "PowerShell($env:PGPASSWORD = '24may1990'; psql -h localhost -U kiran -d \"ifca-auhwest\" -c \"SELECT id, length\\(state_json::text\\) as json_size, \\(state_json->'srenies'\\) IS NOT NULL as has_srenies FROM adwest.core_business_runtime_state;\" 2>&1)",
+      "Bash(mkdir d:\\\\Projects\\\\ADWest\\\\ad-west\\\\ad-west-web\\\\src\\\\hooks)",
+      "Bash(dir)",
+      "PowerShell(Get-ChildItem -Path \"d:\\\\Projects\\\\ADWest\\\\ad-west\\\\ad-docs\" -Recurse | Where-Object { $_.Name -match 'database|schema|migration' } | Select-Object -First 20)",
+      "PowerShell(Set-Location \"d:\\\\Projects\\\\ADWest\\\\ad-west\\\\ad-west-web\"; $result = npx tsc --noEmit 2>&1; $result | Where-Object { $_ -match \"SreniContactListPage|SthanContactsPage|TableLayoutModal|useTableLayout|backendApi\" })",
+      "PowerShell(Set-Location \"d:\\\\Projects\\\\ADWest\\\\ad-west\\\\ad-west-web\"; $errors = npx tsc --noEmit 2>&1 | Out-String; $lines = $errors -split \"`n\"; $filtered = $lines | Where-Object { $_ -match \"SreniContactListPage|SthanContactsPage|TableLayoutModal|useTableLayout|backendApi\\\\.ts\" }; if \\($filtered\\) { $filtered } else { \"No errors in modified files\" })",
+      "PowerShell(Set-Location \"d:\\\\Projects\\\\ADWest\\\\ad-west\\\\ad-west-api\"; $errors = npx tsc --noEmit 2>&1 | Out-String; $lines = $errors -split \"`n\"; $filtered = $lines | Where-Object { $_ -match \"table-layout|user-table-layout|user-management\\\\.module\" }; if \\($filtered\\) { $filtered } else { \"No errors in new backend files\" })"
+    ],
+    "additionalDirectories": [
+      "d:\\Projects\\ADWest\\ad-west"
     ]
   }
 }

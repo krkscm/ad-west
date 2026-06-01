@@ -1,7 +1,9 @@
 import {
+  BadRequestException,
   Inject,
   Injectable,
   Logger,
+  NotFoundException,
   OnModuleDestroy,
   OnModuleInit,
   Optional,
@@ -25,6 +27,7 @@ import {
   CreatePermissionDto,
   CreatePermissionSetDto,
   CreateSreniDefinitionDto,
+  CreateAnalyticsStudioLayoutDto,
   CreateCalendarEventDto,
   CreateAttendanceMetricDto,
   CreateLocationDto,
@@ -63,6 +66,10 @@ import {
   SubmitSthanReportDto,
   CreateLocationReportMetricDto,
   UpdateLocationReportMetricDto,
+  CreateSreniDivisionDto,
+  UpdateSreniDivisionDto,
+  AssignContactDivisionDto,
+  AssignContactSthanDto,
 } from './dto/core-business.dto';
 import { ApprovalRuntimeService } from './services/approval-runtime.service';
 import { AttendanceRuntimeService, type AttendanceRuntimeContext } from './services/attendance-runtime.service';
@@ -88,6 +95,7 @@ import { DataSource } from 'typeorm';
 
 import type {
   ApprovalItemRecord,
+  AnalyticsStudioLayoutRecord,
   ApprovalNotificationRecord,
   ApprovalWorkflowRecord,
   AttendanceMetricRecord,
@@ -112,6 +120,7 @@ import type {
   ReportTemplateRecord,
   RegistrationRecord,
   SreniContactRecord,
+  SreniDivisionRecord,
   SreniMonthlyReportRecord,
   SreniReportParameterRecord,
   SreniReportRecord,
@@ -128,6 +137,7 @@ import type {
 
 export type {
   ApprovalItemRecord,
+  AnalyticsStudioLayoutRecord,
   ApprovalNotificationRecord,
   ApprovalWorkflowRecord,
   AttendanceMetricRecord,
@@ -156,6 +166,7 @@ export type {
   ReportTemplateRecord,
   RegistrationRecord,
   SreniContactRecord,
+  SreniDivisionRecord,
   SreniMonthlyReportRecord,
   SreniReportParameterRecord,
   SreniReportRecord,
@@ -202,6 +213,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   private readonly documents = new Map<string, DocumentRecord>();
   private readonly reportTemplates = new Map<string, ReportTemplateRecord>();
   private readonly reportSubmissions = new Map<string, ReportSubmissionRecord>();
+  private readonly sreniDivisions = new Map<string, SreniDivisionRecord>();
   /** Keyed by `${sreniId}:${rowId}` for flat iteration; grouped by sreniId for queries */
   private readonly sreniContacts = new Map<string, SreniContactRecord>();
   private readonly approvalWorkflows = new Map<string, ApprovalWorkflowRecord>();
@@ -350,6 +362,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit(): Promise<void> {
+    // db mode: hydrate from snapshot or database
     if (this.runtimeMode !== 'db') {
       return;
     }
@@ -458,7 +471,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getOrgRuntime().deleteSreniDefinition(sreniId);
   }
 
-  listSthans(srenyId?: string): SthanRecord[] {
+  async listSthans(srenyId?: string): Promise<Array<{ id: string; name: string }>> {
     return this.getOrgRuntime().listSthans(srenyId);
   }
 
@@ -728,6 +741,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
         permissions: this.permissions,
         permissionSets: this.permissionSets,
         users: this.users,
+        sreniDivisions: this.sreniDivisions,
         sreniContacts: this.sreniContacts,
         calendarEvents: this.calendarEvents,
         attendanceMetrics: this.attendanceMetrics,
@@ -1235,6 +1249,98 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getAttendanceRuntime().listSreniAttendanceListing(sreniId, principal, accessibleSthanIds);
   }
 
+  async listAnalyticsStudioLayouts(
+    sreniId: string,
+    principal: AuthPrincipal,
+    layoutType?: string,
+  ): Promise<AnalyticsStudioLayoutRecord[]> {
+    const dataSource = this.getAnalyticsStudioLayoutDataSource();
+    const normalizedLayoutType = this.normalizeAnalyticsStudioLayoutType(layoutType, true);
+
+    this.ensureSreniExists(sreniId);
+
+    const params: unknown[] = [sreniId, principal.userId];
+    let sql = `
+      SELECT id, sreni_id, user_id, layout_type, name, config_json, created_at, updated_at
+      FROM adwest.analytics_studio_layouts
+      WHERE sreni_id = $1 AND user_id = $2
+    `;
+
+    if (normalizedLayoutType) {
+      params.push(normalizedLayoutType);
+      sql += ' AND layout_type = $3';
+    }
+
+    sql += ' ORDER BY updated_at DESC, name ASC';
+
+    const rows = await dataSource.query(sql, params);
+    return rows.map((row: Record<string, unknown>) => this.mapAnalyticsStudioLayoutRow(row));
+  }
+
+  async saveAnalyticsStudioLayout(
+    sreniId: string,
+    principal: AuthPrincipal,
+    dto: CreateAnalyticsStudioLayoutDto,
+  ): Promise<AnalyticsStudioLayoutRecord> {
+    const dataSource = this.getAnalyticsStudioLayoutDataSource();
+    const layoutType = this.normalizeAnalyticsStudioLayoutType(dto.layoutType);
+    const name = dto.name.trim();
+
+    this.ensureSreniExists(sreniId);
+
+    if (!name) {
+      throw new BadRequestException('Layout name is required');
+    }
+
+    const rows = await dataSource.query(
+      `
+        INSERT INTO adwest.analytics_studio_layouts (
+          sreni_id,
+          user_id,
+          layout_type,
+          name,
+          config_json,
+          created_at,
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5::jsonb, now(), now())
+        ON CONFLICT (sreni_id, user_id, layout_type, name)
+        DO UPDATE SET
+          config_json = EXCLUDED.config_json,
+          updated_at = now()
+        RETURNING id, sreni_id, user_id, layout_type, name, config_json, created_at, updated_at
+      `,
+      [sreniId, principal.userId, layoutType, name, JSON.stringify(dto.config ?? {})],
+    );
+
+    return this.mapAnalyticsStudioLayoutRow(rows[0] as Record<string, unknown>);
+  }
+
+  async deleteAnalyticsStudioLayout(
+    sreniId: string,
+    layoutId: string,
+    principal: AuthPrincipal,
+  ): Promise<{ success: boolean }> {
+    const dataSource = this.getAnalyticsStudioLayoutDataSource();
+
+    this.ensureSreniExists(sreniId);
+
+    const rows = await dataSource.query(
+      `
+        DELETE FROM adwest.analytics_studio_layouts
+        WHERE id = $1 AND sreni_id = $2 AND user_id = $3
+        RETURNING id
+      `,
+      [layoutId, sreniId, principal.userId],
+    );
+
+    if (!rows.length) {
+      throw new NotFoundException('Analytics Studio layout not found');
+    }
+
+    return { success: true };
+  }
+
   async upsertEventAttendanceCapture(
     sreniId: string,
     eventId: string,
@@ -1286,6 +1392,8 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   private getSreniAdminRuntime(): SreniAdminRuntimeService {
     if (!this.sreniAdminRuntimeService) {
       this.sreniAdminRuntimeService = new SreniAdminRuntimeService({
+        srenies: this.srenies,
+        sreniDivisions: this.sreniDivisions,
         sreniContacts: this.sreniContacts,
         reportMetricDefinitions: this.reportMetricDefinitions,
         sreniMonthlyReports: this.sreniMonthlyReports,
@@ -1299,13 +1407,85 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.sreniAdminRuntimeService;
   }
 
+  private getAnalyticsStudioLayoutDataSource(): DataSource {
+    if (!this.dataSource) {
+      throw new BadRequestException('Analytics Studio layouts require DB persistence mode');
+    }
+
+    return this.dataSource;
+  }
+
+  private ensureSreniExists(sreniId: string): void {
+    if (!this.srenies.has(sreniId)) {
+      throw new NotFoundException('Sreni not found');
+    }
+  }
+
+  private normalizeAnalyticsStudioLayoutType(
+    layoutType?: string,
+    allowUndefined = false,
+  ): 'details' | 'pivot' | undefined {
+    if (!layoutType) {
+      if (allowUndefined) {
+        return undefined;
+      }
+
+      throw new BadRequestException('Layout type is required');
+    }
+
+    if (layoutType !== 'details' && layoutType !== 'pivot') {
+      throw new BadRequestException('Layout type must be details or pivot');
+    }
+
+    return layoutType;
+  }
+
+  private mapAnalyticsStudioLayoutRow(row: Record<string, unknown>): AnalyticsStudioLayoutRecord {
+    return {
+      id: String(row.id ?? ''),
+      sreniId: String(row.sreni_id ?? ''),
+      userId: String(row.user_id ?? ''),
+      layoutType: this.normalizeAnalyticsStudioLayoutType(String(row.layout_type ?? 'details')) ?? 'details',
+      name: String(row.name ?? ''),
+      config: (row.config_json as Record<string, unknown> | null) ?? {},
+      createdAt: new Date(String(row.created_at ?? new Date().toISOString())).toISOString(),
+      updatedAt: new Date(String(row.updated_at ?? new Date().toISOString())).toISOString(),
+    };
+  }
+
+  // ── Sreni Divisions ────────────────────────────────────────────────────────
+
+  async listSreniDivisions(sreniId: string): Promise<SreniDivisionRecord[]> {
+    return this.getSreniAdminRuntime().listSreniDivisions(sreniId);
+  }
+
+  async createSreniDivision(sreniId: string, dto: CreateSreniDivisionDto): Promise<SreniDivisionRecord> {
+    return this.getSreniAdminRuntime().createSreniDivision(sreniId, dto);
+  }
+
+  async updateSreniDivision(sreniId: string, divisionId: string, dto: UpdateSreniDivisionDto): Promise<SreniDivisionRecord> {
+    return this.getSreniAdminRuntime().updateSreniDivision(sreniId, divisionId, dto);
+  }
+
+  async deleteSreniDivision(sreniId: string, divisionId: string): Promise<void> {
+    return this.getSreniAdminRuntime().deleteSreniDivision(sreniId, divisionId);
+  }
+
+  async assignContactDivision(sreniId: string, contactId: string, dto: AssignContactDivisionDto): Promise<SreniContactRecord> {
+    return this.getSreniAdminRuntime().assignContactDivision(sreniId, contactId, dto);
+  }
+
+  async assignContactSthan(sreniId: string, contactId: string, dto: AssignContactSthanDto): Promise<SreniContactRecord> {
+    return this.getSreniAdminRuntime().assignContactSthan(sreniId, contactId, dto);
+  }
+
   // ── Sreni Contact List ─────────────────────────────────────────────────────
 
-  listSreniContacts(
+  async listSreniContacts(
     sreniId: string,
     page = 1,
     pageSize = 50,
-  ): { items: SreniContactRecord[]; total: number; page: number; pageSize: number; totalPages: number } {
+  ): Promise<{ items: SreniContactRecord[]; total: number; page: number; pageSize: number; totalPages: number }> {
     return this.getSreniAdminRuntime().listSreniContacts(sreniId, page, pageSize);
   }
 
@@ -1320,6 +1500,13 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
 
   async clearSreniContacts(sreniId: string): Promise<{ deleted: number; sreniId: string }> {
     return this.getSreniAdminRuntime().clearSreniContacts(sreniId);
+  }
+
+  async listAllContacts(
+    page = 1,
+    pageSize = 50,
+  ): Promise<{ items: (SreniContactRecord & { sreniName: string })[]; total: number; page: number; pageSize: number; totalPages: number }> {
+    return this.getSreniAdminRuntime().listAllContacts(page, pageSize);
   }
 
   // ── Report Metric Definitions ───────────────────────────────────────────────

@@ -629,9 +629,16 @@ export class OrgRuntimeService {
     this.ctx.srenies.delete(sreniId);
   }
 
-  listSthans(srenyId?: string): SthanRecord[] {
+  async listSthans(srenyId?: string): Promise<Array<{ id: string; name: string }>> {
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const rows = await this.ctx.dataSource.query(
+        `SELECT id, name FROM adwest.locations WHERE level = 'sthan' AND active = true ORDER BY name ASC`,
+      ) as Array<{ id: string; name: string }>;
+      return rows;
+    }
     const all = Array.from(this.ctx.sthans.values());
-    return srenyId ? all.filter((item) => item.srenyId === srenyId) : all;
+    const filtered = srenyId ? all.filter((item) => item.srenyId === srenyId) : all;
+    return filtered.map((s) => ({ id: s.id, name: s.name }));
   }
 
   createSthan(dto: CreateSthanDto): SthanRecord {

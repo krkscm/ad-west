@@ -27,6 +27,7 @@ import type {
   GovernanceAssignmentRecord,
   ImportRecord,
   EventAttendanceCaptureRecord,
+  SreniDivisionRecord,
 } from '../core-business.types';
 
 export interface CoreBusinessDbHydrationContext {
@@ -51,6 +52,7 @@ export interface CoreBusinessDbHydrationContext {
   permissions: Map<string, PermissionRecord>;
   permissionSets: Map<string, PermissionSetRecord>;
   users: Map<string, UserRecord>;
+  sreniDivisions: Map<string, SreniDivisionRecord>;
   sreniContacts: Map<string, SreniContactRecord>;
   calendarEvents: Map<string, CalendarEventRecord>;
   attendanceMetrics: Map<string, AttendanceMetricRecord>;
@@ -68,7 +70,7 @@ export class CoreBusinessDbHydrationService {
     const [
       locationRows,
       zoneRows,
-      _srenyRows,
+      srenyRows,
       _contactRows,
       _membershipRows,
       _metadataRows,
@@ -92,6 +94,7 @@ export class CoreBusinessDbHydrationService {
       permissionSetRows,
       permissionSetItemRows,
       userRows,
+      sreniDivisionRows,
       sreniContactRows,
       calendarEventRows,
       attendanceMetricRows,
@@ -104,25 +107,17 @@ export class CoreBusinessDbHydrationService {
         'SELECT id, code, name, created_at, updated_at FROM adwest.zones ORDER BY created_at ASC',
       ),
       this.ctx.dataSource.query(
-        'SELECT id, zone_id, name, description, code, active, is_service_sreny, created_by, updated_by, created_at, updated_at FROM adwest.srenies ORDER BY created_at ASC',
+        'SELECT id, zone_id, name, description, code, active, is_service_sreny, join_us_visible, created_by, updated_by, created_at, updated_at FROM adwest.srenies ORDER BY created_at ASC',
       ),
       Promise.resolve([] as unknown[]),
       Promise.resolve([] as unknown[]),
       Promise.resolve([] as unknown[]),
       Promise.resolve([] as unknown[]),
       Promise.resolve([] as unknown[]),
-      this.ctx.dataSource.query(
-        'SELECT id, sreny_id, name, category, start_date, end_date, venue, max_participants, status, description, created_at, updated_at FROM adwest.programs ORDER BY created_at ASC',
-      ),
-      this.ctx.dataSource.query(
-        'SELECT id, program_id, date, start_time, end_time, venue, created_at, updated_at FROM adwest.program_sessions ORDER BY created_at ASC',
-      ),
-      this.ctx.dataSource.query(
-        'SELECT id, program_id, contact_id, status, registered_at, created_at, updated_at FROM adwest.registrations ORDER BY created_at ASC',
-      ),
-      this.ctx.dataSource.query(
-        'SELECT id, session_id, contact_id, status, method, marked_by, marked_at, created_at, updated_at FROM adwest.attendance ORDER BY created_at ASC',
-      ),
+      Promise.resolve([] as unknown[]), // programs — table dropped in 035
+      Promise.resolve([] as unknown[]), // program_sessions — table dropped in 035
+      Promise.resolve([] as unknown[]), // registrations — table dropped in 035
+      Promise.resolve([] as unknown[]), // attendance — table dropped in 035
       Promise.resolve([] as unknown[]),
       Promise.resolve([] as unknown[]),
       this.ctx.dataSource.query(
@@ -160,7 +155,10 @@ export class CoreBusinessDbHydrationService {
         'SELECT id, code, name, phone, email, role_id, sthan_id, permission_set_id, admin_management, password_hash, is_super_admin, must_reset_password, active, created_at, updated_at, created_by, updated_by FROM adwest.users ORDER BY created_at ASC',
       ),
       this.ctx.dataSource.query(
-        'SELECT id, sreni_id, row_index, data, source_file, uploaded_by, created_at, updated_at FROM adwest.sreni_contacts ORDER BY sreni_id ASC, row_index ASC',
+        'SELECT id, sreni_id, name, display_order, created_at, updated_at FROM adwest.sreni_divisions ORDER BY sreni_id ASC, display_order ASC, created_at ASC',
+      ).catch(() => [] as unknown[]),
+      this.ctx.dataSource.query(
+        'SELECT id, sreni_id, row_index, data, division_id, sthan_id, source_file, uploaded_by, created_at, updated_at FROM adwest.sreni_contacts ORDER BY sreni_id ASC, row_index ASC',
       ).catch(() => [] as unknown[]),
       this.ctx.dataSource.query(
         'SELECT id, sreni_id, title, event_date, start_time, end_time, color, notes, scope, sthan_ids, created_by, updated_by, created_at, updated_at FROM adwest.sreni_calendar_events ORDER BY event_date ASC, start_time ASC',
@@ -189,6 +187,7 @@ export class CoreBusinessDbHydrationService {
     this.ctx.approvalItems.clear();
     this.ctx.permissions.clear();
     this.ctx.permissionSets.clear();
+    this.ctx.sreniDivisions.clear();
     this.ctx.sreniContacts.clear();
     this.ctx.calendarEvents.clear();
     this.ctx.attendanceMetrics.clear();
@@ -211,6 +210,28 @@ export class CoreBusinessDbHydrationService {
         id: row.id,
         code: row.code ?? undefined,
         name: row.name,
+        createdAt: this.ctx.toIsoTimestamp(row.created_at),
+        updatedAt: this.ctx.toIsoTimestamp(row.updated_at),
+      });
+    }
+
+    for (const row of srenyRows as Array<{
+      id: string; zone_id: string | null; name: string; description: string | null; code: string | null;
+      active: boolean; is_service_sreny: boolean; join_us_visible?: boolean | null;
+      created_by: string | null; updated_by: string | null;
+      created_at: string | Date; updated_at: string | Date;
+    }>) {
+      this.ctx.srenies.set(row.id, {
+        id: row.id,
+        name: row.name,
+        zoneId: row.zone_id ?? undefined,
+        isServiceSreny: row.is_service_sreny,
+        joinUsVisible: row.join_us_visible ?? false,
+        code: row.code ?? undefined,
+        description: row.description ?? undefined,
+        active: row.active,
+        createdBy: row.created_by ?? undefined,
+        updatedBy: row.updated_by ?? undefined,
         createdAt: this.ctx.toIsoTimestamp(row.created_at),
         updatedAt: this.ctx.toIsoTimestamp(row.updated_at),
       });
@@ -633,9 +654,25 @@ export class CoreBusinessDbHydrationService {
       });
     }
 
+    for (const row of sreniDivisionRows as Array<{
+      id: string; sreni_id: string; name: string; display_order: number;
+      created_at: string | Date; updated_at: string | Date;
+    }>) {
+      const d: SreniDivisionRecord = {
+        id: row.id,
+        sreniId: row.sreni_id,
+        name: row.name,
+        displayOrder: row.display_order,
+        createdAt: this.ctx.toIsoTimestamp(row.created_at),
+        updatedAt: this.ctx.toIsoTimestamp(row.updated_at),
+      };
+      this.ctx.sreniDivisions.set(`${d.sreniId}:${d.id}`, d);
+    }
+
     for (const row of sreniContactRows as Array<{
       id: string; sreni_id: string; row_index: number;
       data: Record<string, string | number | boolean | null>;
+      division_id: string | null; sthan_id: string | null;
       source_file: string | null; uploaded_by: string | null;
       created_at: string | Date; updated_at: string | Date;
     }>) {
@@ -644,6 +681,8 @@ export class CoreBusinessDbHydrationService {
         sreniId: row.sreni_id,
         rowIndex: row.row_index,
         data: row.data ?? {},
+        divisionId: row.division_id ?? undefined,
+        sthanId: row.sthan_id ?? undefined,
         sourceFile: row.source_file ?? undefined,
         uploadedBy: row.uploaded_by ?? undefined,
         createdAt: this.ctx.toIsoTimestamp(row.created_at),

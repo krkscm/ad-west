@@ -10,8 +10,10 @@ import { GoogleIntegrationConfigController } from './controllers/google-integrat
 import { SmtpIntegrationConfigController } from './controllers/smtp-integration-config.controller';
 import { MenuManagementController } from './controllers/menu-management.controller';
 import { RoleDefinitionsController } from './controllers/role-definitions.controller';
+import { TableLayoutController } from './controllers/table-layout.controller';
 import { AdminMenuGrantEntity } from './entities/admin-menu-grant.entity';
 import { AdminUserEntity } from './entities/admin-user.entity';
+import { UserTableLayoutEntity } from './entities/user-table-layout.entity';
 import { AuditLogEntity } from './entities/audit-log.entity';
 import { MemberUserEntity } from './entities/member-user.entity';
 import { MenuItemEntity } from './entities/menu-item.entity';
@@ -35,6 +37,7 @@ import { MenuManagementService } from './services/menu-management.service';
 import { PostgresRoleDefinitionStoreService } from './services/postgres-role-definition-store.service';
 import { PostgresStoreService } from './services/postgres-store.service';
 import { RoleDefinitionsService } from './services/role-definitions.service';
+import { TableLayoutService } from './services/table-layout.service';
 
 @Module({})
 export class UserManagementModule {
@@ -47,6 +50,7 @@ export class UserManagementModule {
       RoleDefinitionEntity,
       MenuItemEntity,
       AdminMenuGrantEntity,
+      UserTableLayoutEntity,
     ];
 
     const imports = useDbPersistence ? [TypeOrmModule.forFeature(entities)] : [];
@@ -100,12 +104,13 @@ export class UserManagementModule {
       AuthGuard,
       MemberAuthGuard,
       RolesGuard,
+      TableLayoutService,
     ];
 
     return {
       module: UserManagementModule,
       imports,
-      controllers: [AuthController, AdminUsersController, AuditController, AiChatController, GmailController, GoogleIntegrationConfigController, SmtpIntegrationConfigController, RoleDefinitionsController, MenuManagementController],
+      controllers: [AuthController, AdminUsersController, AuditController, AiChatController, GmailController, GoogleIntegrationConfigController, SmtpIntegrationConfigController, RoleDefinitionsController, MenuManagementController, TableLayoutController],
       providers,
       exports: [USER_STORE, ROLE_DEFINITION_STORE, AuthService, AuthGuard, MemberAuthGuard, RolesGuard],
     };

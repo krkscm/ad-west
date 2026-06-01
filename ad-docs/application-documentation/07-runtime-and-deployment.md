@@ -1,39 +1,40 @@
 # 07 - Runtime and Deployment Notes
 
-## Default Local Ports
+## Default Local Runtime
 
-- Web app: `3000`
-- API: `3001`
+- Web app: `http://localhost:3000`
+- API: `http://localhost:3001`
 
-## Frontend API Wiring
+## Frontend Runtime Wiring
 
-- Frontend API base defaults to `/api/v1`
-- Vite dev proxy forwards to configured backend target (`VITE_API_PROXY_TARGET`, default `http://localhost:3001`)
+- API base defaults to `/api/v1`
+- Vite dev proxy target is controlled by `VITE_API_PROXY_TARGET` (default `http://localhost:3001`)
 
-## Backend Runtime Notes
+## Backend Runtime Wiring
 
-- API prefix configured to `/api/v1`
-- Swagger docs available at `/api/docs`
-- CORS origin configurable by environment
+- Global API prefix: `/api/v1`
+- Swagger endpoint: `/api/docs` (env-driven enablement)
+- CORS policy: allow-list resolved from `CORS_ORIGIN`
+- Optional proxy trust via `TRUST_PROXY=true`
 
-## Persistence Modes
+## Persistence and Environment Modes
 
-- DB-enabled mode uses PostgreSQL-backed stores/entities
-- Fallback mode uses in-memory runtime stores where supported
-- Public Gateway and Member Services follow the same DB/in-memory conditional mode behavior
+- `ENABLE_DB_PERSISTENCE=true`: PostgreSQL-backed runtime stores and TypeORM registration
+- `ENABLE_DB_PERSISTENCE=false`: in-memory store behavior for supported modules
+- Production guard: app startup fails if DB persistence is disabled
 
-## Google Integration Runtime Notes
+## Security Runtime Defaults
 
-- OAuth/Gmail config values are DB-managed through settings API
-- Env values remain fallback/emergency source
-- Google OAuth start is blocked when integration is disabled via settings
-- Gmail inbox/send is available only for Google-authenticated admin sessions
+- Strict validation pipeline enabled globally
+- Global throttling enabled
+- Request payload limits set to 1 MB
+- Common security headers applied by middleware
 
-## Recommended Operational Checklist
+## Operational Checklist
 
-1. Apply DB scripts in order
-2. Start API and verify health/docs endpoints
-3. Start web app and verify route rendering
-4. Verify admin, member, and public flows
-5. Verify Google settings endpoint and auth flow if enabled
-6. Verify Helpdesk/Member-Services/Gmail workspace flows in the admin dashboard
+1. Apply migration scripts in order from `ad-docs/database-script`.
+2. Start API and verify `/api/v1` routes plus `/api/docs` when enabled.
+3. Start web app and verify public/admin/member route behavior.
+4. Verify login, session restoration, and role-based navigation.
+5. Verify gateway and member-services operational endpoints.
+6. Verify integration settings (Google and SMTP/IMAP) as applicable.

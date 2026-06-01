@@ -396,6 +396,17 @@ export interface SreniReportRecord {
   updatedAt: string;
 }
 
+export interface AnalyticsStudioLayoutRecord {
+  id: string;
+  sreniId: string;
+  userId: string;
+  layoutType: 'details' | 'pivot';
+  name: string;
+  config: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PermissionRecord {
   id: string;
   locationId: string;
@@ -422,11 +433,22 @@ export interface PermissionSetRecord {
   updatedBy?: string;
 }
 
+export interface SreniDivisionRecord {
+  id: string;
+  sreniId: string;
+  name: string;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SreniContactRecord {
   id: string;
   sreniId: string;
   rowIndex: number;
   data: Record<string, string | number | boolean | null>;
+  divisionId?: string;
+  sthanId?: string;
   sourceFile?: string;
   uploadedBy?: string;
   createdAt: string;

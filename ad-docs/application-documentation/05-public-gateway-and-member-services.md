@@ -1,53 +1,51 @@
 # 05 - Public Gateway and Member Services
 
-## Public Gateway Surface
+## Public Gateway Architecture
 
-### Helpdesk
-- Public ticket submission route
-- Internal admin management routes for triage/status updates
+Public gateway routes are intentionally unauthenticated and exposed under `/api/v1/public/...`.
 
-### Jobs
-- Public active job listing
-- Public application submission with optional resume upload
-- Internal admin posting/application management routes
+### Public Helpdesk
 
-Resume constraints implemented in UI/backend flow:
-- Allowed extensions: PDF, DOC, DOCX
-- File size cap: 1 MB
+- Public submit endpoints for ticket intake
+- Admin-side triage/status endpoints under `/api/v1/gateway/helpdesk/...`
 
-### Event Registration
-- Public event registration page with dynamic form-field rendering
-- Public registration submission endpoint
+### Public Jobs
 
-### Join Us / Contact Intake
-- Public contact registration page (`/join-us`) outside authenticated app shell
-- Public contact registration page uses a shared public shell and grouped section cards so the intake reads as Membership, Contact, Profile, Residence, and Security blocks
-- Backend endpoints:
-	- `GET /api/v1/public/sreni-contacts/srenies` for active Sreni options that are explicitly enabled from Sreni CRUD Join Us visibility
-	- `POST /api/v1/public/sreni-contacts/register` for submission persistence into `adwest.sreni_contacts`
-- Submission payload stores normalized public-form metadata in `sreni_contacts.data` with source markers (`public-join-us-form`, `public_join_form`)
-- Join Us form now keeps only the core public intake fields: Sreni, name, phone, email, city, country, notes, and a small set of contact profile fields that match current needs, arranged into labeled sections to make the form easier to scan and complete
-- Anti-bot guardrails: captcha verification, hidden honeypot field validation, and route-level throttling
-- Optional format validation rules:
-	- `phone` accepts permissive international-style patterns (`+`, spaces, dashes, parentheses) and enforces 7-15 digits after normalization
-	- `email` remains optional but must match a standard email structure when supplied
-- Duplicate-contact guard: backend rejects inserts when the same Sreni already has a contact with matching normalized phone or matching email
+- Public listing and application submission routes
+- Admin CRUD/review endpoints under `/api/v1/gateway/jobs/...`
+- Resume upload constraints are enforced by frontend/backend validation (type + size)
 
-## Member Services Surface
+### Public Join-Us Contact Intake
 
-Member services module includes operations around:
-- Reimbursements
-- Special events administration
-- Notifications administration
+- Page route: `/join-us`
+- Sreni options endpoint: `GET /api/v1/public/sreni-contacts/srenies`
+- Submission endpoint: `POST /api/v1/public/sreni-contacts/register`
+- Submission guardrails:
+  - Captcha verification
+  - Honeypot field validation
+  - Route-level throttling
+  - Duplicate detection by normalized identity fields
 
-Admin workspace member-services section includes:
-- Reimbursements page
-- Special Events page
-- Notifications page
-- Gmail Workspace panel (compose + inbox preview)
+### Public Event Registration
 
-## Access Model
+- Public route group: `/api/v1/public/events`
+- Supports dynamic event-field registration payloads from frontend public event pages
 
-- Public routes are intentionally open for intake use cases.
-- Internal operational endpoints remain authenticated and role-scoped.
-- Gmail workspace functionality additionally requires Google-authenticated admin session context.
+## Member Services Architecture
+
+Authenticated member-services route groups:
+- `/api/v1/member-services/reimbursements`
+- `/api/v1/member-services/events`
+- `/api/v1/member-services/notifications`
+
+Admin workspace surfaces include:
+- Reimbursements management
+- Special events management
+- Notifications management
+- Email workspace integration panel
+
+## Access and Guard Model
+
+- Public intake paths remain open by design.
+- Internal operational paths are auth-guarded and role-scoped.
+- Member-services and gateway admin surfaces use dedicated guard patterns for operational actions.

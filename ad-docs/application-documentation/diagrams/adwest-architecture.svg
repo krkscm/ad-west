@@ -1,113 +1,146 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="880" viewBox="0 0 1400 880" role="img" aria-label="ADWest System Architecture">
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" role="img" aria-label="ADWest Layered Architecture">
   <defs>
     <style>
-      .title { font: 700 28px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .title { font: 700 30px 'Segoe UI', Arial, sans-serif; fill: #0b1324; }
       .subtitle { font: 500 14px 'Segoe UI', Arial, sans-serif; fill: #334155; }
-      .h { font: 700 16px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
-      .t { font: 500 13px 'Segoe UI', Arial, sans-serif; fill: #1e293b; }
-      .small { font: 500 12px 'Segoe UI', Arial, sans-serif; fill: #334155; }
+      .section { font: 700 17px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .line { font: 500 13px 'Segoe UI', Arial, sans-serif; fill: #1e293b; }
+      .small { font: 500 12px 'Segoe UI', Arial, sans-serif; fill: #475569; }
       .box { stroke: #94a3b8; stroke-width: 1.4; rx: 16; ry: 16; }
-      .edge { stroke: #334155; stroke-width: 2; fill: none; marker-end: url(#arrow); }
-      .dash { stroke-dasharray: 6 6; }
+      .flow { stroke: #1f2937; stroke-width: 2.1; fill: none; marker-end: url(#arrow); }
+      .flow2 { stroke: #475569; stroke-width: 1.8; stroke-dasharray: 7 6; fill: none; marker-end: url(#arrow2); }
     </style>
+
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
-      <path d="M0,0 L0,6 L9,3 z" fill="#334155" />
+      <path d="M0,0 L0,6 L9,3 z" fill="#1f2937" />
     </marker>
+    <marker id="arrow2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#475569" />
+    </marker>
+
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#f8fbff"/>
-      <stop offset="100%" stop-color="#eef5ff"/>
+      <stop offset="0%" stop-color="#f8fbff" />
+      <stop offset="100%" stop-color="#eef4ff" />
     </linearGradient>
-    <linearGradient id="frontend" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#dbeafe"/>
-      <stop offset="100%" stop-color="#bfdbfe"/>
+    <linearGradient id="exp" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#dbeafe" />
+      <stop offset="100%" stop-color="#bfdbfe" />
     </linearGradient>
-    <linearGradient id="backend" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#dcfce7"/>
-      <stop offset="100%" stop-color="#bbf7d0"/>
+    <linearGradient id="web" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#cffafe" />
+      <stop offset="100%" stop-color="#99f6e4" />
     </linearGradient>
-    <linearGradient id="db" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#fee2e2"/>
-      <stop offset="100%" stop-color="#fecaca"/>
+    <linearGradient id="api" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#dcfce7" />
+      <stop offset="100%" stop-color="#bbf7d0" />
+    </linearGradient>
+    <linearGradient id="store" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fee2e2" />
+      <stop offset="100%" stop-color="#fecaca" />
     </linearGradient>
     <linearGradient id="ext" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#fef3c7"/>
-      <stop offset="100%" stop-color="#fde68a"/>
+      <stop offset="0%" stop-color="#fef3c7" />
+      <stop offset="100%" stop-color="#fde68a" />
     </linearGradient>
   </defs>
 
-  <rect x="0" y="0" width="1400" height="880" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1600" height="980" fill="url(#bg)" />
 
-  <text x="38" y="48" class="title">ADWest Application Architecture</text>
-  <text x="38" y="73" class="subtitle">Frontend: React + Vite (3000) | Backend: NestJS (3001, /api/v1) | Persistence: PostgreSQL</text>
+  <text x="34" y="48" class="title">ADWest Runtime Architecture (Current Implementation)</text>
+  <text x="34" y="74" class="subtitle">React + Vite (3000) | NestJS API (3001, /api/v1) | PostgreSQL + Conditional In-Memory Stores</text>
 
-  <rect class="box" x="36" y="120" width="310" height="250" fill="url(#frontend)"/>
-  <text x="56" y="154" class="h">Client Layer</text>
-  <text x="56" y="184" class="t">- Admin Browser Session</text>
-  <text x="56" y="206" class="t">- Member Browser Session</text>
-  <text x="56" y="228" class="t">- Public Visitors</text>
-  <text x="56" y="260" class="t">Routes:</text>
-  <text x="56" y="282" class="small">/, /portal, /helpdesk, /jobs, /join-us</text>
-  <text x="56" y="304" class="small">/events/:id/register</text>
-  <text x="56" y="326" class="small">Admin dashboard + settings pages</text>
-  <text x="56" y="348" class="small">Member portal pages</text>
+  <rect class="box" x="34" y="110" width="344" height="248" fill="url(#exp)" />
+  <text x="56" y="142" class="section">Experience Layer</text>
+  <text x="56" y="172" class="line">Admin Workspace</text>
+  <text x="56" y="194" class="line">Member Workspace</text>
+  <text x="56" y="216" class="line">Public Portal + Intake Pages</text>
+  <text x="56" y="248" class="small">Public Paths:</text>
+  <text x="56" y="270" class="small">/, /portal, /helpdesk, /jobs, /join-us</text>
+  <text x="56" y="292" class="small">/events/:id/register, /forgot-password, /reset-password</text>
+  <text x="56" y="324" class="small">Authenticated Workspaces: Admin / Member</text>
 
-  <rect class="box" x="392" y="120" width="370" height="250" fill="url(#frontend)"/>
-  <text x="412" y="154" class="h">Web App Layer (ad-west-web)</text>
-  <text x="412" y="184" class="t">React + TypeScript + Vite</text>
-  <text x="412" y="206" class="t">Providers: Auth, Theme, Toast, ConfirmDialog</text>
-  <text x="412" y="228" class="t">API Client: backendApi.ts</text>
-  <text x="412" y="260" class="t">Auth Flows:</text>
-  <text x="412" y="282" class="small">credential login, member login, Google OAuth popup</text>
-  <text x="412" y="304" class="small">Public shell routes + branded portal theme</text>
-  <text x="412" y="326" class="t">Proxy target: /api/v1 -&gt; backend service</text>
+  <rect class="box" x="416" y="110" width="430" height="248" fill="url(#web)" />
+  <text x="438" y="142" class="section">Web Application Layer (ad-west-web)</text>
+  <text x="438" y="172" class="line">App Shell: App.tsx route-mode resolution</text>
+  <text x="438" y="194" class="line">Providers: Auth, Theme, Toast, ConfirmDialog</text>
+  <text x="438" y="216" class="line">Shared API Wrapper: utils/api.ts + backendApi.ts</text>
+  <text x="438" y="248" class="small">Session Restore Gate prevents startup route flicker</text>
+  <text x="438" y="270" class="small">Role/menu-aware admin navigation and governance views</text>
+  <text x="438" y="292" class="small">Public pages remain directly reachable by path design</text>
+  <text x="438" y="324" class="small">Vite proxy forwards to API target in local development</text>
 
-  <rect class="box" x="808" y="120" width="556" height="380" fill="url(#backend)"/>
-  <text x="828" y="154" class="h">API Layer (ad-west-api)</text>
-  <text x="828" y="182" class="t">NestJS Modules</text>
-  <text x="828" y="212" class="small">- UserManagement (auth, roles, menu, audit, Google config, Gmail, AI chat)</text>
-  <text x="828" y="236" class="small">- CoreBusiness (org, permissions, programs, reports, docs, attendance)</text>
-  <text x="828" y="260" class="small">- PublicGateway (helpdesk, jobs, join-us contacts, public event registration)</text>
-  <text x="828" y="284" class="small">- MemberServices (reimbursements, events, notifications)</text>
-  <text x="828" y="308" class="small">- EnumValues, ApprovalWorkflowDefinitions, Health</text>
-  <text x="828" y="340" class="t">Cross-cutting:</text>
-  <text x="828" y="362" class="small">Guards, validation pipe, exception filter, swagger</text>
-  <text x="828" y="384" class="small">Auth/session verification for admin/member routes</text>
-  <text x="828" y="406" class="small">Captcha + throttling guards on auth/public submission routes</text>
-  <text x="828" y="428" class="small">Public routes intentionally unauthenticated</text>
+  <rect class="box" x="878" y="110" width="688" height="560" fill="url(#api)" />
+  <text x="900" y="142" class="section">API Layer (ad-west-api / NestJS)</text>
+  <text x="900" y="172" class="line">Global Prefix: /api/v1</text>
+  <text x="900" y="194" class="line">Global Throttler Guard + Validation Pipe + Exception Filter</text>
 
-  <rect class="box" x="392" y="414" width="370" height="190" fill="url(#ext)"/>
-  <text x="412" y="448" class="h">External Integration</text>
-  <text x="412" y="476" class="t">Google OAuth + Gmail API</text>
-  <text x="412" y="500" class="small">- Start: /auth/google/start</text>
-  <text x="412" y="522" class="small">- Callback: /auth/google/callback</text>
-  <text x="412" y="544" class="small">- Config: /settings/google-integration-config</text>
-  <text x="412" y="566" class="small">DB-backed config with env fallback</text>
+  <rect class="box" x="900" y="224" width="300" height="180" fill="#ecfdf5" />
+  <text x="918" y="252" class="section">Core Domains</text>
+  <text x="918" y="280" class="small">CoreBusinessModule</text>
+  <text x="918" y="302" class="small">ApprovalWorkflowDefinitionsModule</text>
+  <text x="918" y="324" class="small">EnumValuesModule</text>
+  <text x="918" y="346" class="small">HealthModule</text>
+  <text x="918" y="376" class="small">Store abstraction with DB/In-memory binding</text>
 
-  <rect class="box" x="808" y="546" width="556" height="250" fill="url(#db)"/>
-  <text x="828" y="580" class="h">Data Layer (PostgreSQL)</text>
-  <text x="828" y="610" class="t">Migration scripts in ad-docs/database-script</text>
-  <text x="828" y="634" class="small">- Core schema/indexes/triggers</text>
-  <text x="828" y="656" class="small">- Auth/session tables</text>
-  <text x="828" y="678" class="small">- Public gateway + join-us contact tables</text>
-  <text x="828" y="700" class="small">- Member services + sthan contacts tables</text>
-  <text x="828" y="722" class="small">- Google integration config (041)</text>
-  <text x="828" y="744" class="small">- Governance AI chatbot menu + join-us visibility (050/051)</text>
-  <text x="828" y="766" class="t">Persistence mode switch:</text>
-  <text x="828" y="788" class="small">DB mode or in-memory runtime fallback (feature-dependent)</text>
+  <rect class="box" x="1220" y="224" width="324" height="180" fill="#ecfdf5" />
+  <text x="1238" y="252" class="section">User Management</text>
+  <text x="1238" y="280" class="small">auth, admin-users, role-definitions, menu-items</text>
+  <text x="1238" y="302" class="small">audit-logs, ai-chat, settings/* integration controllers</text>
+  <text x="1238" y="324" class="small">gmail send/inbox via SMTP/IMAP services</text>
+  <text x="1238" y="346" class="small">Admin + Member auth guards and role checks</text>
 
-  <path class="edge" d="M346 246 L392 246"/>
-  <path class="edge" d="M762 246 L808 246"/>
-  <path class="edge" d="M1100 500 L1100 546"/>
-  <path class="edge dash" d="M762 500 L808 500"/>
-  <path class="edge dash" d="M576 370 L576 414"/>
+  <rect class="box" x="900" y="426" width="300" height="220" fill="#ecfdf5" />
+  <text x="918" y="454" class="section">Public Gateway</text>
+  <text x="918" y="482" class="small">public/helpdesk</text>
+  <text x="918" y="504" class="small">public/jobs</text>
+  <text x="918" y="526" class="small">public/sreni-contacts</text>
+  <text x="918" y="548" class="small">gateway/helpdesk (admin)</text>
+  <text x="918" y="570" class="small">gateway/jobs (admin)</text>
+  <text x="918" y="602" class="small">Captcha + throttling for intake protection</text>
 
-  <text x="365" y="232" class="small">HTTPS</text>
-  <text x="777" y="232" class="small">REST /api/v1</text>
-  <text x="1114" y="534" class="small">TypeORM/SQL</text>
-  <text x="771" y="490" class="small">OAuth/Gmail</text>
+  <rect class="box" x="1220" y="426" width="324" height="220" fill="#ecfdf5" />
+  <text x="1238" y="454" class="section">Member Services</text>
+  <text x="1238" y="482" class="small">member-services/reimbursements</text>
+  <text x="1238" y="504" class="small">member-services/events</text>
+  <text x="1238" y="526" class="small">member-services/notifications</text>
+  <text x="1238" y="548" class="small">public/events registration endpoints</text>
+  <text x="1238" y="580" class="small">Shared operational guard patterns</text>
 
-  <rect x="36" y="722" width="726" height="108" rx="12" ry="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2"/>
-  <text x="56" y="752" class="h">Legend</text>
-  <text x="56" y="776" class="small">Blue: frontend/client layers | Green: backend modules | Red: persistence layer | Yellow: external integrations</text>
-  <text x="56" y="798" class="small">Solid arrow: primary runtime flow | Dashed arrow: integration/secondary flow</text>
+  <rect class="box" x="416" y="392" width="430" height="278" fill="url(#ext)" />
+  <text x="438" y="424" class="section">Integration Layer</text>
+  <text x="438" y="452" class="line">Google OAuth (start/callback + DB-first config)</text>
+  <text x="438" y="474" class="line">SMTP Email Delivery (gmail/send)</text>
+  <text x="438" y="496" class="line">IMAP Inbox Read (gmail/inbox)</text>
+  <text x="438" y="518" class="line">AI Query Endpoint (ai-chat/query)</text>
+  <text x="438" y="548" class="small">Config Endpoints:</text>
+  <text x="438" y="570" class="small">settings/google-integration-config</text>
+  <text x="438" y="592" class="small">settings/smtp-integration-config</text>
+  <text x="438" y="624" class="small">Settings resolve DB values with environment fallback</text>
+
+  <rect class="box" x="878" y="702" width="688" height="224" fill="url(#store)" />
+  <text x="900" y="734" class="section">Data Layer (PostgreSQL + Migration Chain)</text>
+  <text x="900" y="762" class="line">Canonical SQL Source: ad-docs/database-script</text>
+  <text x="900" y="786" class="small">Core schema, auth, roles/menu grants, gateway/member services tables</text>
+  <text x="900" y="808" class="small">Recent evolution: governance hierarchy, location metrics scope, join-us visibility, SMTP/IMAP config</text>
+  <text x="900" y="830" class="small">analytics_studio_layouts and admin_password_reset_tokens included in current schema chain</text>
+  <text x="900" y="862" class="small">Runtime mode: DB persistence when enabled, in-memory fallback on selected modules</text>
+
+  <path class="flow" d="M378 236 L416 236" />
+  <path class="flow" d="M846 236 L878 236" />
+  <path class="flow" d="M1222 670 L1222 702" />
+  <path class="flow2" d="M846 530 L878 530" />
+  <path class="flow2" d="M632 358 L632 392" />
+
+  <text x="386" y="220" class="small">HTTPS</text>
+  <text x="852" y="220" class="small">REST /api/v1</text>
+  <text x="1238" y="688" class="small">TypeORM + SQL</text>
+  <text x="852" y="520" class="small">Config + External Service Flows</text>
+
+  <rect x="34" y="700" width="812" height="226" rx="14" ry="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" />
+  <text x="56" y="732" class="section">Legend and Notes</text>
+  <text x="56" y="760" class="small">Blue: user/experience layer | Cyan: web app layer | Green: API modules</text>
+  <text x="56" y="782" class="small">Yellow: integration services | Red: persistent data layer</text>
+  <text x="56" y="804" class="small">Solid arrow: primary request/data flow | Dashed arrow: integration or secondary runtime flow</text>
+  <text x="56" y="836" class="small">Security defaults include CORS allow-list, strict validation, throttling, and common response headers.</text>
+  <text x="56" y="858" class="small">Production startup enforces DB persistence mode.</text>
 </svg>

@@ -1,7 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { CreateLocationReportMetricDto, CreateReportMetricDefinitionDto, CreateSreniReportParameterDto, SubmitSreniMonthlyReportDto, UpdateLocationReportMetricDto, UpdateReportMetricDefinitionDto, UpdateSreniReportParameterDto } from '../dto/core-business.dto';
-import type { ReportMetricDefinitionRecord, SreniContactRecord, SreniMonthlyReportRecord, SreniReportParameterRecord } from '../core-business.service';
+import { AssignContactDivisionDto, AssignContactSthanDto, CreateLocationReportMetricDto, CreateReportMetricDefinitionDto, CreateSreniDivisionDto, CreateSreniReportParameterDto, SubmitSreniMonthlyReportDto, UpdateLocationReportMetricDto, UpdateReportMetricDefinitionDto, UpdateSreniDivisionDto, UpdateSreniReportParameterDto } from '../dto/core-business.dto';
+import type { ReportMetricDefinitionRecord, SreniContactRecord, SreniDivisionRecord, SreniMonthlyReportRecord, SreniReportParameterRecord, SrenyRecord } from '../core-business.service';
 
 type SreniContactCellValue = string | number | boolean | null;
 
@@ -57,6 +57,8 @@ const normalizeSreniContactCell = (value: unknown): SreniContactCellValue => {
 };
 
 export interface SreniAdminRuntimeContext {
+  srenies: Map<string, SrenyRecord>;
+  sreniDivisions: Map<string, SreniDivisionRecord>;
   sreniContacts: Map<string, SreniContactRecord>;
   reportMetricDefinitions: Map<string, ReportMetricDefinitionRecord>;
   sreniMonthlyReports: Map<string, SreniMonthlyReportRecord>;
@@ -79,11 +81,226 @@ export class SreniAdminRuntimeService {
     return parsed.getUTCFullYear() * 100 + (parsed.getUTCMonth() + 1);
   }
 
-  listSreniContacts(
+  // ── Sreni Divisions ──────────────────────────────────────────────────────────
+
+  async listSreniDivisions(sreniId: string): Promise<SreniDivisionRecord[]> {
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const rows = await this.ctx.dataSource.query(
+        `SELECT id, sreni_id, name, display_order, created_at, updated_at
+         FROM adwest.sreni_divisions WHERE sreni_id = $1
+         ORDER BY display_order ASC, created_at ASC`,
+        [sreniId],
+      ) as Array<{ id: string; sreni_id: string; name: string; display_order: number; created_at: string | Date; updated_at: string | Date }>;
+      return rows.map((r) => ({
+        id: r.id,
+        sreniId: r.sreni_id,
+        name: r.name,
+        displayOrder: r.display_order,
+        createdAt: this.ctx.toIsoTimestamp(r.created_at),
+        updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+      }));
+    }
+    return Array.from(this.ctx.sreniDivisions.values())
+      .filter((d) => d.sreniId === sreniId)
+      .sort((a, b) => a.displayOrder - b.displayOrder || a.createdAt.localeCompare(b.createdAt));
+  }
+
+  async createSreniDivision(sreniId: string, dto: CreateSreniDivisionDto): Promise<SreniDivisionRecord> {
+    const now = new Date().toISOString();
+    const id = this.ctx.newId('sdiv');
+    const record: SreniDivisionRecord = {
+      id,
+      sreniId,
+      name: dto.name.trim(),
+      displayOrder: dto.displayOrder ?? 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const rows = await this.ctx.dataSource.query(
+        `INSERT INTO adwest.sreni_divisions (sreni_id, name, display_order)
+         VALUES ($1, $2, $3)
+         RETURNING id, sreni_id, name, display_order, created_at, updated_at`,
+        [sreniId, record.name, record.displayOrder],
+      ) as Array<{ id: string; sreni_id: string; name: string; display_order: number; created_at: string | Date; updated_at: string | Date }>;
+      const r = rows[0];
+      return {
+        id: r.id,
+        sreniId: r.sreni_id,
+        name: r.name,
+        displayOrder: r.display_order,
+        createdAt: this.ctx.toIsoTimestamp(r.created_at),
+        updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+      };
+    }
+    this.ctx.sreniDivisions.set(`${sreniId}:${id}`, record);
+    return record;
+  }
+
+  async updateSreniDivision(sreniId: string, divisionId: string, dto: UpdateSreniDivisionDto): Promise<SreniDivisionRecord> {
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const rows = await this.ctx.dataSource.query(
+        `UPDATE adwest.sreni_divisions
+         SET name = COALESCE($1, name),
+             display_order = COALESCE($2, display_order),
+             updated_at = now()
+         WHERE id = $3 AND sreni_id = $4
+         RETURNING id, sreni_id, name, display_order, created_at, updated_at`,
+        [dto.name?.trim() ?? null, dto.displayOrder ?? null, divisionId, sreniId],
+      ) as Array<{ id: string; sreni_id: string; name: string; display_order: number; created_at: string | Date; updated_at: string | Date }>;
+      if (!rows[0]) throw new NotFoundException('Division not found');
+      const r = rows[0];
+      return {
+        id: r.id,
+        sreniId: r.sreni_id,
+        name: r.name,
+        displayOrder: r.display_order,
+        createdAt: this.ctx.toIsoTimestamp(r.created_at),
+        updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+      };
+    }
+    const existing = this.ctx.sreniDivisions.get(`${sreniId}:${divisionId}`);
+    if (!existing) throw new NotFoundException('Division not found');
+    const updated: SreniDivisionRecord = {
+      ...existing,
+      name: dto.name?.trim() ?? existing.name,
+      displayOrder: dto.displayOrder ?? existing.displayOrder,
+      updatedAt: new Date().toISOString(),
+    };
+    this.ctx.sreniDivisions.set(`${sreniId}:${divisionId}`, updated);
+    return updated;
+  }
+
+  async deleteSreniDivision(sreniId: string, divisionId: string): Promise<void> {
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      await this.ctx.dataSource.query(
+        `DELETE FROM adwest.sreni_divisions WHERE id = $1 AND sreni_id = $2`,
+        [divisionId, sreniId],
+      );
+      return;
+    }
+    this.ctx.sreniDivisions.delete(`${sreniId}:${divisionId}`);
+    for (const [key, c] of this.ctx.sreniContacts) {
+      if (c.sreniId === sreniId && c.divisionId === divisionId) {
+        this.ctx.sreniContacts.set(key, { ...c, divisionId: undefined, updatedAt: new Date().toISOString() });
+      }
+    }
+  }
+
+  async assignContactDivision(sreniId: string, contactId: string, dto: AssignContactDivisionDto): Promise<SreniContactRecord> {
+    const divisionId = dto.divisionId ?? undefined;
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const rows = await this.ctx.dataSource.query(
+        `UPDATE adwest.sreni_contacts
+         SET division_id = $1, updated_at = now()
+         WHERE id = $2 AND sreni_id = $3
+         RETURNING id, sreni_id, row_index, data, division_id, source_file, uploaded_by, created_at, updated_at`,
+        [divisionId ?? null, contactId, sreniId],
+      ) as Array<{
+        id: string; sreni_id: string; row_index: number;
+        data: Record<string, string | number | boolean | null>;
+        division_id: string | null; source_file: string | null;
+        uploaded_by: string | null; created_at: string | Date; updated_at: string | Date;
+      }>;
+      if (!rows[0]) throw new NotFoundException('Contact not found');
+      const r = rows[0];
+      const updated: SreniContactRecord = {
+        id: r.id,
+        sreniId: r.sreni_id,
+        rowIndex: r.row_index,
+        data: r.data ?? {},
+        divisionId: r.division_id ?? undefined,
+        sourceFile: r.source_file ?? undefined,
+        uploadedBy: r.uploaded_by ?? undefined,
+        createdAt: this.ctx.toIsoTimestamp(r.created_at),
+        updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+      };
+      this.ctx.sreniContacts.set(`${sreniId}:${contactId}`, updated);
+      return updated;
+    }
+    const existing = this.ctx.sreniContacts.get(`${sreniId}:${contactId}`);
+    if (!existing) throw new NotFoundException('Contact not found');
+    const updated: SreniContactRecord = { ...existing, divisionId, updatedAt: new Date().toISOString() };
+    this.ctx.sreniContacts.set(`${sreniId}:${contactId}`, updated);
+    return updated;
+  }
+
+  async assignContactSthan(sreniId: string, contactId: string, dto: AssignContactSthanDto): Promise<SreniContactRecord> {
+    const sthanId = dto.sthanId ?? undefined;
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const rows = await this.ctx.dataSource.query(
+        `UPDATE adwest.sreni_contacts
+         SET sthan_id = $1, updated_at = now()
+         WHERE id = $2 AND sreni_id = $3
+         RETURNING id, sreni_id, row_index, data, division_id, sthan_id, source_file, uploaded_by, created_at, updated_at`,
+        [sthanId ?? null, contactId, sreniId],
+      ) as Array<{
+        id: string; sreni_id: string; row_index: number;
+        data: Record<string, string | number | boolean | null>;
+        division_id: string | null; sthan_id: string | null;
+        source_file: string | null; uploaded_by: string | null;
+        created_at: string | Date; updated_at: string | Date;
+      }>;
+      if (!rows[0]) throw new NotFoundException('Contact not found');
+      const r = rows[0];
+      const updated: SreniContactRecord = {
+        id: r.id, sreniId: r.sreni_id, rowIndex: r.row_index,
+        data: r.data ?? {}, divisionId: r.division_id ?? undefined,
+        sthanId: r.sthan_id ?? undefined,
+        sourceFile: r.source_file ?? undefined, uploadedBy: r.uploaded_by ?? undefined,
+        createdAt: this.ctx.toIsoTimestamp(r.created_at), updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+      };
+      this.ctx.sreniContacts.set(`${sreniId}:${contactId}`, updated);
+      return updated;
+    }
+    const existing = this.ctx.sreniContacts.get(`${sreniId}:${contactId}`);
+    if (!existing) throw new NotFoundException('Contact not found');
+    const updated: SreniContactRecord = { ...existing, sthanId, updatedAt: new Date().toISOString() };
+    this.ctx.sreniContacts.set(`${sreniId}:${contactId}`, updated);
+    return updated;
+  }
+
+  async listSreniContacts(
     sreniId: string,
     page = 1,
     pageSize = 50,
-  ): { items: SreniContactRecord[]; total: number; page: number; pageSize: number; totalPages: number } {
+  ): Promise<{ items: SreniContactRecord[]; total: number; page: number; pageSize: number; totalPages: number }> {
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const offset = (page - 1) * pageSize;
+      const [countRows, rows] = await Promise.all([
+        this.ctx.dataSource.query(
+          `SELECT COUNT(*)::int AS total FROM adwest.sreni_contacts WHERE sreni_id = $1`,
+          [sreniId],
+        ) as Promise<Array<{ total: number }>>,
+        this.ctx.dataSource.query(
+          `SELECT id, sreni_id, row_index, data, division_id, sthan_id, source_file, uploaded_by, created_at, updated_at
+           FROM adwest.sreni_contacts WHERE sreni_id = $1
+           ORDER BY row_index ASC LIMIT $2 OFFSET $3`,
+          [sreniId, pageSize, offset],
+        ) as Promise<Array<{
+          id: string; sreni_id: string; row_index: number;
+          data: Record<string, string | number | boolean | null>;
+          division_id: string | null; sthan_id: string | null;
+          source_file: string | null; uploaded_by: string | null;
+          created_at: string | Date; updated_at: string | Date;
+        }>>,
+      ]);
+      const total = countRows[0]?.total ?? 0;
+      const totalPages = Math.max(1, Math.ceil(total / pageSize));
+      const items: SreniContactRecord[] = rows.map((r) => ({
+        id: r.id,
+        sreniId: r.sreni_id,
+        rowIndex: r.row_index,
+        data: r.data ?? {},
+        divisionId: r.division_id ?? undefined,
+        sthanId: r.sthan_id ?? undefined,
+        sourceFile: r.source_file ?? undefined,
+        uploadedBy: r.uploaded_by ?? undefined,
+        createdAt: this.ctx.toIsoTimestamp(r.created_at),
+        updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+      }));
+      return { items, total, page, pageSize, totalPages };
+    }
     const all = Array.from(this.ctx.sreniContacts.values())
       .filter((c) => c.sreniId === sreniId)
       .sort((a, b) => a.rowIndex - b.rowIndex);
@@ -214,6 +431,61 @@ export class SreniAdminRuntimeService {
       );
     }
     return { deleted, sreniId };
+  }
+
+  async listAllContacts(
+    page = 1,
+    pageSize = 50,
+  ): Promise<{ items: (SreniContactRecord & { sreniName: string })[]; total: number; page: number; pageSize: number; totalPages: number }> {
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const countRows = await this.ctx.dataSource.query(
+        `SELECT COUNT(*)::int AS total FROM adwest.sreni_contacts`,
+      ) as Array<{ total: number }>;
+      const total = countRows[0]?.total ?? 0;
+      const totalPages = Math.max(1, Math.ceil(total / pageSize));
+      const offset = (page - 1) * pageSize;
+      const rows = await this.ctx.dataSource.query(
+        `SELECT c.id, c.sreni_id, c.row_index, c.data, c.division_id, c.sthan_id,
+                c.source_file, c.uploaded_by, c.created_at, c.updated_at,
+                COALESCE(s.name, c.sreni_id) AS sreni_name
+         FROM adwest.sreni_contacts c
+         LEFT JOIN adwest.srenies s ON s.id::text = c.sreni_id
+         ORDER BY s.name ASC NULLS LAST, c.row_index ASC
+         LIMIT $1 OFFSET $2`,
+        [pageSize, offset],
+      ) as Array<{
+        id: string; sreni_id: string; row_index: number;
+        data: Record<string, string | number | boolean | null>;
+        division_id: string | null; sthan_id: string | null; source_file: string | null;
+        uploaded_by: string | null; created_at: string | Date; updated_at: string | Date;
+        sreni_name: string;
+      }>;
+      const items = rows.map((r) => ({
+        id: r.id,
+        sreniId: r.sreni_id,
+        sreniName: r.sreni_name,
+        rowIndex: r.row_index,
+        data: r.data ?? {},
+        divisionId: r.division_id ?? undefined,
+        sthanId: r.sthan_id ?? undefined,
+        sourceFile: r.source_file ?? undefined,
+        uploadedBy: r.uploaded_by ?? undefined,
+        createdAt: this.ctx.toIsoTimestamp(r.created_at),
+        updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+      }));
+      return { items, total, page, pageSize, totalPages };
+    }
+
+    const all = Array.from(this.ctx.sreniContacts.values())
+      .map((c) => ({
+        ...c,
+        sreniName: this.ctx.srenies.get(c.sreniId)?.name ?? c.sreniId,
+      }))
+      .sort((a, b) => a.sreniName.localeCompare(b.sreniName) || a.rowIndex - b.rowIndex);
+    const total = all.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const start = (page - 1) * pageSize;
+    return { items: all.slice(start, start + pageSize), total, page, pageSize, totalPages };
   }
 
   private mapMetricRow(r: { id: string; name: string; description: string | null; unit: string | null; input_type: string; is_required: boolean; sort_order: number; target?: string | null; active: boolean; scope?: string; created_at: string | Date; updated_at: string | Date }): ReportMetricDefinitionRecord {
