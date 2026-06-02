@@ -77,24 +77,23 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, contact, divisions, s
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Assign — ${contactName}`} maxWidth="400px">
       <div style={{ display: 'grid', gap: '18px' }}>
-        <div>
-          <label className="form-label">Division</label>
-          <select
-            className="form-input"
-            value={divisionId}
-            onChange={(e) => setDivisionId(e.target.value)}
-          >
-            <option value="">— None —</option>
-            {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-          {divisions.length === 0 && (
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)', marginTop: '6px' }}>
-              No divisions defined. Use "Manage Divisions" to add some.
-            </p>
-          )}
-        </div>
+        {divisions.length > 0 && (
+          <>
+            <div>
+              <label className="form-label">Division</label>
+              <select
+                className="form-input"
+                value={divisionId}
+                onChange={(e) => setDivisionId(e.target.value)}
+              >
+                <option value="">— None —</option>
+                {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </div>
 
-        <div style={{ height: '1px', background: 'var(--border-dark)' }} />
+            <div style={{ height: '1px', background: 'var(--border-dark)' }} />
+          </>
+        )}
 
         <div>
           <label className="form-label">Sthan</label>

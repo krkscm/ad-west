@@ -15,7 +15,7 @@ import { UserStore } from '../interfaces/user-store.interface';
 
 const DEFAULT_MENUS: Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>[] = [
   { key: 'dashboard',                    label: 'Dashboard',           parentKey: null,       icon: '📊', sortOrder: 10, active: true },
-  { key: 'governance',                   label: 'Governance',          parentKey: null,       icon: '🧭', sortOrder: 15, active: true },
+  { key: 'governance',                   label: 'General Services',    parentKey: null,       icon: '🧭', sortOrder: 15, active: true },
   { key: 'insights',                     label: 'Insights',            parentKey: 'governance', icon: null, sortOrder: 10, active: true },
   { key: 'my-approvals',                 label: 'My Approvals',        parentKey: 'governance', icon: null, sortOrder: 20, active: true },
   { key: 'ai-chatbot',                   label: 'AI Chatbot',          parentKey: 'governance', icon: null, sortOrder: 25, active: true },
@@ -35,11 +35,10 @@ const DEFAULT_MENUS: Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>[] = [
   { key: 'helpdesk-tickets',                 label: 'Helpdesk Tickets',      parentKey: 'helpdesk',          icon: null, sortOrder: 10, active: true },
   { key: 'job-postings',                     label: 'Job Postings',          parentKey: 'helpdesk',          icon: null, sortOrder: 20, active: true },
   { key: 'job-applications',                 label: 'Job Applications',      parentKey: 'helpdesk',          icon: null, sortOrder: 30, active: true },
-  { key: 'member-services',                  label: 'Member Services',       parentKey: null,                icon: '🛎️', sortOrder: 27, active: true },
-  { key: 'member-services-reimbursements',   label: 'Reimbursements',        parentKey: 'member-services',   icon: null, sortOrder: 10, active: true },
-  { key: 'member-services-events',           label: 'Special Events',        parentKey: 'member-services',   icon: null, sortOrder: 20, active: true },
-  { key: 'member-services-notifications',    label: 'Notifications',         parentKey: 'member-services',   icon: null, sortOrder: 30, active: true },
-  { key: 'member-services-gmail',            label: 'Gmail Workspace',        parentKey: 'member-services',   icon: null, sortOrder: 40, active: true },
+  { key: 'member-services-reimbursements',   label: 'Reimbursements',        parentKey: 'governance',        icon: null, sortOrder: 40, active: true },
+  { key: 'member-services-events',           label: 'Special Events',        parentKey: 'governance',        icon: null, sortOrder: 50, active: true },
+  { key: 'member-services-notifications',    label: 'Notifications',         parentKey: 'governance',        icon: null, sortOrder: 60, active: true },
+  { key: 'member-services-gmail',            label: 'Gmail Workspace',       parentKey: 'governance',        icon: null, sortOrder: 70, active: true },
 ];
 
 @Injectable()
@@ -425,7 +424,7 @@ export class MenuManagementService {
       const entity = new MenuItemEntity();
       entity.id = this.cryptoService.randomId('menu');
       entity.key = 'governance';
-      entity.label = 'Governance';
+      entity.label = 'General Services';
       entity.parentKey = null;
       entity.icon = '🧭';
       entity.sortOrder = 15;
@@ -438,12 +437,12 @@ export class MenuManagementService {
       governanceParent.parentKey !== null
       || governanceParent.sortOrder !== 15
       || governanceParent.active !== true
-      || governanceParent.label !== 'Governance'
+      || governanceParent.label !== 'General Services'
     ) {
       governanceParent.parentKey = null;
       governanceParent.sortOrder = 15;
       governanceParent.active = true;
-      governanceParent.label = 'Governance';
+      governanceParent.label = 'General Services';
       governanceParent.icon = governanceParent.icon ?? '🧭';
       governanceParent.updatedAt = now;
       await this.menuRepo!.save(governanceParent);
@@ -615,38 +614,55 @@ export class MenuManagementService {
     if (!this.useDb()) return;
 
     const allMenus = await this.menuRepo!.find();
-    const existingKeys = new Set(allMenus.map((item) => item.key));
+    const byKey = new Map(allMenus.map((item) => [item.key, item]));
     const now = new Date().toISOString();
-    const missing: MenuItemEntity[] = [];
 
-    const definitions = [
-      { key: 'member-services',                label: 'Member Services',  parentKey: null as string | null,  icon: '🛎️', sortOrder: 27 },
-      { key: 'member-services-reimbursements',  label: 'Reimbursements',   parentKey: 'member-services',      icon: null as string | null, sortOrder: 10 },
-      { key: 'member-services-events',          label: 'Special Events',   parentKey: 'member-services',      icon: null as string | null, sortOrder: 20 },
-      { key: 'member-services-notifications',   label: 'Notifications',    parentKey: 'member-services',      icon: null as string | null, sortOrder: 30 },
-      { key: 'member-services-gmail',           label: 'Gmail Workspace',  parentKey: 'member-services',      icon: null as string | null, sortOrder: 40 },
+    const governanceParent = byKey.get('governance');
+    if (!governanceParent) return;
+
+    const definitions: Array<{ key: string; label: string; sortOrder: number }> = [
+      { key: 'member-services-reimbursements', label: 'Reimbursements', sortOrder: 40 },
+      { key: 'member-services-events', label: 'Special Events', sortOrder: 50 },
+      { key: 'member-services-notifications', label: 'Notifications', sortOrder: 60 },
+      { key: 'member-services-gmail', label: 'Gmail Workspace', sortOrder: 70 },
     ];
 
-    for (const def of definitions) {
-      if (existingKeys.has(def.key)) continue;
-      if (def.parentKey && !existingKeys.has(def.parentKey)) continue;
+    for (const definition of definitions) {
+      const existing = byKey.get(definition.key);
+      if (!existing) {
+        const entity = new MenuItemEntity();
+        entity.id = this.cryptoService.randomId('menu');
+        entity.key = definition.key;
+        entity.label = definition.label;
+        entity.parentKey = 'governance';
+        entity.icon = null;
+        entity.sortOrder = definition.sortOrder;
+        entity.active = true;
+        entity.createdAt = now;
+        entity.updatedAt = now;
+        await this.menuRepo!.insert(entity);
+        continue;
+      }
 
-      const entity = new MenuItemEntity();
-      entity.id = this.cryptoService.randomId('menu');
-      entity.key = def.key;
-      entity.label = def.label;
-      entity.parentKey = def.parentKey;
-      entity.icon = def.icon;
-      entity.sortOrder = def.sortOrder;
-      entity.active = true;
-      entity.createdAt = now;
-      entity.updatedAt = now;
-      missing.push(entity);
-      existingKeys.add(def.key);
+      if (
+        existing.parentKey !== 'governance'
+        || existing.sortOrder !== definition.sortOrder
+        || existing.active !== true
+        || existing.label !== definition.label
+      ) {
+        existing.parentKey = 'governance';
+        existing.sortOrder = definition.sortOrder;
+        existing.active = true;
+        existing.label = definition.label;
+        existing.updatedAt = now;
+        await this.menuRepo!.save(existing);
+      }
     }
 
-    if (missing.length > 0) {
-      await this.menuRepo!.insert(missing);
+    // Remove the legacy Member Services parent so admin grant UI has a single-level grouping under governance.
+    const legacyParent = byKey.get('member-services');
+    if (legacyParent) {
+      await this.menuRepo!.delete({ key: 'member-services' });
     }
   }
 }

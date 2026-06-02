@@ -197,10 +197,10 @@ const TAB_METADATA: { [key: string]: { label: string; parent?: 'settings' | 'gov
   'helpdesk-tickets': { label: 'Helpdesk Tickets' },
   'job-postings': { label: 'Job Postings' },
   'job-applications': { label: 'Job Applications' },
-  'member-services-reimbursements': { label: 'Reimbursements' },
-  'member-services-events': { label: 'Special Events' },
-  'member-services-notifications': { label: 'Notifications' },
-  'member-services-gmail': { label: 'Gmail Workspace' },
+  'member-services-reimbursements': { label: 'Reimbursements', parent: 'governance' },
+  'member-services-events': { label: 'Special Events', parent: 'governance' },
+  'member-services-notifications': { label: 'Notifications', parent: 'governance' },
+  'member-services-gmail': { label: 'Gmail Workspace', parent: 'governance' },
 };
 
 const SETTINGS_TABS: ActiveTab[] = Object.entries(TAB_METADATA)
@@ -234,7 +234,7 @@ const buildBreadcrumbItems = (
     items.push({ label: 'Settings', targetTab: SETTINGS_ROOT_TAB });
     items.push({ label: TAB_METADATA[activeTab]?.label ?? activeTab, targetTab: activeTab });
   } else if (GOVERNANCE_TABS.includes(activeTab)) {
-    items.push({ label: 'Governance' });
+    items.push({ label: 'General Services' });
     items.push({ label: TAB_METADATA[activeTab]?.label ?? activeTab, targetTab: activeTab });
   } else if (tabStr.startsWith('sreni-calendar-')) {
     items.push({ label: options?.sreniName ?? 'Sreni' });
@@ -275,7 +275,6 @@ export const AdminDashboardPage: React.FC = () => {
   const [isGovernanceOpen, setIsGovernanceOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isGatewayOpen, setIsGatewayOpen] = useState(false);
-  const [isMemberServicesOpen, setIsMemberServicesOpen] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isVerySmallDevice, setIsVerySmallDevice] = useState(() => window.innerWidth <= 480);
@@ -611,13 +610,26 @@ export const AdminDashboardPage: React.FC = () => {
   const showAiChatbotTab = isSuperAdmin || hasMenuKey('ai-chatbot');
   const showMyApprovalsTab = isSuperAdmin || hasMenuKey('my-approvals');
   const showResponsibilityChartTab = isSuperAdmin || hasMenuKey('settings-responsibility-chart');
+  const showReimbursementsTab = isSuperAdmin || hasMenuKey('member-services-reimbursements');
+  const showEventsTab = isSuperAdmin || hasMenuKey('member-services-events');
+  const showNotificationsTab = isSuperAdmin || hasMenuKey('member-services-notifications');
+  const showGmailTab = isSuperAdmin || hasMenuKey('member-services-gmail');
+
+  const governanceMenu = sidebarMenuItems.find((item) => item.active && item.key === 'governance');
+  const governanceLabel = governanceMenu?.label || 'General Services';
+  const governanceIcon = governanceMenu?.icon || '🧭';
+
   const showGovernanceSection =
     isSuperAdmin ||
     hasMenuKey('governance') ||
     showInsightsTab ||
     showAiChatbotTab ||
     showMyApprovalsTab ||
-    showResponsibilityChartTab;
+    showResponsibilityChartTab ||
+    showReimbursementsTab ||
+    showEventsTab ||
+    showNotificationsTab ||
+    showGmailTab;
 
   const showGatewaySection = isSuperAdmin || hasMenuKey('helpdesk') || hasMenuKey('helpdesk-tickets') || hasMenuKey('job-postings') || hasMenuKey('job-applications');
   const showHelpdeskTicketsTab = isSuperAdmin || hasMenuKey('helpdesk-tickets');
@@ -626,16 +638,8 @@ export const AdminDashboardPage: React.FC = () => {
   const isGatewayTabActive = activeTab === 'helpdesk-tickets' || activeTab === 'job-postings' || activeTab === 'job-applications';
   const isGatewaySectionOpen = isGatewayOpen || isGatewayTabActive;
 
-  const isGovernanceTabActive = activeTab === 'insights' || activeTab === 'ai-chatbot' || activeTab === 'my-approvals' || activeTab === 'settings-responsibility-chart';
+  const isGovernanceTabActive = activeTab === 'insights' || activeTab === 'ai-chatbot' || activeTab === 'my-approvals' || activeTab === 'settings-responsibility-chart' || activeTab === 'member-services-reimbursements' || activeTab === 'member-services-events' || activeTab === 'member-services-notifications' || activeTab === 'member-services-gmail';
   const isGovernanceSectionOpen = isGovernanceOpen || isGovernanceTabActive;
-
-  const showMemberServicesSection = isSuperAdmin || hasMenuKey('member-services') || hasMenuKey('member-services-reimbursements') || hasMenuKey('member-services-events') || hasMenuKey('member-services-notifications') || hasMenuKey('member-services-gmail');
-  const showReimbursementsTab = isSuperAdmin || hasMenuKey('member-services-reimbursements');
-  const showEventsTab = isSuperAdmin || hasMenuKey('member-services-events');
-  const showNotificationsTab = isSuperAdmin || hasMenuKey('member-services-notifications');
-  const showGmailTab = isSuperAdmin || hasMenuKey('member-services-gmail');
-  const isMemberServicesTabActive = activeTab === 'member-services-reimbursements' || activeTab === 'member-services-events' || activeTab === 'member-services-notifications' || activeTab === 'member-services-gmail';
-  const isMemberServicesSectionOpen = isMemberServicesOpen || isMemberServicesTabActive;
 
   // Sreni sidebar menu structure — only items whose keys start with 'sreni-'
   const sreniParentMenus = sidebarMenuItems.filter(m => m.active && m.key.startsWith('sreni-') && !m.parentKey);
@@ -1005,7 +1009,7 @@ export const AdminDashboardPage: React.FC = () => {
                   color: isGovernanceTabActive ? '#fff' : 'var(--text-secondary-dark)',
                   width: '100%',
                 }}
-                title="Governance"
+                title={governanceLabel}
                 onClick={() => {
                   if (isSidebarCollapsed) {
                     if (showInsightsTab) {
@@ -1022,15 +1026,20 @@ export const AdminDashboardPage: React.FC = () => {
                     }
                     if (showResponsibilityChartTab) {
                       setActiveTab('settings-responsibility-chart');
+                      return;
                     }
+                    if (showReimbursementsTab) { setActiveTab('member-services-reimbursements'); return; }
+                    if (showEventsTab) { setActiveTab('member-services-events'); return; }
+                    if (showNotificationsTab) { setActiveTab('member-services-notifications'); return; }
+                    if (showGmailTab) { setActiveTab('member-services-gmail'); return; }
                     return;
                   }
                   setIsGovernanceOpen((prev) => !prev);
                 }}
               >
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                  <span>🧭</span>
-                  {!isSidebarCollapsed && <span>Governance</span>}
+                  <span>{governanceIcon}</span>
+                  {!isSidebarCollapsed && <span>{governanceLabel}</span>}
                 </span>
                 {!isSidebarCollapsed && <span style={{ fontSize: '0.8rem' }}>{isGovernanceSectionOpen ? '▾' : '▸'}</span>}
               </button>
@@ -1116,6 +1125,43 @@ export const AdminDashboardPage: React.FC = () => {
                       }}
                     >
                       🧭 Responsibility Chart
+                    </button>
+                  )}
+
+                  {showReimbursementsTab && (
+                    <button
+                      onClick={() => setActiveTab('member-services-reimbursements')}
+                      className={`btn ${activeTab === 'member-services-reimbursements' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'member-services-reimbursements' ? '' : 'transparent', border: 'none', color: activeTab === 'member-services-reimbursements' ? '#fff' : 'var(--text-secondary-dark)' }}
+                    >
+                      💰 Reimbursements
+                    </button>
+                  )}
+                  {showEventsTab && (
+                    <button
+                      onClick={() => setActiveTab('member-services-events')}
+                      className={`btn ${activeTab === 'member-services-events' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'member-services-events' ? '' : 'transparent', border: 'none', color: activeTab === 'member-services-events' ? '#fff' : 'var(--text-secondary-dark)' }}
+                    >
+                      🗓️ Special Events
+                    </button>
+                  )}
+                  {showNotificationsTab && (
+                    <button
+                      onClick={() => setActiveTab('member-services-notifications')}
+                      className={`btn ${activeTab === 'member-services-notifications' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'member-services-notifications' ? '' : 'transparent', border: 'none', color: activeTab === 'member-services-notifications' ? '#fff' : 'var(--text-secondary-dark)' }}
+                    >
+                      🔔 Notifications
+                    </button>
+                  )}
+                  {showGmailTab && (
+                    <button
+                      onClick={() => setActiveTab('member-services-gmail')}
+                      className={`btn ${activeTab === 'member-services-gmail' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'member-services-gmail' ? '' : 'transparent', border: 'none', color: activeTab === 'member-services-gmail' ? '#fff' : 'var(--text-secondary-dark)' }}
+                    >
+                      ✉️ Gmail Workspace
                     </button>
                   )}
                 </div>
@@ -1348,77 +1394,6 @@ export const AdminDashboardPage: React.FC = () => {
                       }}
                     >
                       📄 Job Applications
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {showMemberServicesSection && (
-            <div>
-              <button
-                className={`btn ${isMemberServicesTabActive ? 'btn-primary' : 'btn-secondary'}`}
-                style={{
-                  justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
-                  padding: '10px 16px', fontSize: '0.9rem',
-                  background: isMemberServicesTabActive ? '' : 'transparent', border: 'none',
-                  color: isMemberServicesTabActive ? '#fff' : 'var(--text-secondary-dark)', width: '100%',
-                }}
-                title="Member Services"
-                onClick={() => {
-                  if (isSidebarCollapsed) {
-                    if (showReimbursementsTab) { setActiveTab('member-services-reimbursements'); return }
-                    if (showEventsTab) { setActiveTab('member-services-events'); return }
-                    if (showNotificationsTab) { setActiveTab('member-services-notifications'); return }
-                    return
-                  }
-                  setIsMemberServicesOpen((prev) => !prev)
-                }}
-              >
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                  <span>🛎️</span>
-                  {!isSidebarCollapsed && <span>Member Services</span>}
-                </span>
-                {!isSidebarCollapsed && <span style={{ fontSize: '0.8rem' }}>{isMemberServicesSectionOpen ? '▾' : '▸'}</span>}
-              </button>
-
-              {isMemberServicesSectionOpen && !isSidebarCollapsed && (
-                <div style={{ display: 'grid', gap: '4px', paddingLeft: '14px' }}>
-                  {showReimbursementsTab && (
-                    <button
-                      onClick={() => setActiveTab('member-services-reimbursements')}
-                      className={`btn ${activeTab === 'member-services-reimbursements' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'member-services-reimbursements' ? '' : 'transparent', border: 'none', color: activeTab === 'member-services-reimbursements' ? '#fff' : 'var(--text-secondary-dark)' }}
-                    >
-                      💰 Reimbursements
-                    </button>
-                  )}
-                  {showEventsTab && (
-                    <button
-                      onClick={() => setActiveTab('member-services-events')}
-                      className={`btn ${activeTab === 'member-services-events' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'member-services-events' ? '' : 'transparent', border: 'none', color: activeTab === 'member-services-events' ? '#fff' : 'var(--text-secondary-dark)' }}
-                    >
-                      🗓️ Special Events
-                    </button>
-                  )}
-                  {showNotificationsTab && (
-                    <button
-                      onClick={() => setActiveTab('member-services-notifications')}
-                      className={`btn ${activeTab === 'member-services-notifications' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'member-services-notifications' ? '' : 'transparent', border: 'none', color: activeTab === 'member-services-notifications' ? '#fff' : 'var(--text-secondary-dark)' }}
-                    >
-                      🔔 Notifications
-                    </button>
-                  )}
-                  {showGmailTab && (
-                    <button
-                      onClick={() => setActiveTab('member-services-gmail')}
-                      className={`btn ${activeTab === 'member-services-gmail' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'member-services-gmail' ? '' : 'transparent', border: 'none', color: activeTab === 'member-services-gmail' ? '#fff' : 'var(--text-secondary-dark)' }}
-                    >
-                      ✉️ Gmail Workspace
                     </button>
                   )}
                 </div>

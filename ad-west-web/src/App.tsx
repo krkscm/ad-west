@@ -70,14 +70,6 @@ function AppContent() {
     if (publicContent) return publicContent;
   }
 
-  // Admin/member login path — fall through to auth flow
-  if (pathname === '/login') {
-    if (adminUser && mustResetPassword) return <ForcePasswordChangePage />;
-    if (adminUser) return <AdminDashboardPage />;
-    if (memberUser) return <MemberPortalPage onBack={() => undefined} />;
-    return <AdminLoginPage />;
-  }
-
   if (isInitializing) {
     return (
       <div className="app-bootstrap-screen admin-theme">
@@ -96,6 +88,14 @@ function AppContent() {
         </div>
       </div>
     );
+  }
+
+  // Admin/member login path — render only after session initialization completes.
+  if (pathname === '/login') {
+    if (adminUser && mustResetPassword) return <ForcePasswordChangePage />;
+    if (adminUser) return <AdminDashboardPage />;
+    if (memberUser) return <MemberPortalPage onBack={() => undefined} />;
+    return <AdminLoginPage />;
   }
 
   // Authenticated users — go to their workspace

@@ -37,6 +37,7 @@ Includes authentication, authorization, identity, and operational settings:
 - Audit: `audit-logs`
 - Roles: `role-definitions`
 - Menu visibility/grants: `menu-items`
+- Menu grant hierarchy now uses a unified `General Services` parent (`governance` key) for governance and member-services child items.
 - Google config: `settings/google-integration-config`
 - SMTP/IMAP config: `settings/smtp-integration-config`
 - Table layouts: `settings/table-layouts`

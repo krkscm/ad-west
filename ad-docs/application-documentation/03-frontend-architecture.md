@@ -17,6 +17,7 @@ The app uses path-based conditional rendering (no external router package in the
 - Authenticated workspaces: admin dashboard or member portal
 
 `AuthProvider` gates workspace rendering until session restoration completes, preventing route flicker during startup.
+The `/login` route also defers rendering the sign-in page until initialization completes, so authenticated refreshes show the bootstrap loader instead of a transient login flash.
 
 ## Primary Frontend Surfaces
 
@@ -72,4 +73,6 @@ These providers establish shared UX behaviors and session-aware access patterns 
 - Shared field and date-time components are reused across operational forms.
 - Dashboard and analytics pages prioritize role/menu-aware visibility and reusable control panels.
 - The frontend honors backend-driven menu grants for governance and settings navigation.
+- Governance and Member Services are presented under a shared sidebar parent group (`General Services`) in the admin workspace while child visibility remains grant-driven.
 - Analytics Studio Detailed Reports now includes Table Customization using persisted per-user table layouts via the shared table-layout modal pattern.
+- In Sreni contact assignment flows, the Division selector is conditionally rendered and is hidden when no division records are available.

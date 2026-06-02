@@ -78,6 +78,7 @@ If your backend runs on a different port, set `VITE_API_PROXY_TARGET` before sta
 - Admin sign-in is code-based now, and Administrator CRUD uses admin code, admin name, active status, and a linked role definition instead of the old profile/scope fields.
 - Super Admins implicitly receive all menu rights; other admins remain managed through admin menu-grant operations in the Admin Management page.
 - Sidebar role gating now normalizes role values (for example, `SUPER_ADMIN` and `Super Admin` both resolve to Super Admin behavior) to avoid visibility mismatches.
+- The admin sidebar now groups Governance and Member Services under one shared collapsible parent (`General Services`) while preserving existing child-level menu grant checks.
 - The app now supports three public utility entry points outside authentication: `/helpdesk` for public support requests, `/jobs` for public job discovery, and `/jobs/apply?job=<jobId>` for direct job application.
 - The public job application form accepts an optional resume upload instead of a free-form URL; the UI checks PDF, DOC, and DOCX extensions, enforces a 1 MB limit, and warns on unsupported MIME types before submit.
 - The internal Job Applications screen opens stored resumes through an authenticated blob download flow, so reviewers can view files without exposing direct unauthenticated links.
@@ -118,6 +119,7 @@ If your backend runs on a different port, set `VITE_API_PROXY_TARGET` before sta
 - Form placeholders use generic sample names/emails (no personal identifiers).
 - The theme switch is shown only after authentication; it is hidden on the login page.
 - On authenticated pages, it is placed in the page header as an icon-only action.
+- In Sreni contact assignment, the Division selector is rendered only when at least one division exists; if none are defined, the Division field is hidden instead of showing an empty dropdown.
 - The admin workspace now includes a persistent authenticated footer aligned to the main content pane, so it does not overlap the left sidebar.
 - On very small devices (`<=480px`), admin navigation now behaves like an app drawer (menu button opens a slide-in sidebar with backdrop) while desktop/tablet sidebar behavior remains unchanged.
 
