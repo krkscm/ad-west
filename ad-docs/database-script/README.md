@@ -56,6 +56,8 @@ This folder contains executable PostgreSQL scripts for ADWest.
 46. 051_sreni_join_us_visibility.sql (Adds explicit Join Us visibility flag on Sreni definitions for public intake filtering)
 47. 055_analytics_studio_layouts.sql (Adds DB-backed saved Analytics Studio layouts per user and per Sreni)
 48. 058_general_services_menu_merge.sql (Merges Governance + Member Services hierarchy into a single General Services parent for admin menu grants)
+49. 063_enum_values_parent_value.sql (Adds parent_value support for hierarchical enum domains such as role_level)
+50. 064_contact_location_hierarchy_tags.sql (Adds explicit zone/sthan/division location tags on contacts for parent-child hierarchy assignment)
 
 ## Enum Visibility Note
 - API now serves only supported active enum domains to the UI, even if legacy rows still exist in `adwest.enum_values`.
@@ -127,5 +129,7 @@ psql "$env:DATABASE_URL" -f "ad-docs/database-script/050_governance_ai_chatbot_m
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/051_sreni_join_us_visibility.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/055_analytics_studio_layouts.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/058_general_services_menu_merge.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/063_enum_values_parent_value.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/064_contact_location_hierarchy_tags.sql"
 ```
 

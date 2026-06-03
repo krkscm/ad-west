@@ -70,8 +70,8 @@ export class InMemoryStoreService implements UserStore {
     const memberSeeds: MemberUser[] = [
       {
         id: 'member_001',
-        fullName: 'John Doe',
-        email: 'john.doe@email.com',
+        fullName: 'Rahul Madhav',
+        email: 'rahul.madhav@email.com',
         phone: '971500000001',
         passwordHash: this.cryptoService.hashPassword('Member@123'),
         failedAttempts: 0,

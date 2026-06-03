@@ -33,6 +33,7 @@ The `/login` route also defers rendering the sign-in page until initialization c
 
 - Admin dashboard and module tabs
 - Governance pages (including insights, approvals, responsibility chart, AI chatbot)
+- Governance Contacts workspace (`governance-contacts`) for global contact upload/review and assignment flows
 - Core business operations (Sreni/Sthan/reporting/attendance)
 - Helpdesk admin operations
 - Member services admin operations
@@ -56,6 +57,8 @@ Frontend API integration is layered:
 2. `src/utils/backendApi.ts`
 	- Domain-specific wrappers for auth, gateway, member services, core business, settings, and analytics operations
 	- Form-data upload wrappers for public job application flows
+	- Global/sreni contact wrappers include upload, active toggle, delete, and cross-Sreni tag assignment APIs
+	- Location definition wrappers now pass hierarchy context (`parentId`) and consume role-level parent mappings
 
 ## Context and Provider Layer
 
@@ -74,5 +77,13 @@ These providers establish shared UX behaviors and session-aware access patterns 
 - Dashboard and analytics pages prioritize role/menu-aware visibility and reusable control panels.
 - The frontend honors backend-driven menu grants for governance and settings navigation.
 - Governance and Member Services are presented under a shared sidebar parent group (`General Services`) in the admin workspace while child visibility remains grant-driven.
+- `Contacts` is an explicit child under `General Services` and is menu-grant aware.
 - Analytics Studio Detailed Reports now includes Table Customization using persisted per-user table layouts via the shared table-layout modal pattern.
-- In Sreni contact assignment flows, the Division selector is conditionally rendered and is hidden when no division records are available.
+- In contact assignment flows, administrators can set primary Sreni division/standalone Sthan assignment.
+- In contact assignment flows, administrators can add additional Sreni tags with per-tag division context.
+- In contact assignment flows, administrators can manage active/inactive lifecycle state.
+- In Location Definition, parent options are inferred from `role_level` enum parent-child relationships.
+
+## Architecture Diagrams
+
+- Governance contacts and assignment flow: `diagrams/frontend-governance-contacts-flow.md`

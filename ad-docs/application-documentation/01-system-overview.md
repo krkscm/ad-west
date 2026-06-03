@@ -20,6 +20,7 @@ The backend supports conditional persistence behavior:
 ## Functional Domains
 
 - Core business operations (Sreni/Sthan, reporting, attendance, analytics)
+- Contact governance and cross-Sreni tagging (global contacts, per-Sreni assignment, activity state)
 - User and access management (auth, roles, menu visibility, sessions)
 - Approval workflow definitions and governance support
 - Public gateway intake (helpdesk, jobs, join-us)
@@ -44,4 +45,6 @@ The backend supports conditional persistence behavior:
 ## Architecture Artifacts
 
 - Primary visual diagram: `diagrams/adwest-architecture.svg`
+- Backend contact/runtime diagram: `diagrams/backend-contact-location-hierarchy.md`
+- Frontend governance/contact diagram: `diagrams/frontend-governance-contacts-flow.md`
 - Details by layer are documented in chapters `02` through `07`.

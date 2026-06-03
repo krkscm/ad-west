@@ -76,6 +76,8 @@ import {
   UpdateSreniDivisionDto,
   AssignContactDivisionDto,
   AssignContactSthanDto,
+  SetContactActiveDto,
+  SetContactSreniTagsDto,
 } from './dto/core-business.dto';
 import { CoreBusinessService } from './core-business.service';
 
@@ -796,6 +798,25 @@ export class CoreBusinessController {
     );
   }
 
+  @Post('org/contacts/upload')
+  @UseGuards(CoreAdminAuthGuard)
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async uploadGlobalContacts(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentUser() actor?: AuthPrincipal,
+  ) {
+    if (!file) throw new BadRequestException('No file uploaded. Send the Excel file as "file" in a multipart/form-data request.');
+    const allowedMimes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'application/octet-stream',
+    ];
+    if (!allowedMimes.includes(file.mimetype) && !file.originalname.match(/\.(xlsx|xls)$/i)) {
+      throw new BadRequestException('Only .xlsx and .xls files are accepted.');
+    }
+    return this.service.uploadGlobalContacts(file.buffer, file.originalname, actor?.email ?? actor?.userId);
+  }
+
   @Patch('org/sreni-definitions/:sreniId/contacts/:contactId/division')
   @UseGuards(CoreAdminAuthGuard)
   async assignContactDivision(
@@ -814,6 +835,40 @@ export class CoreBusinessController {
     @Body() dto: AssignContactSthanDto,
   ) {
     return this.service.assignContactSthan(sreniId, contactId, dto);
+  }
+
+  @Patch('org/sreni-definitions/:sreniId/contacts/:contactId/active')
+  @UseGuards(CoreAdminAuthGuard)
+  toggleContactActive(
+    @Param('sreniId') sreniId: string,
+    @Param('contactId') contactId: string,
+    @Body() dto: SetContactActiveDto,
+  ) {
+    return this.service.toggleContactActive(sreniId, contactId, dto.active);
+  }
+
+  @Delete('org/sreni-definitions/:sreniId/contacts/:contactId')
+  @UseGuards(CoreAdminAuthGuard)
+  deleteContact(
+    @Param('sreniId') sreniId: string,
+    @Param('contactId') contactId: string,
+  ) {
+    return this.service.deleteContact(sreniId, contactId);
+  }
+
+  @Get('org/contacts/:contactId/sreni-tags')
+  @UseGuards(CoreAdminAuthGuard)
+  listContactSreniTags(@Param('contactId') contactId: string) {
+    return this.service.listContactSreniTags(contactId);
+  }
+
+  @Put('org/contacts/:contactId/sreni-tags')
+  @UseGuards(CoreAdminAuthGuard)
+  setContactSreniTags(
+    @Param('contactId') contactId: string,
+    @Body() dto: SetContactSreniTagsDto,
+  ) {
+    return this.service.setContactSreniTags(contactId, dto);
   }
 
   // ── Sreni Divisions ────────────────────────────────────────────────────────

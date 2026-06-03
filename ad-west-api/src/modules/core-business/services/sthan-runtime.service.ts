@@ -23,6 +23,50 @@ export interface SthanRuntimeContext {
 export class SthanRuntimeService {
   constructor(private readonly ctx: SthanRuntimeContext) {}
 
+  private async resolveLocationHierarchy(locationId: string): Promise<{
+    zoneLocationId: string | null;
+    sthanLocationId: string | null;
+    divisionLocationId: string | null;
+  }> {
+    if (!(this.ctx.runtimeMode === 'db' && this.ctx.dataSource)) {
+      return { zoneLocationId: null, sthanLocationId: null, divisionLocationId: null };
+    }
+
+    const rows = await this.ctx.dataSource.query(
+      `SELECT
+          CASE
+            WHEN l.level = 'zone' THEN l.id::text
+            WHEN p1.level = 'zone' THEN p1.id::text
+            WHEN p2.level = 'zone' THEN p2.id::text
+            ELSE NULL
+          END AS zone_location_id,
+          CASE
+            WHEN l.level = 'sthan' THEN l.id::text
+            WHEN p1.level = 'sthan' THEN p1.id::text
+            WHEN p2.level = 'sthan' THEN p2.id::text
+            ELSE NULL
+          END AS sthan_location_id,
+          CASE
+            WHEN l.level = 'division' THEN l.id::text
+            WHEN p1.level = 'division' THEN p1.id::text
+            WHEN p2.level = 'division' THEN p2.id::text
+            ELSE NULL
+          END AS division_location_id
+       FROM adwest.locations l
+       LEFT JOIN adwest.locations p1 ON p1.id::text = l.parent_id
+       LEFT JOIN adwest.locations p2 ON p2.id::text = p1.parent_id
+       WHERE l.id = $1::uuid
+       LIMIT 1`,
+      [locationId],
+    ) as Array<{ zone_location_id: string | null; sthan_location_id: string | null; division_location_id: string | null }>;
+
+    return {
+      zoneLocationId: rows[0]?.zone_location_id ?? null,
+      sthanLocationId: rows[0]?.sthan_location_id ?? null,
+      divisionLocationId: rows[0]?.division_location_id ?? null,
+    };
+  }
+
   // ── Reports ─────────────────────────────────────────────────────────────────
 
   async listSthanReports(locationId: string): Promise<SthanReportRecord[]> {
@@ -165,16 +209,21 @@ export class SthanRuntimeService {
           [locationId],
         ),
         this.ctx.dataSource.query(
-          `SELECT id::text, location_id::text, row_index, data, source_file, uploaded_by, created_at, updated_at
+          `SELECT id::text, location_id::text, row_index, data,
+                  zone_location_id::text, sthan_location_id::text, division_location_id::text,
+                  source_file, uploaded_by, created_at, updated_at
            FROM adwest.sreni_contacts WHERE location_id=$1::uuid ORDER BY row_index LIMIT $2 OFFSET $3`,
           [locationId, pageSize, offset],
         ),
       ]);
       const total = (countRows as Array<{ total: number }>)[0].total;
-      const items = (dataRows as Array<{ id: string; location_id: string; row_index: number; data: Record<string, unknown>; source_file: string | null; uploaded_by: string | null; created_at: string | Date; updated_at: string | Date }>)
+      const items = (dataRows as Array<{ id: string; location_id: string; row_index: number; data: Record<string, unknown>; zone_location_id: string | null; sthan_location_id: string | null; division_location_id: string | null; source_file: string | null; uploaded_by: string | null; created_at: string | Date; updated_at: string | Date }>)
         .map((r) => ({
           id: r.id, locationId: r.location_id, rowIndex: r.row_index,
           data: r.data as Record<string, string | number | boolean | null>,
+          zoneLocationId: r.zone_location_id ?? undefined,
+          sthanLocationId: r.sthan_location_id ?? undefined,
+          divisionLocationId: r.division_location_id ?? undefined,
           sourceFile: r.source_file ?? undefined, uploadedBy: r.uploaded_by ?? undefined,
           createdAt: this.ctx.toIsoTimestamp(r.created_at), updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
         }));
@@ -212,6 +261,7 @@ export class SthanRuntimeService {
     if (parsedRows.length === 0) return { inserted: 0, locationId };
 
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const hierarchy = await this.resolveLocationHierarchy(locationId);
       // Replace existing contacts for this location in the shared sreni_contacts table
       await this.ctx.dataSource.query(
         `DELETE FROM adwest.sreni_contacts WHERE location_id=$1::uuid`,
@@ -219,9 +269,27 @@ export class SthanRuntimeService {
       );
       for (const r of parsedRows) {
         await this.ctx.dataSource.query(
-          `INSERT INTO adwest.sreni_contacts (location_id, row_index, data, source_file, uploaded_by)
-           VALUES ($1::uuid, $2, $3::jsonb, $4, $5)`,
-          [locationId, r.rowIndex, JSON.stringify(r.data), originalName, uploadedBy ?? null],
+          `INSERT INTO adwest.sreni_contacts (
+             location_id,
+             zone_location_id,
+             sthan_location_id,
+             division_location_id,
+             row_index,
+             data,
+             source_file,
+             uploaded_by
+           )
+           VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5, $6::jsonb, $7, $8)`,
+          [
+            locationId,
+            hierarchy.zoneLocationId,
+            hierarchy.sthanLocationId,
+            hierarchy.divisionLocationId,
+            r.rowIndex,
+            JSON.stringify(r.data),
+            originalName,
+            uploadedBy ?? null,
+          ],
         );
       }
     }

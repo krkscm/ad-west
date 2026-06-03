@@ -38,6 +38,9 @@ export class EnumValueEntity {
   @Column({ type: 'boolean', default: true })
   active!: boolean;
 
+  @Column({ name: 'parent_value', type: 'varchar', length: 60, nullable: true, default: null })
+  parentValue!: string | null;
+
   @Column({ name: 'created_at', type: 'varchar', length: 40 })
   createdAt!: string;
 

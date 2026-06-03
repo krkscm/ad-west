@@ -28,6 +28,11 @@ Conditional persistence is controlled by `ENABLE_DB_PERSISTENCE`.
 - Primary domain runtime orchestration and business state handling.
 - Uses store abstraction (`CORE_BUSINESS_STORE`) with in-memory/postgres binding.
 - Exposes a broad endpoint surface from `CoreBusinessController` under the global API prefix.
+- Location definitions now support hierarchy via `level` (`zone`, `sthan`, `division`) and optional `parentId`.
+- Contact runtime supports global contact upload (`POST /api/v1/org/contacts/upload`).
+- Contact runtime supports cross-Sreni tagging (`GET/PUT /api/v1/org/contacts/:contactId/sreni-tags`).
+- Contact runtime supports active-toggle and delete (`PATCH /active`, `DELETE /contacts/:contactId`).
+- Contact runtime persists location hierarchy tags (`zoneLocationId`, `sthanLocationId`, `divisionLocationId`).
 
 ### User Management (`src/modules/user-management`)
 
@@ -65,8 +70,21 @@ Admin operational controllers:
 ### Supporting Modules
 
 - `ApprovalWorkflowDefinitionsModule`: workflow definition layer.
-- `EnumValuesModule`: enum/value catalogs and related boundaries.
+- `EnumValuesModule`: enum/value catalogs and related boundaries, including parent-child enum links via `parentValue` (used by `role_level` hierarchy).
 - `HealthModule`: health endpoints and runtime readiness checks.
+
+## Data Shape Notes
+
+- `LocationRecord.level` accepts `zone | sthan | division`.
+- `LocationRecord.parentId` models location parent-child linkage.
+- `SreniContactRecord` includes primary assignment fields (`divisionId`, `sthanId`).
+- `SreniContactRecord` includes location hierarchy tags (`zoneLocationId`, `sthanLocationId`, `divisionLocationId`).
+- `SreniContactRecord` includes contact status (`active`).
+- Global uploads include duplicate reporting by personal number with source Sreni hints.
+
+## Architecture Diagrams
+
+- Contact and location hierarchy runtime: `diagrams/backend-contact-location-hierarchy.md`
 
 ## Security and Runtime Guards
 

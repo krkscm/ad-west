@@ -1,7 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { AssignContactDivisionDto, AssignContactSthanDto, CreateLocationReportMetricDto, CreateReportMetricDefinitionDto, CreateSreniDivisionDto, CreateSreniReportParameterDto, SubmitSreniMonthlyReportDto, UpdateLocationReportMetricDto, UpdateReportMetricDefinitionDto, UpdateSreniDivisionDto, UpdateSreniReportParameterDto } from '../dto/core-business.dto';
-import type { ReportMetricDefinitionRecord, SreniContactRecord, SreniDivisionRecord, SreniMonthlyReportRecord, SreniReportParameterRecord, SrenyRecord } from '../core-business.service';
+import { AssignContactDivisionDto, AssignContactSthanDto, CreateLocationReportMetricDto, CreateReportMetricDefinitionDto, CreateSreniDivisionDto, CreateSreniReportParameterDto, SetContactSreniTagsDto, SubmitSreniMonthlyReportDto, UpdateLocationReportMetricDto, UpdateReportMetricDefinitionDto, UpdateSreniDivisionDto, UpdateSreniReportParameterDto } from '../dto/core-business.dto';
+import type { ContactSreniTagRecord, GlobalContactUploadDuplicate, ReportMetricDefinitionRecord, SreniContactRecord, SreniDivisionRecord, SreniMonthlyReportRecord, SreniReportParameterRecord, SrenyRecord } from '../core-business.service';
 
 type SreniContactCellValue = string | number | boolean | null;
 
@@ -194,12 +194,13 @@ export class SreniAdminRuntimeService {
         `UPDATE adwest.sreni_contacts
          SET division_id = $1, updated_at = now()
          WHERE id = $2 AND sreni_id = $3
-         RETURNING id, sreni_id, row_index, data, division_id, source_file, uploaded_by, created_at, updated_at`,
+         RETURNING id, sreni_id, row_index, data, zone_location_id, sthan_location_id, division_location_id, division_id, COALESCE(active, true) AS active, source_file, uploaded_by, created_at, updated_at`,
         [divisionId ?? null, contactId, sreniId],
       ) as Array<{
         id: string; sreni_id: string; row_index: number;
         data: Record<string, string | number | boolean | null>;
-        division_id: string | null; source_file: string | null;
+        zone_location_id: string | null; sthan_location_id: string | null; division_location_id: string | null;
+        division_id: string | null; active: boolean; source_file: string | null;
         uploaded_by: string | null; created_at: string | Date; updated_at: string | Date;
       }>;
       if (!rows[0]) throw new NotFoundException('Contact not found');
@@ -209,7 +210,11 @@ export class SreniAdminRuntimeService {
         sreniId: r.sreni_id,
         rowIndex: r.row_index,
         data: r.data ?? {},
+        zoneLocationId: r.zone_location_id ?? undefined,
+        sthanLocationId: r.sthan_location_id ?? undefined,
+        divisionLocationId: r.division_location_id ?? undefined,
         divisionId: r.division_id ?? undefined,
+        active: r.active ?? true,
         sourceFile: r.source_file ?? undefined,
         uploadedBy: r.uploaded_by ?? undefined,
         createdAt: this.ctx.toIsoTimestamp(r.created_at),
@@ -232,12 +237,13 @@ export class SreniAdminRuntimeService {
         `UPDATE adwest.sreni_contacts
          SET sthan_id = $1, updated_at = now()
          WHERE id = $2 AND sreni_id = $3
-         RETURNING id, sreni_id, row_index, data, division_id, sthan_id, source_file, uploaded_by, created_at, updated_at`,
+         RETURNING id, sreni_id, row_index, data, zone_location_id, sthan_location_id, division_location_id, division_id, sthan_id, COALESCE(active, true) AS active, source_file, uploaded_by, created_at, updated_at`,
         [sthanId ?? null, contactId, sreniId],
       ) as Array<{
         id: string; sreni_id: string; row_index: number;
         data: Record<string, string | number | boolean | null>;
-        division_id: string | null; sthan_id: string | null;
+        zone_location_id: string | null; sthan_location_id: string | null; division_location_id: string | null;
+        division_id: string | null; sthan_id: string | null; active: boolean;
         source_file: string | null; uploaded_by: string | null;
         created_at: string | Date; updated_at: string | Date;
       }>;
@@ -245,8 +251,12 @@ export class SreniAdminRuntimeService {
       const r = rows[0];
       const updated: SreniContactRecord = {
         id: r.id, sreniId: r.sreni_id, rowIndex: r.row_index,
-        data: r.data ?? {}, divisionId: r.division_id ?? undefined,
-        sthanId: r.sthan_id ?? undefined,
+        data: r.data ?? {},
+        zoneLocationId: r.zone_location_id ?? undefined,
+        sthanLocationId: r.sthan_location_id ?? undefined,
+        divisionLocationId: r.division_location_id ?? undefined,
+        divisionId: r.division_id ?? undefined,
+        sthanId: r.sthan_id ?? undefined, active: r.active ?? true,
         sourceFile: r.source_file ?? undefined, uploadedBy: r.uploaded_by ?? undefined,
         createdAt: this.ctx.toIsoTimestamp(r.created_at), updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
       };
@@ -264,51 +274,87 @@ export class SreniAdminRuntimeService {
     sreniId: string,
     page = 1,
     pageSize = 50,
-  ): Promise<{ items: SreniContactRecord[]; total: number; page: number; pageSize: number; totalPages: number }> {
+  ): Promise<{ items: (SreniContactRecord & { sreniName: string; isTagged: boolean })[]; total: number; page: number; pageSize: number; totalPages: number }> {
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
       const offset = (page - 1) * pageSize;
+      // Include contacts directly in this sreni AND contacts tagged to this sreni via contact_sreni_tags
       const [countRows, rows] = await Promise.all([
         this.ctx.dataSource.query(
-          `SELECT COUNT(*)::int AS total FROM adwest.sreni_contacts WHERE sreni_id = $1`,
+          `SELECT COUNT(DISTINCT c.id)::int AS total
+           FROM adwest.sreni_contacts c
+           LEFT JOIN adwest.contact_sreni_tags cst ON cst.contact_id = c.id AND cst.sreni_id = $1
+           WHERE c.sreni_id = $1 OR cst.id IS NOT NULL`,
           [sreniId],
         ) as Promise<Array<{ total: number }>>,
         this.ctx.dataSource.query(
-          `SELECT id, sreni_id, row_index, data, division_id, sthan_id, source_file, uploaded_by, created_at, updated_at
-           FROM adwest.sreni_contacts WHERE sreni_id = $1
-           ORDER BY row_index ASC LIMIT $2 OFFSET $3`,
+          `SELECT c.id, c.sreni_id, c.row_index, c.data,
+                  c.zone_location_id, c.sthan_location_id, c.division_location_id,
+                  CASE WHEN c.sreni_id = $1 THEN c.division_id ELSE cst.division_id END AS division_id,
+                  c.sthan_id, COALESCE(c.active, true) AS active,
+                  c.source_file, c.uploaded_by, c.created_at, c.updated_at,
+                  COALESCE(s.name, c.sreni_id) AS sreni_name,
+                  (c.sreni_id != $1) AS is_tagged
+           FROM adwest.sreni_contacts c
+           LEFT JOIN adwest.contact_sreni_tags cst ON cst.contact_id = c.id AND cst.sreni_id = $1
+           LEFT JOIN adwest.srenies s ON s.id::text = c.sreni_id
+           WHERE c.sreni_id = $1 OR cst.id IS NOT NULL
+           ORDER BY (c.sreni_id = $1) DESC, c.row_index ASC
+           LIMIT $2 OFFSET $3`,
           [sreniId, pageSize, offset],
         ) as Promise<Array<{
           id: string; sreni_id: string; row_index: number;
           data: Record<string, string | number | boolean | null>;
-          division_id: string | null; sthan_id: string | null;
+          zone_location_id: string | null; sthan_location_id: string | null; division_location_id: string | null;
+          division_id: string | null; sthan_id: string | null; active: boolean;
           source_file: string | null; uploaded_by: string | null;
           created_at: string | Date; updated_at: string | Date;
+          sreni_name: string; is_tagged: boolean;
         }>>,
       ]);
       const total = countRows[0]?.total ?? 0;
       const totalPages = Math.max(1, Math.ceil(total / pageSize));
-      const items: SreniContactRecord[] = rows.map((r) => ({
+      const items = rows.map((r) => ({
         id: r.id,
         sreniId: r.sreni_id,
         rowIndex: r.row_index,
         data: r.data ?? {},
+        zoneLocationId: r.zone_location_id ?? undefined,
+        sthanLocationId: r.sthan_location_id ?? undefined,
+        divisionLocationId: r.division_location_id ?? undefined,
         divisionId: r.division_id ?? undefined,
         sthanId: r.sthan_id ?? undefined,
+        active: r.active ?? true,
         sourceFile: r.source_file ?? undefined,
         uploadedBy: r.uploaded_by ?? undefined,
         createdAt: this.ctx.toIsoTimestamp(r.created_at),
         updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+        sreniName: r.sreni_name,
+        isTagged: r.is_tagged ?? false,
       }));
       return { items, total, page, pageSize, totalPages };
     }
+    // In-memory: direct contacts + tagged contacts
+    const taggedIds = new Set(
+      Array.from(this.ctx.sreniContacts.values())
+        .filter((c) => c.sreniId !== sreniId)
+        .map((c) => c.id),
+    );
     const all = Array.from(this.ctx.sreniContacts.values())
-      .filter((c) => c.sreniId === sreniId)
-      .sort((a, b) => a.rowIndex - b.rowIndex);
+      .filter((c) => c.sreniId === sreniId || taggedIds.has(c.id))
+      .sort((a, b) => {
+        if (a.sreniId === sreniId && b.sreniId !== sreniId) return -1;
+        if (a.sreniId !== sreniId && b.sreniId === sreniId) return 1;
+        return a.rowIndex - b.rowIndex;
+      })
+      .map((c) => ({
+        ...c,
+        sreniName: this.ctx.srenies.get(c.sreniId ?? '')?.name ?? (c.sreniId ?? ''),
+        isTagged: c.sreniId !== sreniId,
+      }));
     const total = all.length;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     const start = (page - 1) * pageSize;
-    const items = all.slice(start, start + pageSize);
-    return { items, total, page, pageSize, totalPages };
+    return { items: all.slice(start, start + pageSize), total, page, pageSize, totalPages };
   }
 
   async uploadSreniContacts(
@@ -388,6 +434,7 @@ export class SreniAdminRuntimeService {
         sreniId,
         rowIndex: idx + 1,
         data: row,
+        active: true,
         sourceFile: originalName,
         uploadedBy,
         createdAt: now,
@@ -433,6 +480,102 @@ export class SreniAdminRuntimeService {
     return { deleted, sreniId };
   }
 
+  async uploadGlobalContacts(
+    fileBuffer: Buffer,
+    originalName: string,
+    uploadedBy?: string,
+  ): Promise<{ inserted: number; duplicates: GlobalContactUploadDuplicate[] }> {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const XLSX = require('xlsx') as typeof import('xlsx');
+    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) throw new Error('Excel file has no sheets');
+    const sheet = workbook.Sheets[sheetName];
+    const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, blankrows: false, raw: false }) as unknown[][];
+    if (grid.length <= 1) return { inserted: 0, duplicates: [] };
+
+    const headerRow = grid[0] ?? [];
+    const normalizedHeaders = headerRow.map((cell) => normalizeContactTemplateHeader(cell));
+    const parsedRows: Array<{ data: Record<string, SreniContactCellValue>; rowIndex: number }> = [];
+
+    for (let i = 1; i < grid.length; i++) {
+      const row = grid[i] ?? [];
+      const data: Record<string, SreniContactCellValue> = {};
+      let hasValue = false;
+      for (let j = 0; j < normalizedHeaders.length; j++) {
+        const header = normalizedHeaders[j];
+        if (!header) continue;
+        const field = MASTER_SRENI_CONTACT_FIELDS.find((f) => f.header === header);
+        const key = field?.key ?? header.replace(/\s+/g, '_');
+        const val = normalizeSreniContactCell(row[j]);
+        if (val !== null) { data[key] = val; hasValue = true; }
+      }
+      if (hasValue) parsedRows.push({ data, rowIndex: i });
+    }
+
+    if (parsedRows.length === 0) return { inserted: 0, duplicates: [] };
+
+    const duplicates: GlobalContactUploadDuplicate[] = [];
+    const toInsert: Array<{ data: Record<string, SreniContactCellValue>; rowIndex: number }> = [];
+
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      // Collect personal numbers from incoming rows for bulk duplicate check
+      const incomingPNs = parsedRows
+        .map((r) => r.data['personalNumber'])
+        .filter((v): v is string => typeof v === 'string' && v.length > 0);
+
+      const existingRows: Array<{ personal_number: string; sreni_id: string | null }> =
+        incomingPNs.length > 0
+          ? (await this.ctx.dataSource.query(
+              `SELECT data->>'personalNumber' AS personal_number, sreni_id
+               FROM adwest.sreni_contacts
+               WHERE data->>'personalNumber' = ANY($1)`,
+              [incomingPNs],
+            ) as Array<{ personal_number: string; sreni_id: string | null }>)
+          : [];
+
+      const existingPNSet = new Map(existingRows.map((r) => [r.personal_number, r.sreni_id]));
+
+      for (const row of parsedRows) {
+        const pn = typeof row.data['personalNumber'] === 'string' ? row.data['personalNumber'] : null;
+        if (pn && existingPNSet.has(pn)) {
+          duplicates.push({
+            rowIndex: row.rowIndex,
+            name: typeof row.data['name'] === 'string' ? row.data['name'] : null,
+            personalNumber: pn,
+            existingSreniId: existingPNSet.get(pn) ?? null,
+          });
+        } else {
+          toInsert.push(row);
+        }
+      }
+
+      const now = new Date().toISOString();
+      for (const row of toInsert) {
+        await this.ctx.dataSource.query(
+          `INSERT INTO adwest.sreni_contacts (id, sreni_id, row_index, data, active, source_file, uploaded_by, created_at, updated_at)
+           VALUES ($1, NULL, $2, $3, true, $4, $5, $6, $6)`,
+          [this.ctx.newId('sc'), row.rowIndex, row.data, originalName, uploadedBy ?? null, now],
+        );
+      }
+      return { inserted: toInsert.length, duplicates };
+    }
+
+    // In-memory fallback — no duplicate detection
+    const now = new Date().toISOString();
+    for (const row of parsedRows) {
+      const id = this.ctx.newId('sc');
+      const record: SreniContactRecord = {
+        id, sreniId: null, rowIndex: row.rowIndex,
+        data: row.data, active: true,
+        sourceFile: originalName, uploadedBy,
+        createdAt: now, updatedAt: now,
+      };
+      this.ctx.sreniContacts.set(`global:${id}`, record);
+    }
+    return { inserted: parsedRows.length, duplicates: [] };
+  }
+
   async listAllContacts(
     page = 1,
     pageSize = 50,
@@ -445,7 +588,10 @@ export class SreniAdminRuntimeService {
       const totalPages = Math.max(1, Math.ceil(total / pageSize));
       const offset = (page - 1) * pageSize;
       const rows = await this.ctx.dataSource.query(
-        `SELECT c.id, c.sreni_id, c.row_index, c.data, c.division_id, c.sthan_id,
+        `SELECT c.id, c.sreni_id, c.row_index, c.data,
+          c.zone_location_id, c.sthan_location_id, c.division_location_id,
+          c.division_id, c.sthan_id,
+                COALESCE(c.active, true) AS active,
                 c.source_file, c.uploaded_by, c.created_at, c.updated_at,
                 COALESCE(s.name, c.sreni_id) AS sreni_name
          FROM adwest.sreni_contacts c
@@ -456,7 +602,8 @@ export class SreniAdminRuntimeService {
       ) as Array<{
         id: string; sreni_id: string; row_index: number;
         data: Record<string, string | number | boolean | null>;
-        division_id: string | null; sthan_id: string | null; source_file: string | null;
+        zone_location_id: string | null; sthan_location_id: string | null; division_location_id: string | null;
+        division_id: string | null; sthan_id: string | null; active: boolean; source_file: string | null;
         uploaded_by: string | null; created_at: string | Date; updated_at: string | Date;
         sreni_name: string;
       }>;
@@ -466,8 +613,12 @@ export class SreniAdminRuntimeService {
         sreniName: r.sreni_name,
         rowIndex: r.row_index,
         data: r.data ?? {},
+        zoneLocationId: r.zone_location_id ?? undefined,
+        sthanLocationId: r.sthan_location_id ?? undefined,
+        divisionLocationId: r.division_location_id ?? undefined,
         divisionId: r.division_id ?? undefined,
         sthanId: r.sthan_id ?? undefined,
+        active: r.active ?? true,
         sourceFile: r.source_file ?? undefined,
         uploadedBy: r.uploaded_by ?? undefined,
         createdAt: this.ctx.toIsoTimestamp(r.created_at),
@@ -479,7 +630,7 @@ export class SreniAdminRuntimeService {
     const all = Array.from(this.ctx.sreniContacts.values())
       .map((c) => ({
         ...c,
-        sreniName: this.ctx.srenies.get(c.sreniId)?.name ?? c.sreniId,
+        sreniName: (c.sreniId ? (this.ctx.srenies.get(c.sreniId)?.name ?? c.sreniId) : '') as string,
       }))
       .sort((a, b) => a.sreniName.localeCompare(b.sreniName) || a.rowIndex - b.rowIndex);
     const total = all.length;
@@ -835,5 +986,104 @@ export class SreniAdminRuntimeService {
     }
     this.ctx.sreniReportParameters.delete(parameterId);
     return { success: true };
+  }
+
+  async toggleContactActive(sreniId: string, contactId: string, active: boolean): Promise<SreniContactRecord> {
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const rows = await this.ctx.dataSource.query(
+        `UPDATE adwest.sreni_contacts
+         SET active = $1, updated_at = now()
+         WHERE id = $2 AND sreni_id = $3
+         RETURNING id, sreni_id, row_index, data, zone_location_id, sthan_location_id, division_location_id, division_id, sthan_id, active, source_file, uploaded_by, created_at, updated_at`,
+        [active, contactId, sreniId],
+      ) as Array<{
+        id: string; sreni_id: string; row_index: number;
+        data: Record<string, string | number | boolean | null>;
+        zone_location_id: string | null; sthan_location_id: string | null; division_location_id: string | null;
+        division_id: string | null; sthan_id: string | null; active: boolean;
+        source_file: string | null; uploaded_by: string | null;
+        created_at: string | Date; updated_at: string | Date;
+      }>;
+      if (!rows[0]) throw new NotFoundException('Contact not found');
+      const r = rows[0];
+      return {
+        id: r.id, sreniId: r.sreni_id, rowIndex: r.row_index,
+        data: r.data ?? {},
+        zoneLocationId: r.zone_location_id ?? undefined,
+        sthanLocationId: r.sthan_location_id ?? undefined,
+        divisionLocationId: r.division_location_id ?? undefined,
+        divisionId: r.division_id ?? undefined,
+        sthanId: r.sthan_id ?? undefined, active: r.active,
+        sourceFile: r.source_file ?? undefined, uploadedBy: r.uploaded_by ?? undefined,
+        createdAt: this.ctx.toIsoTimestamp(r.created_at), updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+      };
+    }
+    const existing = this.ctx.sreniContacts.get(`${sreniId}:${contactId}`);
+    if (!existing) throw new NotFoundException('Contact not found');
+    const updated: SreniContactRecord = { ...existing, active, updatedAt: new Date().toISOString() };
+    this.ctx.sreniContacts.set(`${sreniId}:${contactId}`, updated);
+    return updated;
+  }
+
+  async deleteContact(sreniId: string, contactId: string): Promise<{ deleted: boolean }> {
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      await this.ctx.dataSource.query(
+        `DELETE FROM adwest.contact_sreni_tags WHERE contact_id = $1`,
+        [contactId],
+      );
+      const result = await this.ctx.dataSource.query(
+        `DELETE FROM adwest.sreni_contacts WHERE id = $1 AND sreni_id = $2`,
+        [contactId, sreniId],
+      ) as { affected?: number };
+      return { deleted: (result?.affected ?? 0) > 0 };
+    }
+    const existed = this.ctx.sreniContacts.has(`${sreniId}:${contactId}`);
+    this.ctx.sreniContacts.delete(`${sreniId}:${contactId}`);
+    return { deleted: existed };
+  }
+
+  async listContactSreniTags(contactId: string): Promise<ContactSreniTagRecord[]> {
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const rows = await this.ctx.dataSource.query(
+        `SELECT id, contact_id, sreni_id, division_id, created_at, updated_at
+         FROM adwest.contact_sreni_tags
+         WHERE contact_id = $1
+         ORDER BY created_at ASC`,
+        [contactId],
+      ) as Array<{
+        id: string; contact_id: string; sreni_id: string;
+        division_id: string | null; created_at: string | Date; updated_at: string | Date;
+      }>;
+      return rows.map((r) => ({
+        id: r.id,
+        contactId: r.contact_id,
+        sreniId: r.sreni_id,
+        divisionId: r.division_id ?? undefined,
+        createdAt: this.ctx.toIsoTimestamp(r.created_at),
+        updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+      }));
+    }
+    return [];
+  }
+
+  async setContactSreniTags(contactId: string, dto: SetContactSreniTagsDto): Promise<ContactSreniTagRecord[]> {
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      await this.ctx.dataSource.query(
+        `DELETE FROM adwest.contact_sreni_tags WHERE contact_id = $1`,
+        [contactId],
+      );
+      if (dto.tags.length === 0) return [];
+      const now = new Date().toISOString();
+      for (const tag of dto.tags) {
+        await this.ctx.dataSource.query(
+          `INSERT INTO adwest.contact_sreni_tags (id, contact_id, sreni_id, division_id, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $5)
+           ON CONFLICT (contact_id, sreni_id) DO UPDATE SET division_id = EXCLUDED.division_id, updated_at = EXCLUDED.updated_at`,
+          [this.ctx.newId('cst'), contactId, tag.sreniId, tag.divisionId ?? null, now],
+        );
+      }
+      return this.listContactSreniTags(contactId);
+    }
+    return [];
   }
 }

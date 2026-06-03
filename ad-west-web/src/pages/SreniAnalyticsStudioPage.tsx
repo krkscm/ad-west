@@ -137,6 +137,70 @@ const isSortDirection = (value: unknown): value is SortDirection => value === 'a
 const isAggregation = (value: unknown): value is Aggregation =>
   value === 'sum' || value === 'avg' || value === 'min' || value === 'max' || value === 'count';
 
+const toText = (value: ScalarValue): string => {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  return String(value);
+};
+
+const tryParseDateMs = (value: ScalarValue): number | null => {
+  if (!value || typeof value !== 'string') return null;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : null;
+};
+
+const csvEscape = (value: ScalarValue): string => {
+  const text = toText(value);
+  if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+};
+
+const formatDateCell = (value: ScalarValue): string => {
+  if (!value) return '-';
+  const ms = tryParseDateMs(String(value));
+  if (ms === null) return String(value);
+  return new Date(ms).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const aggregateValues = (values: number[], aggregation: Aggregation): number => {
+  if (!values.length) return 0;
+  if (aggregation === 'count') return values.length;
+  if (aggregation === 'sum' || aggregation === 'avg') {
+    const sum = values.reduce((acc, v) => acc + v, 0);
+    return aggregation === 'avg' ? sum / values.length : sum;
+  }
+  if (aggregation === 'min') return Math.min(...values);
+  return Math.max(...values);
+};
+
+const toIsoFromEvent = (event: CalendarEventApi): string => {
+  if (!event.date) return event.updatedAt ?? '';
+  const time = event.startTime ? `T${event.startTime}:00` : 'T00:00:00';
+  return `${event.date}${time}`;
+};
+
+const durationMinutes = (startTime: string | null | undefined, endTime: string | null | undefined): number | null => {
+  if (!startTime || !endTime) return null;
+  const [sh, sm] = startTime.split(':').map(Number);
+  const [eh, em] = endTime.split(':').map(Number);
+  if ([sh, sm, eh, em].some(isNaN)) return null;
+  const diff = (eh * 60 + em) - (sh * 60 + sm);
+  return diff >= 0 ? diff : diff + 24 * 60;
+};
+
+const loadAllContacts = async (sreniId: string): Promise<SreniContactRowApi[]> => {
+  const pageSize = 200;
+  const first = await backendApi.listSreniContacts(sreniId, 1, pageSize);
+  const pages: SreniContactRowApi[][] = [first.items];
+  for (let p = 2; p <= first.totalPages; p++) {
+    const next = await backendApi.listSreniContacts(sreniId, p, pageSize);
+    pages.push(next.items);
+  }
+  return pages.flat();
+};
+
 const mergeSavedLayout = (
   current: AnalyticsStudioLayoutApi[],
   saved: AnalyticsStudioLayoutApi,

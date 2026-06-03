@@ -69,6 +69,7 @@ export class ReimbursementController {
     @CurrentUser() user: AuthPrincipal,
   ) {
     if (!body.description?.trim()) throw new BadRequestException('Description is required');
+    if (body.description.trim().length < 5) throw new BadRequestException('Description must be at least 5 characters');
     if (!receipt) throw new BadRequestException('A receipt or proof of payment file is required');
     const amount = parseFloat(body.amount);
     if (!amount || amount <= 0) throw new BadRequestException('Amount must be greater than 0');

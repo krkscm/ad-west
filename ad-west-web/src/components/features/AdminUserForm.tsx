@@ -265,7 +265,7 @@ export const AdminUserForm: React.FC<Props> = ({ editingId, onBack, onSaved }) =
                   className="form-input"
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  placeholder="e.g. Alex Johnson"
+                  placeholder="e.g. Arjun Madhav"
                   required
                 />
               </div>

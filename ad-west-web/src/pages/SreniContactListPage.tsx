@@ -290,14 +290,12 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
   const confirm = useConfirm();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [activeTab, setActiveTab] = useState<'this-sreni' | 'all'>('this-sreni');
   const [showLayoutModal, setShowLayoutModal] = useState(false);
 
-  // ── Table layout hooks (per tab) ──
+  // ── Table layout ──
   const sreniLayout = useTableLayout('sreni-contacts');
-  const allLayout = useTableLayout('all-contacts');
 
-  // ── This Sreni tab state ──
+  // ── State ──
   const [rows, setRows] = useState<SreniContactRowApi[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
   const [total, setTotal] = useState(0);
@@ -310,32 +308,20 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
   const [divisions, setDivisions] = useState<SreniDivisionApi[]>([]);
   const [showDivisionsModal, setShowDivisionsModal] = useState(false);
   const [sthans, setSthans] = useState<SthanBasicApi[]>([]);
-  // Assign modal state
-  const [assignTarget, setAssignTarget] = useState<{ contact: SreniContactRowApi; tab: 'this-sreni' | 'all' } | null>(null);
+  const [assignTarget, setAssignTarget] = useState<SreniContactRowApi | null>(null);
   const [isSavingAssign, setIsSavingAssign] = useState(false);
 
-  // ── All Contacts tab state ──
-  const [allRows, setAllRows] = useState<SreniContactRowApi[]>([]);
-  const [allColumns, setAllColumns] = useState<string[]>([]);
-  const [allTotal, setAllTotal] = useState(0);
-  const [allTotalPages, setAllTotalPages] = useState(1);
-  const [allPage, setAllPage] = useState(1);
-  const [isLoadingAll, setIsLoadingAll] = useState(false);
-
-  // Columns passed to layout hooks exclude 'name' (rendered as a fixed column)
   const sreniColDefs = useMemo(
     () => columns.filter((k) => k !== 'name').map((k) => ({ key: k, label: MASTER_CONTACT_COLUMN_LABELS.get(k) ?? k })),
     [columns],
   );
-  const allColDefs = useMemo(
-    () => allColumns.filter((k) => k !== 'name').map((k) => ({ key: k, label: MASTER_CONTACT_COLUMN_LABELS.get(k) ?? k })),
-    [allColumns],
-  );
-  const visibleSreniCols = sreniLayout.visibleKeys(sreniColDefs);
-  const visibleAllCols = allLayout.visibleKeys(allColDefs);
-
-  const activeLayoutHook = activeTab === 'this-sreni' ? sreniLayout : allLayout;
-  const activeColDefs = activeTab === 'this-sreni' ? sreniColDefs : allColDefs;
+  const visibleSreniCols = useMemo(() => {
+    if (!sreniColDefs.length) return [];
+    const active = sreniLayout.activeId ? sreniLayout.layouts.find((l) => l.id === sreniLayout.activeId) : null;
+    if (!active || !active.columns.length) return sreniColDefs.map((c) => c.key);
+    const defKeys = new Set(sreniColDefs.map((c) => c.key));
+    return active.columns.filter((sc) => sc.visible && defKeys.has(sc.key)).map((sc) => sc.key);
+  }, [sreniLayout.activeId, sreniLayout.layouts, sreniColDefs]);
 
   const loadDivisions = useCallback(() => {
     backendApi.listSreniDivisions(sreniId)
@@ -366,33 +352,12 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
       .finally(() => setIsLoading(false));
   }, [sreniId, pageSize, addToast]);
 
-  const loadAll = useCallback((p: number) => {
-    setIsLoadingAll(true);
-    backendApi.listAllContacts(p, pageSize)
-      .then((res) => {
-        setAllRows(res.items);
-        setAllTotal(res.total);
-        setAllTotalPages(res.totalPages);
-        const colSet = new Set<string>();
-        for (const r of res.items) Object.keys(r.data).forEach((k) => colSet.add(k));
-        if (colSet.size > 0) {
-          const masterOrdered = MASTER_CONTACT_COLUMNS.map((c) => c.key).filter((k) => colSet.has(k));
-          const extras = Array.from(colSet).filter((k) => !MASTER_CONTACT_COLUMN_LABELS.has(k)).sort((a, b) => a.localeCompare(b));
-          setAllColumns([...masterOrdered, ...extras]);
-        }
-      })
-      .catch((err) => addToast(toUiError(err, 'Failed to load all contacts.'), 'error'))
-      .finally(() => setIsLoadingAll(false));
-  }, [pageSize, addToast]);
-
   useEffect(() => {
     setPage(1); setRows([]); setColumns([]); setTotal(0); setTotalPages(1); setSourceFile(null);
-    setAllPage(1); setAllRows([]); setAllColumns([]); setAllTotal(0); setAllTotalPages(1);
     setSthans([]);
     load(1);
-    loadAll(1);
     loadDivisions();
-  }, [sreniId, load, loadAll, loadDivisions]);
+  }, [sreniId, load, loadDivisions]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -430,7 +395,7 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
 
   const handleSaveAssign = async (divisionId: string | null, sthanId: string | null) => {
     if (!assignTarget) return;
-    const { contact, tab } = assignTarget;
+    const contact = assignTarget;
     setIsSavingAssign(true);
     try {
       const [updatedDiv, updatedSthan] = await Promise.all([
@@ -441,16 +406,9 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
           ? backendApi.assignContactSthan(contact.sreniId, contact.id, sthanId)
           : Promise.resolve(contact),
       ]);
-      const merged: SreniContactRowApi = {
-        ...contact,
-        divisionId: updatedDiv.divisionId,
-        sthanId: updatedSthan.sthanId,
-      };
-      if (tab === 'this-sreni') {
-        setRows((prev) => prev.map((r) => (r.id === contact.id ? merged : r)));
-      } else {
-        setAllRows((prev) => prev.map((r) => (r.id === contact.id ? { ...merged, sreniName: r.sreniName } : r)));
-      }
+      setRows((prev) => prev.map((r) => r.id !== contact.id ? r : {
+        ...r, divisionId: updatedDiv.divisionId, sthanId: updatedSthan.sthanId,
+      }));
       setAssignTarget(null);
     } catch (err) {
       addToast(toUiError(err, 'Failed to save assignment.'), 'error');
@@ -483,14 +441,14 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
       <TableLayoutModal
         isOpen={showLayoutModal}
         onClose={() => setShowLayoutModal(false)}
-        tableTitle={activeTab === 'this-sreni' ? `${sreniName} Contacts` : 'All Contacts'}
-        allColumns={activeColDefs}
-        layouts={activeLayoutHook.layouts}
-        activeId={activeLayoutHook.activeId}
-        onActivate={activeLayoutHook.activateLayout}
-        onCreate={(name, cols) => activeLayoutHook.createLayout(name, cols)}
-        onUpdate={(id, cols, nm) => activeLayoutHook.updateLayout(id, cols, nm)}
-        onDelete={activeLayoutHook.deleteLayout}
+        tableTitle={`${sreniName} Contacts`}
+        allColumns={sreniColDefs}
+        layouts={sreniLayout.layouts}
+        activeId={sreniLayout.activeId}
+        onActivate={sreniLayout.activateLayout}
+        onCreate={(name, cols) => sreniLayout.createLayout(name, cols)}
+        onUpdate={(id, cols, nm) => sreniLayout.updateLayout(id, cols, nm)}
+        onDelete={sreniLayout.deleteLayout}
       />
       <DivisionsModal
         isOpen={showDivisionsModal}
@@ -501,7 +459,7 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
       />
       <AssignModal
         isOpen={assignTarget !== null}
-        contact={assignTarget?.contact ?? null}
+        contact={assignTarget}
         divisions={divisions}
         sthans={sthans}
         isSaving={isSavingAssign}
@@ -515,10 +473,7 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>📋 {sreniName} — Contacts</h2>
           <div style={{ marginTop: '10px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <span className="badge badge-info" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid currentColor', background: 'transparent', fontSize: '0.8rem', fontWeight: 600 }}>
-              <span style={{ fontWeight: 800 }}>{total}</span> This Sreni
-            </span>
-            <span className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid var(--border-dark)', background: 'transparent', fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>
-              <span style={{ fontWeight: 700 }}>{allTotal}</span> All Contacts
+              <span style={{ fontWeight: 800 }}>{total}</span> contacts
             </span>
             <span className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid var(--border-dark)', background: 'transparent', fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>
               {divisions.length} division{divisions.length !== 1 ? 's' : ''}
@@ -526,9 +481,7 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
           </div>
         </div>
 
-        {/* Actions — only on This Sreni tab */}
-        {activeTab === 'this-sreni' && (
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
             <button type="button" className="btn btn-secondary" style={{ fontSize: '0.875rem' }} onClick={() => setShowDivisionsModal(true)}>
               Manage Divisions
             </button>
@@ -549,10 +502,9 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
             </button>
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={(e) => void handleUpload(e)} />
           </div>
-        )}
       </div>
 
-      {/* Customize Columns button (always visible, per active tab) */}
+      {/* Columns button */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
         <button
           type="button"
@@ -562,227 +514,102 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
           Columns
-          {activeLayoutHook.activeLayoutName && (
+          {sreniLayout.activeLayoutName && (
             <span style={{ fontSize: '0.72rem', fontWeight: 700, background: 'rgba(99,102,241,0.15)', color: 'var(--primary)', padding: '1px 6px', borderRadius: '4px' }}>
-              {activeLayoutHook.activeLayoutName}
+              {sreniLayout.activeLayoutName}
             </span>
           )}
         </button>
       </div>
-
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-        {(['this-sreni', 'all'] as const).map((tab) => {
-          const isActive = activeTab === tab;
-          const label = tab === 'this-sreni' ? `This Sreni (${total})` : `All Contacts (${allTotal})`;
-          return (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              style={{
-                padding: '8px 18px', borderRadius: '8px', fontSize: '0.875rem', fontWeight: 600,
-                border: `1px solid ${isActive ? 'var(--primary)' : 'var(--border-dark)'}`,
-                background: isActive ? 'rgba(99,102,241,0.12)' : 'transparent',
-                color: isActive ? 'var(--primary)' : 'var(--text-secondary-dark)',
-                cursor: 'pointer',
-              }}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ── This Sreni Tab ── */}
-      {activeTab === 'this-sreni' && (
+      {(isLoading && rows.length === 0) || sreniLayout.loading ? (
+        <div className="glass-panel" style={{ padding: '60px 24px', textAlign: 'center', color: 'var(--text-secondary-dark)' }}>
+          Loading contacts…
+        </div>
+      ) : !isLoading && total === 0 ? (
+        <div className="glass-panel" style={{ padding: '60px 24px', textAlign: 'center' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📋</div>
+          <h3 style={{ fontWeight: 700, marginBottom: '8px' }}>No contacts yet</h3>
+          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', margin: '0 auto 24px', maxWidth: '400px' }}>
+            Upload the master contact Excel template, or tag contacts from other Srenies to this Sreni via the global Contacts page.
+          </p>
+          <button type="button" className="btn btn-primary" onClick={() => fileInputRef.current?.click()}>Upload Excel File</button>
+        </div>
+      ) : (
         <>
-          {!isLoading && total === 0 && (
-            <div className="glass-panel" style={{ padding: '60px 24px', textAlign: 'center' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📋</div>
-              <h3 style={{ fontWeight: 700, marginBottom: '8px' }}>No contacts yet</h3>
-              <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', margin: '0 auto 24px', maxWidth: '400px' }}>
-                Upload the master contact Excel template to populate this Sreni's contact list.
-              </p>
-              <button type="button" className="btn btn-primary" onClick={() => fileInputRef.current?.click()}>Upload Excel File</button>
-            </div>
-          )}
-
-          {(isLoading || total > 0) && (
-            <>
-              {sourceFile && <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.8rem', marginBottom: '12px', fontStyle: 'italic' }}>Source: {sourceFile}</p>}
-              <div className="table-container" style={{ overflowX: 'auto' }}>
-                <table className="custom-table">
-                  <thead>
-                    <tr>
-                      <th style={{ width: '48px', textAlign: 'center' }}>#</th>
-                      <th style={{ whiteSpace: 'nowrap' }}>Name</th>
-                      <th style={{ whiteSpace: 'nowrap' }}>Division</th>
-                      <th style={{ whiteSpace: 'nowrap' }}>Sthan</th>
-                      {isLoading && columns.length === 0 ? <th>Loading…</th> : visibleSreniCols.map((col) => (
-                        <th key={col} style={{ whiteSpace: 'nowrap' }}>{MASTER_CONTACT_COLUMN_LABELS.get(col) ?? col}</th>
+          {sourceFile && <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.8rem', marginBottom: '12px', fontStyle: 'italic' }}>Source: {sourceFile}</p>}
+          <div className="table-container" style={{ overflowX: 'auto' }}>
+            <table className="custom-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '48px', textAlign: 'center' }}>#</th>
+                  <th style={{ whiteSpace: 'nowrap' }}>Name</th>
+                  <th style={{ whiteSpace: 'nowrap' }}>Division</th>
+                  <th style={{ whiteSpace: 'nowrap' }}>Sthan</th>
+                  {isLoading && columns.length === 0 ? <th>Loading…</th> : visibleSreniCols.map((col) => (
+                    <th key={col} style={{ whiteSpace: 'nowrap' }}>{MASTER_CONTACT_COLUMN_LABELS.get(col) ?? col}</th>
+                  ))}
+                  <th style={{ width: '80px' }} />
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <tr key={i}>
+                      <td>{i + 1}</td>
+                      {Array.from({ length: Math.max(visibleSreniCols.length + 3, 5) }).map((__, j) => (
+                        <td key={j}><div style={{ height: '12px', borderRadius: '4px', background: 'var(--border-dark)', width: `${50 + (j * 17) % 40}%`, animation: 'pulse 1.4s ease-in-out infinite' }} /></td>
                       ))}
-                      <th style={{ width: '80px' }} />
                     </tr>
-                  </thead>
-                  <tbody>
-                    {isLoading ? (
-                      Array.from({ length: 6 }).map((_, i) => (
-                        <tr key={i}>
-                          <td>{i + 1}</td>
-                          {Array.from({ length: Math.max(visibleSreniCols.length + 3, 5) }).map((__, j) => (
-                            <td key={j}><div style={{ height: '12px', borderRadius: '4px', background: 'var(--border-dark)', width: `${50 + (j * 17) % 40}%`, animation: 'pulse 1.4s ease-in-out infinite' }} /></td>
-                          ))}
-                        </tr>
-                      ))
-                    ) : rows.map((row) => {
-                      const divName = row.divisionId ? divisions.find((d) => d.id === row.divisionId)?.name : null;
-                      const sthanName = row.sthanId ? sthans.find((s) => s.id === row.sthanId)?.name : null;
-                      return (
-                        <tr key={row.id}>
-                          <td style={{ textAlign: 'center', color: 'var(--text-secondary-dark)', fontSize: '0.8rem' }}>{row.rowIndex}</td>
-                          <td style={{ fontWeight: 600, whiteSpace: 'nowrap', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {row.data['name'] != null ? String(row.data['name']) : <span style={{ color: 'var(--text-secondary-dark)', opacity: 0.45 }}>—</span>}
+                  ))
+                ) : rows.map((row) => {
+                  const divName = row.divisionId ? divisions.find((d) => d.id === row.divisionId)?.name : null;
+                  const sthanName = row.sthanId ? sthans.find((s) => s.id === row.sthanId)?.name : null;
+                  return (
+                    <tr key={row.id}>
+                      <td style={{ textAlign: 'center', color: 'var(--text-secondary-dark)', fontSize: '0.8rem' }}>{row.rowIndex}</td>
+                      <td style={{ fontWeight: 600, whiteSpace: 'nowrap', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <span>{row.data['name'] != null ? String(row.data['name']) : <span style={{ color: 'var(--text-secondary-dark)', opacity: 0.45 }}>—</span>}</span>
+                        {row.isTagged && (
+                          <span style={{ marginLeft: '6px', fontSize: '0.68rem', fontWeight: 700, background: 'rgba(249,115,22,0.12)', color: '#fb923c', padding: '1px 6px', borderRadius: '4px', border: '1px solid rgba(249,115,22,0.3)', verticalAlign: 'middle' }}>
+                            {row.sreniName ?? 'tagged'}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        {divName
+                          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', fontWeight: 600, background: 'rgba(99,102,241,0.1)', color: '#818cf8', padding: '2px 8px', borderRadius: '5px', border: '1px solid rgba(99,102,241,0.25)' }}>{divName}</span>
+                          : <span style={{ opacity: 0.4, fontSize: '0.84rem' }}>—</span>}
+                      </td>
+                      <td>
+                        {sthanName
+                          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', fontWeight: 600, background: 'rgba(20,184,166,0.1)', color: '#2dd4bf', padding: '2px 8px', borderRadius: '5px', border: '1px solid rgba(20,184,166,0.25)' }}>{sthanName}</span>
+                          : <span style={{ opacity: 0.4, fontSize: '0.84rem' }}>—</span>}
+                      </td>
+                      {visibleSreniCols.map((col) => {
+                        const val = row.data[col];
+                        return (
+                          <td key={col} style={{ maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={val != null ? String(val) : undefined}>
+                            {val != null ? String(val) : <span style={{ color: 'var(--text-secondary-dark)', opacity: 0.45 }}>—</span>}
                           </td>
-                          <td>
-                            {divName
-                              ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', fontWeight: 600, background: 'rgba(99,102,241,0.1)', color: '#818cf8', padding: '2px 8px', borderRadius: '5px', border: '1px solid rgba(99,102,241,0.25)' }}>{divName}</span>
-                              : <span style={{ opacity: 0.4, fontSize: '0.84rem' }}>—</span>}
-                          </td>
-                          <td>
-                            {sthanName
-                              ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', fontWeight: 600, background: 'rgba(20,184,166,0.1)', color: '#2dd4bf', padding: '2px 8px', borderRadius: '5px', border: '1px solid rgba(20,184,166,0.25)' }}>{sthanName}</span>
-                              : <span style={{ opacity: 0.4, fontSize: '0.84rem' }}>—</span>}
-                          </td>
-                          {visibleSreniCols.map((col) => {
-                            const val = row.data[col];
-                            return (
-                              <td key={col} style={{ maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={val != null ? String(val) : undefined}>
-                                {val != null ? String(val) : <span style={{ color: 'var(--text-secondary-dark)', opacity: 0.45 }}>—</span>}
-                              </td>
-                            );
-                          })}
-                          <td style={{ whiteSpace: 'nowrap' }}>
-                            <button
-                              type="button"
-                              className="btn btn-secondary"
-                              style={{ padding: '4px 10px', fontSize: '0.8rem' }}
-                              onClick={() => setAssignTarget({ contact: row, tab: 'this-sreni' })}
-                            >
-                              Assign
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              {renderPagination(page, totalPages, (p) => { setPage(p); load(p); })}
-            </>
-          )}
-        </>
-      )}
-
-      {/* ── All Contacts Tab ── */}
-      {activeTab === 'all' && (
-        <>
-          {isLoadingAll && allRows.length === 0 && (
-            <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary-dark)' }}>Loading all contacts…</div>
-          )}
-
-          {(!isLoadingAll && allTotal === 0) && (
-            <div className="glass-panel" style={{ padding: '60px 24px', textAlign: 'center' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📋</div>
-              <h3 style={{ fontWeight: 700, marginBottom: '8px' }}>No contacts in the system yet</h3>
-              <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem' }}>Upload contacts from any Sreni's contact page to see them here.</p>
-            </div>
-          )}
-
-          {(isLoadingAll || allTotal > 0) && (
-            <>
-              <div className="table-container" style={{ overflowX: 'auto' }}>
-                <table className="custom-table">
-                  <thead>
-                    <tr>
-                      <th style={{ width: '48px', textAlign: 'center' }}>#</th>
-                      <th style={{ whiteSpace: 'nowrap' }}>Name</th>
-                      <th style={{ whiteSpace: 'nowrap' }}>Sthan</th>
-                      <th style={{ whiteSpace: 'nowrap' }}>Sreni</th>
-                      {isLoadingAll && allColumns.length === 0 ? <th>Loading…</th> : visibleAllCols.map((col) => (
-                        <th key={col} style={{ whiteSpace: 'nowrap' }}>{MASTER_CONTACT_COLUMN_LABELS.get(col) ?? col}</th>
-                      ))}
-                      <th style={{ width: '80px' }} />
+                        );
+                      })}
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ padding: '4px 10px', fontSize: '0.8rem' }}
+                          onClick={() => setAssignTarget(row)}
+                        >
+                          Assign
+                        </button>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {isLoadingAll ? (
-                      Array.from({ length: 6 }).map((_, i) => (
-                        <tr key={i}>
-                          <td>{i + 1}</td>
-                          {Array.from({ length: Math.max(visibleAllCols.length + 4, 6) }).map((__, j) => (
-                            <td key={j}><div style={{ height: '12px', borderRadius: '4px', background: 'var(--border-dark)', width: `${50 + (j * 17) % 40}%`, animation: 'pulse 1.4s ease-in-out infinite' }} /></td>
-                          ))}
-                        </tr>
-                      ))
-                    ) : allRows.map((row, idx) => {
-                      const sthanName = row.sthanId ? sthans.find((s) => s.id === row.sthanId)?.name : null;
-                      return (
-                        <tr key={row.id}>
-                          <td style={{ textAlign: 'center', color: 'var(--text-secondary-dark)', fontSize: '0.8rem' }}>{(allPage - 1) * pageSize + idx + 1}</td>
-                          <td style={{ fontWeight: 600, whiteSpace: 'nowrap', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {row.data['name'] != null ? String(row.data['name']) : <span style={{ color: 'var(--text-secondary-dark)', opacity: 0.45 }}>—</span>}
-                          </td>
-                          <td>
-                            {sthanName
-                              ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', fontWeight: 600, background: 'rgba(20,184,166,0.1)', color: '#2dd4bf', padding: '2px 8px', borderRadius: '5px', border: '1px solid rgba(20,184,166,0.25)' }}>{sthanName}</span>
-                              : <span style={{ opacity: 0.4, fontSize: '0.84rem' }}>—</span>}
-                          </td>
-                          <td style={{ whiteSpace: 'nowrap' }}>
-                            <span style={{
-                              display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', fontWeight: 600,
-                              background: row.sreniId === sreniId ? 'rgba(99,102,241,0.1)' : 'transparent',
-                              color: row.sreniId === sreniId ? '#818cf8' : 'var(--text-secondary-dark)',
-                              padding: '2px 8px', borderRadius: '5px',
-                              border: `1px solid ${row.sreniId === sreniId ? 'rgba(99,102,241,0.25)' : 'var(--border-dark)'}`,
-                            }}>
-                              {row.sreniName ?? row.sreniId}
-                            </span>
-                          </td>
-                          {visibleAllCols.map((col) => {
-                            const val = row.data[col];
-                            return (
-                              <td key={col} style={{ maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={val != null ? String(val) : undefined}>
-                                {val != null ? String(val) : <span style={{ color: 'var(--text-secondary-dark)', opacity: 0.45 }}>—</span>}
-                              </td>
-                            );
-                          })}
-                          <td style={{ whiteSpace: 'nowrap' }}>
-                            <button
-                              type="button"
-                              className="btn btn-secondary"
-                              style={{ padding: '4px 10px', fontSize: '0.8rem' }}
-                              onClick={() => setAssignTarget({ contact: row, tab: 'all' })}
-                            >
-                              Assign
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              {renderPagination(allPage, allTotalPages, (p) => { setAllPage(p); loadAll(p); })}
-            </>
-          )}
-
-          <div className="glass-panel" style={{ padding: '12px 16px', marginTop: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '1rem', flexShrink: 0 }}>ℹ️</span>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>
-              Read-only view. Contacts highlighted in purple belong to <strong>{sreniName}</strong>. To upload or manage contacts, switch to the <strong>This Sreni</strong> tab.
-            </span>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
+          {renderPagination(page, totalPages, (p) => { setPage(p); load(p); })}
         </>
       )}
     </div>

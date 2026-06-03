@@ -122,13 +122,14 @@ export class OrgRuntimeService {
         [searchParam, levelParam],
       ),
       this.ctx.dataSource.query(
-        `SELECT id, code, name, level, active, created_at, updated_at FROM adwest.locations WHERE ($1::text IS NULL OR name ILIKE $1 OR code ILIKE $1) AND ($2::text IS NULL OR level = $2) ORDER BY name LIMIT $3 OFFSET $4`,
+        `SELECT id, code, name, level, parent_id, active, created_at, updated_at FROM adwest.locations WHERE ($1::text IS NULL OR name ILIKE $1 OR code ILIKE $1) AND ($2::text IS NULL OR level = $2) ORDER BY name LIMIT $3 OFFSET $4`,
         [searchParam, levelParam, pageSize, (page - 1) * pageSize],
       ),
     ]);
     const total = (countRows as Array<{ total: number }>)[0].total;
-    const items = (dataRows as Array<{ id: string; code: string | null; name: string; level: string; active: boolean; created_at: string | Date; updated_at: string | Date }>).map((r) => ({
-      id: r.id, code: r.code ?? undefined, name: r.name, level: r.level as 'zone' | 'sthan', active: r.active,
+    const items = (dataRows as Array<{ id: string; code: string | null; name: string; level: string; parent_id: string | null; active: boolean; created_at: string | Date; updated_at: string | Date }>).map((r) => ({
+      id: r.id, code: r.code ?? undefined, name: r.name, level: r.level as 'zone' | 'sthan' | 'division',
+      parentId: r.parent_id ?? undefined, active: r.active,
       createdAt: this.ctx.toIsoTimestamp(r.created_at), updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
     }));
     return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) || 1 };
@@ -142,6 +143,7 @@ export class OrgRuntimeService {
         code: dto.code,
         name: dto.name,
         level: dto.level,
+        parentId: dto.parentId ?? undefined,
         active: true,
         createdAt: now,
         updatedAt: now,
@@ -151,17 +153,18 @@ export class OrgRuntimeService {
     }
 
     const rows = (await this.ctx.dataSource.query(
-      `INSERT INTO adwest.locations (code, name, level)
-       VALUES ($1, $2, $3)
-       RETURNING id, code, name, level, active, created_at, updated_at`,
-      [dto.code ?? null, dto.name, dto.level],
-    )) as Array<{ id: string; code: string | null; name: string; level: string; active: boolean; created_at: string | Date; updated_at: string | Date }>;
+      `INSERT INTO adwest.locations (code, name, level, parent_id)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, code, name, level, parent_id, active, created_at, updated_at`,
+      [dto.code ?? null, dto.name, dto.level, dto.parentId ?? null],
+    )) as Array<{ id: string; code: string | null; name: string; level: string; parent_id: string | null; active: boolean; created_at: string | Date; updated_at: string | Date }>;
     const row = rows[0];
     const record: LocationRecord = {
       id: row.id,
       code: row.code ?? undefined,
       name: row.name,
-      level: row.level as 'zone' | 'sthan',
+      level: row.level as 'zone' | 'sthan' | 'division',
+      parentId: row.parent_id ?? undefined,
       active: row.active,
       createdAt: this.ctx.toIsoTimestamp(row.created_at),
       updatedAt: this.ctx.toIsoTimestamp(row.updated_at),
@@ -193,12 +196,12 @@ export class OrgRuntimeService {
   async updateLocation(locationId: string, dto: UpdateLocationDto): Promise<LocationRecord> {
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource && !this.ctx.locations.has(locationId)) {
       const rows = await this.ctx.dataSource.query(
-        'SELECT id, code, name, level, active, created_at, updated_at FROM adwest.locations WHERE id=$1',
+        'SELECT id, code, name, level, parent_id, active, created_at, updated_at FROM adwest.locations WHERE id=$1',
         [locationId],
-      ) as Array<{ id: string; code: string | null; name: string; level: string; active: boolean; created_at: string | Date; updated_at: string | Date }>;
+      ) as Array<{ id: string; code: string | null; name: string; level: string; parent_id: string | null; active: boolean; created_at: string | Date; updated_at: string | Date }>;
       if (!rows.length) throw new NotFoundException('Location not found');
       const r = rows[0];
-      this.ctx.locations.set(r.id, { id: r.id, code: r.code ?? undefined, name: r.name, level: r.level as 'zone' | 'sthan', active: r.active, createdAt: this.ctx.toIsoTimestamp(r.created_at), updatedAt: this.ctx.toIsoTimestamp(r.updated_at) });
+      this.ctx.locations.set(r.id, { id: r.id, code: r.code ?? undefined, name: r.name, level: r.level as 'zone' | 'sthan' | 'division', parentId: r.parent_id ?? undefined, active: r.active, createdAt: this.ctx.toIsoTimestamp(r.created_at), updatedAt: this.ctx.toIsoTimestamp(r.updated_at) });
     }
     const current = this.ctx.locations.get(locationId);
     if (!current) {
@@ -212,6 +215,7 @@ export class OrgRuntimeService {
         code: dto.code !== undefined ? dto.code : current.code,
         active: dto.active !== undefined ? dto.active : current.active,
         level: dto.level ?? current.level,
+        parentId: dto.parentId !== undefined ? (dto.parentId ?? undefined) : current.parentId,
         updatedAt: new Date().toISOString(),
       };
       this.ctx.locations.set(locationId, updated);
@@ -222,19 +226,21 @@ export class OrgRuntimeService {
     const nextCode = dto.code !== undefined ? dto.code : current.code ?? null;
     const nextActive = dto.active !== undefined ? dto.active : current.active;
     const nextLevel = dto.level ?? current.level;
+    const nextParentId = dto.parentId !== undefined ? (dto.parentId ?? null) : (current.parentId ?? null);
     const rows = (await this.ctx.dataSource.query(
       `UPDATE adwest.locations
-       SET name = $2, code = $3, active = $4, level = $5, updated_at = now()
+       SET name = $2, code = $3, active = $4, level = $5, parent_id = $6, updated_at = now()
        WHERE id = $1
-       RETURNING id, code, name, level, active, created_at, updated_at`,
-      [locationId, nextName, nextCode, nextActive, nextLevel],
-    )) as unknown as [Array<{ id: string; code: string | null; name: string; level: string; active: boolean; created_at: string | Date; updated_at: string | Date }>, number];
+       RETURNING id, code, name, level, parent_id, active, created_at, updated_at`,
+      [locationId, nextName, nextCode, nextActive, nextLevel, nextParentId],
+    )) as unknown as [Array<{ id: string; code: string | null; name: string; level: string; parent_id: string | null; active: boolean; created_at: string | Date; updated_at: string | Date }>, number];
     const row = rows[0][0];
     const updated: LocationRecord = {
       id: row.id,
       code: row.code ?? undefined,
       name: row.name,
-      level: row.level as 'zone' | 'sthan',
+      level: row.level as 'zone' | 'sthan' | 'division',
+      parentId: row.parent_id ?? undefined,
       active: row.active,
       createdAt: this.ctx.toIsoTimestamp(row.created_at),
       updatedAt: this.ctx.toIsoTimestamp(row.updated_at),

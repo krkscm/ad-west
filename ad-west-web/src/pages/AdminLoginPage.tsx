@@ -79,7 +79,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = () => {
             <input
               type="text"
               className="form-input"
-              placeholder="e.g. alex.user@example.com"
+              placeholder="e.g. arjun.madhav@example.com"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               required

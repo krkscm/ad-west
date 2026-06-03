@@ -70,6 +70,7 @@ import {
   UpdateSreniDivisionDto,
   AssignContactDivisionDto,
   AssignContactSthanDto,
+  SetContactSreniTagsDto,
 } from './dto/core-business.dto';
 import { ApprovalRuntimeService } from './services/approval-runtime.service';
 import { AttendanceRuntimeService, type AttendanceRuntimeContext } from './services/attendance-runtime.service';
@@ -101,6 +102,8 @@ import type {
   AttendanceMetricRecord,
   AttendanceRecord,
   CalendarEventRecord,
+  ContactSreniTagRecord,
+  GlobalContactUploadDuplicate,
   CoreBusinessPersistenceReadinessRecord,
   DocumentFolderRecord,
   DocumentRecord,
@@ -165,6 +168,8 @@ export type {
   ReportSubmissionRecord,
   ReportTemplateRecord,
   RegistrationRecord,
+  ContactSreniTagRecord,
+  GlobalContactUploadDuplicate,
   SreniContactRecord,
   SreniDivisionRecord,
   SreniMonthlyReportRecord,
@@ -1502,11 +1507,35 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getSreniAdminRuntime().clearSreniContacts(sreniId);
   }
 
+  async uploadGlobalContacts(
+    fileBuffer: Buffer,
+    originalName: string,
+    uploadedBy?: string,
+  ): Promise<{ inserted: number; duplicates: GlobalContactUploadDuplicate[] }> {
+    return this.getSreniAdminRuntime().uploadGlobalContacts(fileBuffer, originalName, uploadedBy);
+  }
+
   async listAllContacts(
     page = 1,
     pageSize = 50,
   ): Promise<{ items: (SreniContactRecord & { sreniName: string })[]; total: number; page: number; pageSize: number; totalPages: number }> {
     return this.getSreniAdminRuntime().listAllContacts(page, pageSize);
+  }
+
+  async toggleContactActive(sreniId: string, contactId: string, active: boolean): Promise<SreniContactRecord> {
+    return this.getSreniAdminRuntime().toggleContactActive(sreniId, contactId, active);
+  }
+
+  async deleteContact(sreniId: string, contactId: string): Promise<{ deleted: boolean }> {
+    return this.getSreniAdminRuntime().deleteContact(sreniId, contactId);
+  }
+
+  async listContactSreniTags(contactId: string): Promise<ContactSreniTagRecord[]> {
+    return this.getSreniAdminRuntime().listContactSreniTags(contactId);
+  }
+
+  async setContactSreniTags(contactId: string, dto: SetContactSreniTagsDto): Promise<ContactSreniTagRecord[]> {
+    return this.getSreniAdminRuntime().setContactSreniTags(contactId, dto);
   }
 
   // ── Report Metric Definitions ───────────────────────────────────────────────

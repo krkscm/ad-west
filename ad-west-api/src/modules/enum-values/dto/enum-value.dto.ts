@@ -26,6 +26,11 @@ export class CreateEnumValueDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  parentValue?: string | null;
 }
 
 export class UpdateEnumValueDto {
@@ -50,6 +55,11 @@ export class UpdateEnumValueDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  parentValue?: string | null;
 }
 
 export class ListEnumValuesQueryDto {

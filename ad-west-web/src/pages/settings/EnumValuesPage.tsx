@@ -24,9 +24,10 @@ interface FormState {
   label: string
   sortOrder: string
   active: boolean
+  parentValue: string
 }
 
-const BLANK_FORM: FormState = { value: '', label: '', sortOrder: '0', active: true }
+const BLANK_FORM: FormState = { value: '', label: '', sortOrder: '0', active: true, parentValue: '' }
 
 export const EnumValuesPage: React.FC = () => {
   const { addToast } = useToast()
@@ -70,7 +71,7 @@ export const EnumValuesPage: React.FC = () => {
   const openEdit = (item: EnumValueApi) => {
     setEditingId(item.id)
     setIsAdding(false)
-    setForm({ value: item.value, label: item.label, sortOrder: String(item.sortOrder), active: item.active })
+    setForm({ value: item.value, label: item.label, sortOrder: String(item.sortOrder), active: item.active, parentValue: item.parentValue ?? '' })
   }
 
   const openAdd = () => {
@@ -97,12 +98,14 @@ export const EnumValuesPage: React.FC = () => {
 
     setIsSaving(true)
     try {
+      const cleanParentValue = form.parentValue.trim() || null
       if (editingId) {
         const updated = await backendApi.updateEnumValue(editingId, {
           value: form.value.trim(),
           label: form.label.trim(),
           sortOrder,
           active: form.active,
+          parentValue: cleanParentValue,
         })
         setAllValues((prev) => prev.map((v) => v.id === editingId ? updated : v))
         addToast('Value updated.', 'success')
@@ -115,6 +118,7 @@ export const EnumValuesPage: React.FC = () => {
           label: form.label.trim(),
           sortOrder,
           active: form.active,
+          parentValue: cleanParentValue,
         })
         setAllValues((prev) => [...prev, created])
         if (!types.includes(enumType)) {
@@ -153,6 +157,10 @@ export const EnumValuesPage: React.FC = () => {
       addToast(toUiError(e, 'Failed to delete.'), 'error')
     }
   }
+
+  const effectiveFormType = isAdding ? newEnumType.trim() : selectedType
+  const showParentField = effectiveFormType === 'role_level'
+  const parentCandidates = visibleValues.filter((v) => v.id !== editingId)
 
   return (
     <div className="animate-slide-up">
@@ -243,7 +251,7 @@ export const EnumValuesPage: React.FC = () => {
                 <div style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--primary)', marginBottom: '14px' }}>
                   {editingId ? 'Edit Value' : 'Add New Value'}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: isAdding ? '1fr 1fr 1fr 120px 100px' : '1fr 1fr 120px 100px', gap: '12px', alignItems: 'end' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isAdding ? `1fr 1fr 1fr${showParentField ? ' 1fr' : ''} 120px 100px` : `1fr 1fr${showParentField ? ' 1fr' : ''} 120px 100px`, gap: '12px', alignItems: 'end' }}>
                   {isAdding && (
                     <div className="form-group" style={{ margin: 0 }}>
                       <label className="form-label">Enum Type *</label>
@@ -277,6 +285,22 @@ export const EnumValuesPage: React.FC = () => {
                       placeholder="e.g. In Progress"
                     />
                   </div>
+                  {showParentField && (
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">Parent Level <span style={{ color: 'var(--text-secondary-dark)', fontWeight: 400 }}>(optional)</span></label>
+                      <select
+                        className="form-input"
+                        value={form.parentValue}
+                        onChange={(e) => setForm((f) => ({ ...f, parentValue: e.target.value }))}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <option value="">— None (top level) —</option>
+                        {parentCandidates.map((p) => (
+                          <option key={p.id} value={p.value}>{p.label} ({p.value})</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label">Sort Order</label>
                     <input
@@ -332,7 +356,7 @@ export const EnumValuesPage: React.FC = () => {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border-dark)' }}>
-                    {(['Value', 'Label', 'Sort', 'Active', ''] as const).map((h) => (
+                    {(['Value', 'Label', ...(selectedType === 'role_level' ? ['Parent'] : []), 'Sort', 'Active', ''] as const).map((h) => (
                       <th key={h} style={{
                         padding: '10px 16px', textAlign: h === '' ? 'right' : 'left',
                         fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase',
@@ -358,6 +382,13 @@ export const EnumValuesPage: React.FC = () => {
                         <td style={{ padding: '12px 16px', fontSize: '0.875rem', fontWeight: 500 }}>
                           {item.label}
                         </td>
+                        {selectedType === 'role_level' && (
+                          <td style={{ padding: '12px 16px', fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>
+                            {item.parentValue
+                              ? (() => { const p = allValues.find((v) => v.enumType === 'role_level' && v.value === item.parentValue); return p ? <><code style={{ fontSize: '0.78rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(99,102,241,0.08)', color: 'var(--primary)' }}>{p.value}</code> <span>{p.label}</span></> : <span style={{ fontStyle: 'italic' }}>{item.parentValue}</span>; })()
+                              : <span style={{ opacity: 0.4 }}>—</span>}
+                          </td>
+                        )}
                         <td style={{ padding: '12px 16px', fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>
                           {item.sortOrder}
                         </td>

@@ -149,8 +149,12 @@ export class CreateLocationDto {
   @IsString()
   code?: string;
 
-  @IsIn(['zone', 'sthan'])
-  level!: 'zone' | 'sthan';
+  @IsIn(['zone', 'sthan', 'division'])
+  level!: 'zone' | 'sthan' | 'division';
+
+  @IsOptional()
+  @IsString()
+  parentId?: string | null;
 }
 
 export class UpdateLocationDto {
@@ -168,8 +172,12 @@ export class UpdateLocationDto {
   active?: boolean;
 
   @IsOptional()
-  @IsIn(['zone', 'sthan'])
-  level?: 'zone' | 'sthan';
+  @IsIn(['zone', 'sthan', 'division'])
+  level?: 'zone' | 'sthan' | 'division';
+
+  @IsOptional()
+  @IsString()
+  parentId?: string | null;
 }
 
 export class CreateGovernanceStructureDto {
@@ -1172,4 +1180,23 @@ export class AssignContactSthanDto {
   @IsOptional()
   @IsString()
   sthanId?: string | null;
+}
+
+export class SetContactActiveDto {
+  @IsBoolean()
+  active!: boolean;
+}
+
+export class ContactSreniTagItemDto {
+  @IsString()
+  sreniId!: string;
+
+  @IsOptional()
+  @IsString()
+  divisionId?: string | null;
+}
+
+export class SetContactSreniTagsDto {
+  @IsArray()
+  tags!: ContactSreniTagItemDto[];
 }

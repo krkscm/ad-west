@@ -18,7 +18,7 @@ const DEFAULT_MENUS: Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>[] = [
   { key: 'governance',                   label: 'General Services',    parentKey: null,       icon: '🧭', sortOrder: 15, active: true },
   { key: 'insights',                     label: 'Insights',            parentKey: 'governance', icon: null, sortOrder: 10, active: true },
   { key: 'my-approvals',                 label: 'My Approvals',        parentKey: 'governance', icon: null, sortOrder: 20, active: true },
-  { key: 'ai-chatbot',                   label: 'AI Chatbot',          parentKey: 'governance', icon: null, sortOrder: 25, active: true },
+  { key: 'ai-chatbot',                   label: 'AI Chatbot',          parentKey: 'governance', icon: null, sortOrder: 90, active: true },
   { key: 'settings',                     label: 'Settings',            parentKey: null,       icon: '⚙️', sortOrder: 20, active: true },
   { key: 'settings-roles-definition',    label: 'Roles Definition',    parentKey: 'settings', icon: null, sortOrder: 10, active: true },
   { key: 'settings-location-definition', label: 'Location Definition', parentKey: 'settings', icon: null, sortOrder: 20, active: true },
@@ -29,16 +29,17 @@ const DEFAULT_MENUS: Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>[] = [
   { key: 'settings-admins',              label: 'Admin Management',    parentKey: 'settings', icon: null, sortOrder: 60, active: true },
   { key: 'settings-approval-workflows',  label: 'Approval Workflows',  parentKey: 'settings', icon: null, sortOrder: 70, active: true },
   { key: 'settings-users',               label: 'Users',               parentKey: 'settings', icon: null, sortOrder: 80, active: true },
-  { key: 'settings-responsibility-chart', label: 'Responsibility Chart', parentKey: 'governance', icon: null, sortOrder: 30, active: true },
+  { key: 'settings-responsibility-chart', label: 'Responsibility Chart', parentKey: 'governance', icon: null, sortOrder: 40, active: true },
   { key: 'settings-google-integration',  label: 'Google Integration',  parentKey: 'settings', icon: null, sortOrder: 95, active: true },
   { key: 'helpdesk',                         label: 'Helpdesk',              parentKey: null,                icon: '🛠️', sortOrder: 25, active: true },
   { key: 'helpdesk-tickets',                 label: 'Helpdesk Tickets',      parentKey: 'helpdesk',          icon: null, sortOrder: 10, active: true },
   { key: 'job-postings',                     label: 'Job Postings',          parentKey: 'helpdesk',          icon: null, sortOrder: 20, active: true },
   { key: 'job-applications',                 label: 'Job Applications',      parentKey: 'helpdesk',          icon: null, sortOrder: 30, active: true },
-  { key: 'member-services-reimbursements',   label: 'Reimbursements',        parentKey: 'governance',        icon: null, sortOrder: 40, active: true },
-  { key: 'member-services-events',           label: 'Special Events',        parentKey: 'governance',        icon: null, sortOrder: 50, active: true },
-  { key: 'member-services-notifications',    label: 'Notifications',         parentKey: 'governance',        icon: null, sortOrder: 60, active: true },
-  { key: 'member-services-gmail',            label: 'Gmail Workspace',       parentKey: 'governance',        icon: null, sortOrder: 70, active: true },
+  { key: 'governance-contacts',              label: 'Contacts',              parentKey: 'governance',        icon: null, sortOrder: 30, active: true },
+  { key: 'member-services-reimbursements',   label: 'Reimbursements',        parentKey: 'governance',        icon: null, sortOrder: 50, active: true },
+  { key: 'member-services-events',           label: 'Special Events',        parentKey: 'governance',        icon: null, sortOrder: 60, active: true },
+  { key: 'member-services-notifications',    label: 'Notifications',         parentKey: 'governance',        icon: null, sortOrder: 70, active: true },
+  { key: 'member-services-gmail',            label: 'Gmail Workspace',       parentKey: 'governance',        icon: null, sortOrder: 80, active: true },
 ];
 
 @Injectable()
@@ -451,8 +452,8 @@ export class MenuManagementService {
     const childDefinitions: Array<{ key: string; label: string; sortOrder: number }> = [
       { key: 'insights', label: 'Insights', sortOrder: 10 },
       { key: 'my-approvals', label: 'My Approvals', sortOrder: 20 },
-      { key: 'ai-chatbot', label: 'AI Chatbot', sortOrder: 25 },
-      { key: 'settings-responsibility-chart', label: 'Responsibility Chart', sortOrder: 30 },
+      { key: 'settings-responsibility-chart', label: 'Responsibility Chart', sortOrder: 40 },
+      { key: 'ai-chatbot', label: 'AI Chatbot', sortOrder: 90 },
     ];
 
     for (const definition of childDefinitions) {
@@ -621,10 +622,11 @@ export class MenuManagementService {
     if (!governanceParent) return;
 
     const definitions: Array<{ key: string; label: string; sortOrder: number }> = [
-      { key: 'member-services-reimbursements', label: 'Reimbursements', sortOrder: 40 },
-      { key: 'member-services-events', label: 'Special Events', sortOrder: 50 },
-      { key: 'member-services-notifications', label: 'Notifications', sortOrder: 60 },
-      { key: 'member-services-gmail', label: 'Gmail Workspace', sortOrder: 70 },
+      { key: 'governance-contacts', label: 'Contacts', sortOrder: 30 },
+      { key: 'member-services-reimbursements', label: 'Reimbursements', sortOrder: 50 },
+      { key: 'member-services-events', label: 'Special Events', sortOrder: 60 },
+      { key: 'member-services-notifications', label: 'Notifications', sortOrder: 70 },
+      { key: 'member-services-gmail', label: 'Gmail Workspace', sortOrder: 80 },
     ];
 
     for (const definition of definitions) {

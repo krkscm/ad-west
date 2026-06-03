@@ -12,7 +12,8 @@ export interface LocationRecord {
   id: string;
   code?: string;
   name: string;
-  level: 'zone' | 'sthan';
+  level: 'zone' | 'sthan' | 'division';
+  parentId?: string;
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -442,15 +443,35 @@ export interface SreniDivisionRecord {
   updatedAt: string;
 }
 
+export interface GlobalContactUploadDuplicate {
+  rowIndex: number;
+  name: string | null;
+  personalNumber: string | null;
+  existingSreniId: string | null;
+}
+
 export interface SreniContactRecord {
   id: string;
-  sreniId: string;
+  sreniId: string | null;
   rowIndex: number;
   data: Record<string, string | number | boolean | null>;
+  zoneLocationId?: string;
+  sthanLocationId?: string;
+  divisionLocationId?: string;
   divisionId?: string;
   sthanId?: string;
+  active: boolean;
   sourceFile?: string;
   uploadedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContactSreniTagRecord {
+  id: string;
+  contactId: string;
+  sreniId: string;
+  divisionId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -573,6 +594,9 @@ export interface SthanContactRecord {
   locationId: string;
   rowIndex: number;
   data: Record<string, string | number | boolean | null>;
+  zoneLocationId?: string;
+  sthanLocationId?: string;
+  divisionLocationId?: string;
   sourceFile?: string;
   uploadedBy?: string;
   createdAt: string;

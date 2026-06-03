@@ -12,25 +12,26 @@ export interface EnumValue {
   label: string;
   sortOrder: number;
   active: boolean;
+  parentValue: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 const SEED_VALUES: Omit<EnumValue, 'id' | 'createdAt' | 'updatedAt'>[] = [
   // Admin roles
-  { enumType: 'admin_role', value: 'SUPER_ADMIN',  label: 'Super Admin',  sortOrder: 10, active: true },
-  { enumType: 'admin_role', value: 'ZONE_ADMIN',   label: 'Zone Admin',   sortOrder: 20, active: true },
-  { enumType: 'admin_role', value: 'SRENY_ADMIN',  label: 'Sreny Admin',  sortOrder: 30, active: true },
+  { enumType: 'admin_role', value: 'SUPER_ADMIN',  label: 'Super Admin',  sortOrder: 10, active: true, parentValue: null },
+  { enumType: 'admin_role', value: 'ZONE_ADMIN',   label: 'Zone Admin',   sortOrder: 20, active: true, parentValue: null },
+  { enumType: 'admin_role', value: 'SRENY_ADMIN',  label: 'Sreny Admin',  sortOrder: 30, active: true, parentValue: null },
   // Scope types
-  { enumType: 'scope_type', value: 'global', label: 'Global', sortOrder: 10, active: true },
-  { enumType: 'scope_type', value: 'zone',   label: 'Zone',   sortOrder: 20, active: true },
-  { enumType: 'scope_type', value: 'sreny',  label: 'Sreny',  sortOrder: 30, active: true },
+  { enumType: 'scope_type', value: 'global', label: 'Global', sortOrder: 10, active: true, parentValue: null },
+  { enumType: 'scope_type', value: 'zone',   label: 'Zone',   sortOrder: 20, active: true, parentValue: null },
+  { enumType: 'scope_type', value: 'sreny',  label: 'Sreny',  sortOrder: 30, active: true, parentValue: null },
   // Role levels
-  { enumType: 'role_level', value: 'ZONE',  label: 'Zone',  sortOrder: 10, active: true },
-  { enumType: 'role_level', value: 'STHAN', label: 'Sthan', sortOrder: 20, active: true },
+  { enumType: 'role_level', value: 'ZONE',  label: 'Zone',  sortOrder: 10, active: true, parentValue: null },
+  { enumType: 'role_level', value: 'STHAN', label: 'Sthan', sortOrder: 20, active: true, parentValue: 'ZONE' },
   // Approval modes
-  { enumType: 'approval_mode', value: 'sequential', label: 'Sequential', sortOrder: 10, active: true },
-  { enumType: 'approval_mode', value: 'parallel',   label: 'Parallel',   sortOrder: 20, active: true },
+  { enumType: 'approval_mode', value: 'sequential', label: 'Sequential', sortOrder: 10, active: true, parentValue: null },
+  { enumType: 'approval_mode', value: 'parallel',   label: 'Parallel',   sortOrder: 20, active: true, parentValue: null },
 ];
 
 const SUPPORTED_ENUM_TYPES = new Set<string>([
@@ -74,6 +75,7 @@ export class EnumValuesService {
       label: e.label,
       sortOrder: e.sortOrder,
       active: e.active,
+      parentValue: e.parentValue ?? null,
       createdAt: e.createdAt,
       updatedAt: e.updatedAt,
     };
@@ -134,6 +136,7 @@ export class EnumValuesService {
       label: dto.label,
       sortOrder: dto.sortOrder ?? 0,
       active: dto.active ?? true,
+      parentValue: dto.parentValue ?? null,
       createdAt: now,
       updatedAt: now,
     };
@@ -160,6 +163,7 @@ export class EnumValuesService {
       label: dto.label ?? item.label,
       sortOrder: dto.sortOrder ?? item.sortOrder,
       active: dto.active ?? item.active,
+      parentValue: dto.parentValue !== undefined ? (dto.parentValue ?? null) : item.parentValue,
       updatedAt: new Date().toISOString(),
     };
 
@@ -208,6 +212,7 @@ export class EnumValuesService {
     e.label = item.label;
     e.sortOrder = item.sortOrder;
     e.active = item.active;
+    e.parentValue = item.parentValue;
     e.createdAt = item.createdAt;
     e.updatedAt = item.updatedAt;
     return e;

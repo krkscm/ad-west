@@ -2,7 +2,7 @@
 
 This directory is the architecture and runtime reference for the live ADWest implementation.
 
-Prepared on: 2026-06-01
+Prepared on: 2026-06-04
 
 ## Document Index
 
@@ -15,6 +15,8 @@ Prepared on: 2026-06-01
 7. [07-runtime-and-deployment.md](./07-runtime-and-deployment.md)
 8. [08-performance-and-security-baselines.md](./08-performance-and-security-baselines.md)
 9. [diagrams/adwest-architecture.svg](./diagrams/adwest-architecture.svg)
+10. [diagrams/backend-contact-location-hierarchy.md](./diagrams/backend-contact-location-hierarchy.md)
+11. [diagrams/frontend-governance-contacts-flow.md](./diagrams/frontend-governance-contacts-flow.md)
 
 ## Source Inputs
 

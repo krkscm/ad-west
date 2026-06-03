@@ -40,6 +40,7 @@ import { NotificationCarouselModal } from '../components/common/NotificationCaro
 import { GmailWorkspacePanel } from '../components/features/GmailWorkspacePanel';
 import { InsightsPage } from './InsightsPage';
 import { AiChatbotPage } from './governance/AiChatbotPage';
+import { GlobalContactsPage } from './GlobalContactsPage';
 import {
   ApprovalWorkflowDefinitionApi,
   backendApi,
@@ -122,6 +123,7 @@ type ActiveTab =
   | 'member-services-events'
   | 'member-services-notifications'
   | 'member-services-gmail'
+  | 'governance-contacts'
   | `sreni-calendar-${string}`
   | `sreni-contacts-${string}`
   | `sreni-attendance-${string}`
@@ -143,6 +145,7 @@ const ALL_TABS: ActiveTab[] = [
   'insights', 'ai-chatbot',
   'helpdesk-tickets', 'job-postings', 'job-applications',
   'member-services-reimbursements', 'member-services-events', 'member-services-notifications', 'member-services-gmail',
+  'governance-contacts',
 ];
 
 const LEGACY_TAB_REDIRECTS: Record<string, ActiveTab> = {
@@ -201,6 +204,7 @@ const TAB_METADATA: { [key: string]: { label: string; parent?: 'settings' | 'gov
   'member-services-events': { label: 'Special Events', parent: 'governance' },
   'member-services-notifications': { label: 'Notifications', parent: 'governance' },
   'member-services-gmail': { label: 'Gmail Workspace', parent: 'governance' },
+  'governance-contacts': { label: 'Contacts', parent: 'governance' },
 };
 
 const SETTINGS_TABS: ActiveTab[] = Object.entries(TAB_METADATA)
@@ -390,11 +394,11 @@ export const AdminDashboardPage: React.FC = () => {
   // Metrics state
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const [programs, setPrograms] = useState<UiProgram[]>([]);
-  const [openTicketsCount, setOpenTicketsCount] = useState(0);
-  const [newApplicationsCount, setNewApplicationsCount] = useState(0);
-  const [underReviewApplicationsCount, setUnderReviewApplicationsCount] = useState(0);
-  const [activeJobPostingsCount, setActiveJobPostingsCount] = useState(0);
-  const [expiringJobPostingsCount, setExpiringJobPostingsCount] = useState(0);
+  const [, setOpenTicketsCount] = useState(0);
+  const [, setNewApplicationsCount] = useState(0);
+  const [, setUnderReviewApplicationsCount] = useState(0);
+  const [, setActiveJobPostingsCount] = useState(0);
+  const [, setExpiringJobPostingsCount] = useState(0);
   const [srenyId, setSrenyId] = useState('');
   const [docFolderName, setDocFolderName] = useState('Weekly Reports');
   const [docFileName, setDocFileName] = useState('sreny-weekly-summary.pdf');
@@ -501,7 +505,7 @@ export const AdminDashboardPage: React.FC = () => {
             if (!eventInDateRange(item.event?.date, fromIso, toIso)) return innerSum;
             const eventScore = item.metrics.reduce((eventTotal, metricItem) => {
               const values = metricItem.capture?.values ?? {};
-              const numericTotal = Object.values(values).reduce((acc, value) => acc + parseNumericValue(value), 0);
+              const numericTotal = Object.values(values as Record<string, unknown>).reduce<number>((acc, value) => acc + parseNumericValue(value), 0);
               return eventTotal + (numericTotal > 0 ? numericTotal : metricItem.capture ? 1 : 0);
             }, 0);
             return innerSum + eventScore;
@@ -614,6 +618,7 @@ export const AdminDashboardPage: React.FC = () => {
   const showEventsTab = isSuperAdmin || hasMenuKey('member-services-events');
   const showNotificationsTab = isSuperAdmin || hasMenuKey('member-services-notifications');
   const showGmailTab = isSuperAdmin || hasMenuKey('member-services-gmail');
+  const showContactsTab = isSuperAdmin || hasMenuKey('governance-contacts');
 
   const governanceMenu = sidebarMenuItems.find((item) => item.active && item.key === 'governance');
   const governanceLabel = governanceMenu?.label || 'General Services';
@@ -629,7 +634,8 @@ export const AdminDashboardPage: React.FC = () => {
     showReimbursementsTab ||
     showEventsTab ||
     showNotificationsTab ||
-    showGmailTab;
+    showGmailTab ||
+    showContactsTab;
 
   const showGatewaySection = isSuperAdmin || hasMenuKey('helpdesk') || hasMenuKey('helpdesk-tickets') || hasMenuKey('job-postings') || hasMenuKey('job-applications');
   const showHelpdeskTicketsTab = isSuperAdmin || hasMenuKey('helpdesk-tickets');
@@ -638,7 +644,7 @@ export const AdminDashboardPage: React.FC = () => {
   const isGatewayTabActive = activeTab === 'helpdesk-tickets' || activeTab === 'job-postings' || activeTab === 'job-applications';
   const isGatewaySectionOpen = isGatewayOpen || isGatewayTabActive;
 
-  const isGovernanceTabActive = activeTab === 'insights' || activeTab === 'ai-chatbot' || activeTab === 'my-approvals' || activeTab === 'settings-responsibility-chart' || activeTab === 'member-services-reimbursements' || activeTab === 'member-services-events' || activeTab === 'member-services-notifications' || activeTab === 'member-services-gmail';
+  const isGovernanceTabActive = activeTab === 'insights' || activeTab === 'ai-chatbot' || activeTab === 'my-approvals' || activeTab === 'settings-responsibility-chart' || activeTab === 'member-services-reimbursements' || activeTab === 'member-services-events' || activeTab === 'member-services-notifications' || activeTab === 'member-services-gmail' || activeTab === 'governance-contacts';
   const isGovernanceSectionOpen = isGovernanceOpen || isGovernanceTabActive;
 
   // Sreni sidebar menu structure — only items whose keys start with 'sreni-'
@@ -688,15 +694,6 @@ export const AdminDashboardPage: React.FC = () => {
   });
   const sidebarWidth = isSidebarCollapsed ? '84px' : '260px';
   const currentYear = new Date().getFullYear();
-  const uniqueZoneCount = new Set(programs.map((program) => program.subtitle).filter(Boolean)).size;
-  const mappedSreniesCount = programs.filter((program) => Boolean(program.subtitle)).length;
-  const unmappedSreniesCount = programs.length - mappedSreniesCount;
-  const coverageRate = programs.length > 0 ? Math.round((mappedSreniesCount / programs.length) * 100) : 0;
-  const intakeBacklogCount = openTicketsCount + newApplicationsCount + underReviewApplicationsCount;
-  const hiringPipelineCount = newApplicationsCount + underReviewApplicationsCount;
-  const reviewLoadRate = hiringPipelineCount > 0 ? Math.round((underReviewApplicationsCount / hiringPipelineCount) * 100) : 0;
-  const backlogPerSreni = programs.length > 0 ? Number((intakeBacklogCount / programs.length).toFixed(1)) : 0;
-  const isSreniAdmin = !isSuperAdmin && !isZoneAdmin;
   const thresholdProfile = isSuperAdmin
     ? { approvalsWatch: 5, approvalsCritical: 15, intakeWatch: 10, intakeCritical: 25, coverageWatch: 80, coverageHealthy: 92, expiringWatch: 2, expiringCritical: 6, unmappedWatch: 1, unmappedCritical: 4, reviewLoadWatch: 55, reviewLoadCritical: 75, backlogDensityWatch: 2, backlogDensityCritical: 4 }
     : isZoneAdmin
@@ -717,23 +714,6 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   const approvalsSignal = toSignal(pendingApprovalsCount, thresholdProfile.approvalsWatch, thresholdProfile.approvalsCritical);
-  const intakeSignal = toSignal(intakeBacklogCount, thresholdProfile.intakeWatch, thresholdProfile.intakeCritical);
-  const unmappedSignal: 'healthy' | 'watch' | 'critical' | 'neutral' = programs.length === 0
-    ? 'neutral'
-    : toSignal(unmappedSreniesCount, thresholdProfile.unmappedWatch, thresholdProfile.unmappedCritical);
-  const expiringSignal = toSignal(expiringJobPostingsCount, thresholdProfile.expiringWatch, thresholdProfile.expiringCritical);
-  const reviewLoadSignal = toSignal(reviewLoadRate, thresholdProfile.reviewLoadWatch, thresholdProfile.reviewLoadCritical);
-  const backlogDensitySignal: 'healthy' | 'watch' | 'critical' | 'neutral' = programs.length === 0
-    ? 'neutral'
-    : toSignal(backlogPerSreni, thresholdProfile.backlogDensityWatch, thresholdProfile.backlogDensityCritical);
-  const coverageSignal: 'healthy' | 'watch' | 'critical' | 'neutral' = programs.length === 0
-    ? 'neutral'
-    : coverageRate >= thresholdProfile.coverageHealthy
-    ? 'healthy'
-    : coverageRate >= thresholdProfile.coverageWatch
-    ? 'watch'
-    : 'critical';
-
   const dashboardHeading = isSuperAdmin
     ? 'Executive Dashboard'
     : isZoneAdmin
@@ -1020,10 +1000,7 @@ export const AdminDashboardPage: React.FC = () => {
                       setActiveTab('my-approvals');
                       return;
                     }
-                    if (showAiChatbotTab) {
-                      setActiveTab('ai-chatbot');
-                      return;
-                    }
+                    if (showContactsTab) { setActiveTab('governance-contacts'); return; }
                     if (showResponsibilityChartTab) {
                       setActiveTab('settings-responsibility-chart');
                       return;
@@ -1032,6 +1009,7 @@ export const AdminDashboardPage: React.FC = () => {
                     if (showEventsTab) { setActiveTab('member-services-events'); return; }
                     if (showNotificationsTab) { setActiveTab('member-services-notifications'); return; }
                     if (showGmailTab) { setActiveTab('member-services-gmail'); return; }
+                    if (showAiChatbotTab) { setActiveTab('ai-chatbot'); return; }
                     return;
                   }
                   setIsGovernanceOpen((prev) => !prev);
@@ -1078,36 +1056,20 @@ export const AdminDashboardPage: React.FC = () => {
                     >
                       <span>📝 My Approvals</span>
                       {pendingApprovalsCount > 0 && (
-                        <span
-                          style={{
-                            background: 'var(--warning)',
-                            color: '#fff',
-                            borderRadius: '10px',
-                            padding: '1px 7px',
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                          }}
-                        >
+                        <span style={{ background: 'var(--warning)', color: '#fff', borderRadius: '10px', padding: '1px 7px', fontSize: '0.72rem', fontWeight: 700 }}>
                           {pendingApprovalsCount}
                         </span>
                       )}
                     </button>
                   )}
 
-                  {showAiChatbotTab && (
+                  {showContactsTab && (
                     <button
-                      onClick={() => setActiveTab('ai-chatbot')}
-                      className={`btn ${activeTab === 'ai-chatbot' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{
-                        justifyContent: 'flex-start',
-                        padding: '8px 14px',
-                        fontSize: '0.84rem',
-                        background: activeTab === 'ai-chatbot' ? '' : 'transparent',
-                        border: 'none',
-                        color: activeTab === 'ai-chatbot' ? '#fff' : 'var(--text-secondary-dark)',
-                      }}
+                      onClick={() => setActiveTab('governance-contacts')}
+                      className={`btn ${activeTab === 'governance-contacts' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'governance-contacts' ? '' : 'transparent', border: 'none', color: activeTab === 'governance-contacts' ? '#fff' : 'var(--text-secondary-dark)' }}
                     >
-                      🤖 AI Chatbot
+                      📋 Contacts
                     </button>
                   )}
 
@@ -1115,14 +1077,7 @@ export const AdminDashboardPage: React.FC = () => {
                     <button
                       onClick={() => setActiveTab('settings-responsibility-chart')}
                       className={`btn ${activeTab === 'settings-responsibility-chart' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{
-                        justifyContent: 'flex-start',
-                        padding: '8px 14px',
-                        fontSize: '0.84rem',
-                        background: activeTab === 'settings-responsibility-chart' ? '' : 'transparent',
-                        border: 'none',
-                        color: activeTab === 'settings-responsibility-chart' ? '#fff' : 'var(--text-secondary-dark)',
-                      }}
+                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'settings-responsibility-chart' ? '' : 'transparent', border: 'none', color: activeTab === 'settings-responsibility-chart' ? '#fff' : 'var(--text-secondary-dark)' }}
                     >
                       🧭 Responsibility Chart
                     </button>
@@ -1162,6 +1117,15 @@ export const AdminDashboardPage: React.FC = () => {
                       style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'member-services-gmail' ? '' : 'transparent', border: 'none', color: activeTab === 'member-services-gmail' ? '#fff' : 'var(--text-secondary-dark)' }}
                     >
                       ✉️ Gmail Workspace
+                    </button>
+                  )}
+                  {showAiChatbotTab && (
+                    <button
+                      onClick={() => setActiveTab('ai-chatbot')}
+                      className={`btn ${activeTab === 'ai-chatbot' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'ai-chatbot' ? '' : 'transparent', border: 'none', color: activeTab === 'ai-chatbot' ? '#fff' : 'var(--text-secondary-dark)' }}
+                    >
+                      🤖 AI Chatbot
                     </button>
                   )}
                 </div>
@@ -2064,6 +2028,8 @@ export const AdminDashboardPage: React.FC = () => {
           {activeTab === 'member-services-notifications' && showNotificationsTab && <NotificationsAdminPage />}
 
           {activeTab === 'member-services-gmail' && showGmailTab && <GmailWorkspacePanel />}
+
+          {activeTab === 'governance-contacts' && showContactsTab && <GlobalContactsPage />}
 
           {activeTab === 'settings-approval-workflows' && (
             <ApprovalWorkflowPage

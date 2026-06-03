@@ -23,7 +23,7 @@ const saveToStorage = <T>(key: string, data: T): void => {
 const getInitialAdmins = (): AdminUser[] => [
   {
     id: 'admin_super',
-    name: 'Sarah Connor (Super Admin)',
+    name: 'Hari Krishnan (Super Admin)',
     email: 'superadmin@adwest.org',
     passwordHash: '8e811c75c5e8c171:5e7d5830b53d8a7c645bc2fa5bbd323b63297a7cc262db80eb9d0e2e9c20a95f5669b32943343a6d96924dcf58925576a8b75e7a909bb6b5c3cb84074211a7c7', // password123
     roles: [
@@ -33,7 +33,7 @@ const getInitialAdmins = (): AdminUser[] => [
   },
   {
     id: 'admin_zone',
-    name: 'Bruce Wayne (Zone Admin)',
+    name: 'Mohan Krishnan (Zone Admin)',
     email: 'zoneadmin@adwest.org',
     passwordHash: '8e811c75c5e8c171:5e7d5830b53d8a7c645bc2fa5bbd323b63297a7cc262db80eb9d0e2e9c20a95f5669b32943343a6d96924dcf58925576a8b75e7a909bb6b5c3cb84074211a7c7', // password123
     roles: [
@@ -43,7 +43,7 @@ const getInitialAdmins = (): AdminUser[] => [
   },
   {
     id: 'admin_sreny',
-    name: 'Peter Parker (Sreny Admin)',
+    name: 'Athul Krishnan (Sreny Admin)',
     email: 'srenyadmin@adwest.org',
     passwordHash: '8e811c75c5e8c171:5e7d5830b53d8a7c645bc2fa5bbd323b63297a7cc262db80eb9d0e2e9c20a95f5669b32943343a6d96924dcf58925576a8b75e7a909bb6b5c3cb84074211a7c7', // password123
     roles: [
@@ -57,11 +57,11 @@ const getInitialContacts = (): Contact[] => [
   {
     id: 'contact_1',
     zoneId: 'zone_west_coast',
-    firstName: 'John',
-    lastName: 'Doe',
+    firstName: 'Rahul',
+    lastName: 'Madhav',
     phonePrimary: '+971501234567',
     phoneSecondary: '+971507654321',
-    emailPrimary: 'john.doe@email.com',
+    emailPrimary: 'rahul.Madhav@email.com',
     dob: '1990-05-15',
     gender: 'male',
     address: 'Marina Heights, Dubai, UAE',
@@ -73,10 +73,10 @@ const getInitialContacts = (): Contact[] => [
   {
     id: 'contact_2',
     zoneId: 'zone_west_coast',
-    firstName: 'Jane',
-    lastName: 'Smith',
+    firstName: 'Deepa',
+    lastName: 'Nair',
     phonePrimary: '+14159876543',
-    emailPrimary: 'jane.smith@email.com',
+    emailPrimary: 'deepa.nair@email.com',
     dob: '1993-11-22',
     gender: 'female',
     address: '123 Market St, San Francisco, CA',
@@ -107,7 +107,7 @@ const getInitialEditRequests = (): EditRequest[] => [
   {
     id: 'req_1',
     contactId: 'contact_1',
-    contactName: 'John Doe',
+    contactName: 'Rahul Madhav',
     requestedFields: {
       phonePrimary: '+971509998888',
       address: 'Jumeirah Living, Dubai, UAE'
@@ -132,7 +132,7 @@ const getInitialAuditLogs = (): AuditLog[] => [
   {
     id: 'log_2',
     actorId: 'admin_super',
-    actorName: 'Sarah Connor',
+    actorName: 'Hari Krishnan',
     action: 'ROLE_ASSIGNMENT',
     entityType: 'AdminUser',
     entityId: 'admin_zone',
@@ -146,7 +146,7 @@ const getInitialTickets = (): HelpdeskTicket[] => [
   {
     id: 'ticket_1',
     contactId: 'contact_1',
-    contactName: 'John Doe',
+    contactName: 'Rahul Madhav',
     zoneId: 'zone_west_coast',
     category: 'Membership',
     subject: 'Request to Link secondary Sreny',
@@ -159,7 +159,7 @@ const getInitialTickets = (): HelpdeskTicket[] => [
   {
     id: 'ticket_2',
     contactId: 'contact_2',
-    contactName: 'Jane Smith',
+    contactName: 'Deepa Nair',
     zoneId: 'zone_west_coast',
     category: 'Profile Edit',
     subject: 'Incorrect date of birth shown',
@@ -167,7 +167,7 @@ const getInitialTickets = (): HelpdeskTicket[] => [
     priority: 'low',
     status: 'in_progress',
     assignedTo: 'admin_sreny',
-    assignedToName: 'Peter Parker',
+    assignedToName: 'Athul Krishnan',
     createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
     commentsCount: 1
   }

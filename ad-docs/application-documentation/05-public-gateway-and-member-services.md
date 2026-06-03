@@ -38,6 +38,11 @@ Authenticated member-services route groups:
 - `/api/v1/member-services/events`
 - `/api/v1/member-services/notifications`
 
+Reimbursement submission guardrails include:
+- Description is required and must be at least 5 characters.
+- Receipt/proof file is mandatory.
+- Amount must be greater than zero.
+
 Admin workspace surfaces include:
 - Reimbursements management
 - Special events management

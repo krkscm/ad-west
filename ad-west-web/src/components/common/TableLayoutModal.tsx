@@ -26,14 +26,19 @@ export const TableLayoutModal: React.FC<Props> = ({
   const [newName, setNewName] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // On open, initialize the editor from the currently active layout (or default)
+  const hasColumns = allColumns.length > 0;
+
+  // Initialise the column editor whenever the modal opens OR columns first become available.
+  // The second dep (`hasColumns`) lets the editor bootstrap correctly when data loads after the
+  // modal is already open (e.g. user opens Columns before the first page fetch returns).
   useEffect(() => {
-    if (!isOpen) return;
-    const layout = activeId ? layouts.find((l) => l.id === activeId) : null;
-    setCols(buildColumnItems(allColumns, layout?.columns ?? null));
+    if (!isOpen || !hasColumns) return;
+    const active = activeId ? layouts.find((l) => l.id === activeId) : null;
+    setCols(buildColumnItems(allColumns, active?.columns ?? null));
     setEditingId(activeId);
     setNewName('');
-  }, [isOpen]); // intentionally only re-init on open, not on every prop change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, hasColumns]);
 
   const visibleCount = cols.filter((c) => c.visible).length;
 

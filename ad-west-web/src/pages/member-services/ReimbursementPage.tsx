@@ -35,7 +35,6 @@ type Mode = 'list' | 'create'
 
 const BLANK = { category: 'other' as ReimbursementCategory, description: '', amount: '', currency: 'AED', asDraft: false }
 const MAX_RECEIPT_BYTES = 500 * 1024
-const ALLOWED_RECEIPT_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf'])
 const ALLOWED_RECEIPT_EXT = ['.jpg', '.jpeg', '.png', '.pdf']
 
 export function ReimbursementPage() {

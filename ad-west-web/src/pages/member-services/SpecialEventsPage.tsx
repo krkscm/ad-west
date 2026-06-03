@@ -83,7 +83,7 @@ export function SpecialEventsPage() {
         setEvents((prev) => [created, ...prev])
         addToast('Event created', 'success')
       } else if (editId) {
-        const updated = await backendApi.updateSpecialEvent(editId, payload)
+        const updated = await backendApi.updateSpecialEvent(editId, payload as any)
         setEvents((prev) => prev.map((ev) => (ev.id === updated.id ? updated : ev)))
         addToast('Event updated', 'success')
       }

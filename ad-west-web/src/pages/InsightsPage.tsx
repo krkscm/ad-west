@@ -41,14 +41,6 @@ const buildPresetDateRange = (months: number) => {
 
 const LAST_ONE_MONTH_RANGE = buildPresetDateRange(1)
 
-const C = {
-  primary: '#2563eb',
-  sreni: '#0ea5e9',
-  sthan: '#14b8a6',
-  attendance: '#f59e0b',
-  reporting: '#8b5cf6',
-}
-
 const CHART_COLORS = ['#2563eb', '#14b8a6', '#f59e0b', '#8b5cf6', '#06b6d4', '#f97316', '#10b981', '#ec4899', '#84cc16', '#6366f1']
 
 const TOOLTIP_STYLE: React.CSSProperties = {
@@ -227,7 +219,7 @@ export function InsightsPage() {
           if (!withinRange(item.event?.date, selectedRange)) return sum
           const itemScore = item.metrics.reduce((metricSum: number, metricItem: any) => {
             const values = metricItem.capture?.values ?? {}
-            const numeric = Object.values(values).reduce((acc, value) => acc + parseNumericValue(value), 0)
+            const numeric = Object.values(values as Record<string, unknown>).reduce<number>((acc, value) => acc + parseNumericValue(value), 0)
             return metricSum + (numeric > 0 ? numeric : metricItem.capture ? 1 : 0)
           }, 0)
 

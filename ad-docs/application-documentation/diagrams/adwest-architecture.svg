@@ -66,8 +66,9 @@
   <text x="438" y="216" class="line">Shared API Wrapper: utils/api.ts + backendApi.ts</text>
   <text x="438" y="248" class="small">Session Restore Gate prevents startup route flicker</text>
   <text x="438" y="270" class="small">Role/menu-aware admin navigation and governance views</text>
-  <text x="438" y="292" class="small">Public pages remain directly reachable by path design</text>
-  <text x="438" y="324" class="small">Vite proxy forwards to API target in local development</text>
+  <text x="438" y="292" class="small">General Services now includes Governance Contacts workspace</text>
+  <text x="438" y="314" class="small">Location Definition uses role_level parentValue for parent selection</text>
+  <text x="438" y="336" class="small">Public pages remain directly reachable by path design</text>
 
   <rect class="box" x="878" y="110" width="688" height="560" fill="url(#api)" />
   <text x="900" y="142" class="section">API Layer (ad-west-api / NestJS)</text>
@@ -78,9 +79,10 @@
   <text x="918" y="252" class="section">Core Domains</text>
   <text x="918" y="280" class="small">CoreBusinessModule</text>
   <text x="918" y="302" class="small">ApprovalWorkflowDefinitionsModule</text>
-  <text x="918" y="324" class="small">EnumValuesModule</text>
-  <text x="918" y="346" class="small">HealthModule</text>
-  <text x="918" y="376" class="small">Store abstraction with DB/In-memory binding</text>
+  <text x="918" y="324" class="small">EnumValuesModule (parentValue hierarchy support)</text>
+  <text x="918" y="346" class="small">Location hierarchy: zone/sthan/division + parentId</text>
+  <text x="918" y="368" class="small">Contacts: upload, active toggle, delete, cross-Sreni tags</text>
+  <text x="918" y="390" class="small">Store abstraction with DB/In-memory binding</text>
 
   <rect class="box" x="1220" y="224" width="324" height="180" fill="#ecfdf5" />
   <text x="1238" y="252" class="section">User Management</text>
@@ -104,7 +106,8 @@
   <text x="1238" y="504" class="small">member-services/events</text>
   <text x="1238" y="526" class="small">member-services/notifications</text>
   <text x="1238" y="548" class="small">public/events registration endpoints</text>
-  <text x="1238" y="580" class="small">Shared operational guard patterns</text>
+  <text x="1238" y="570" class="small">Reimbursement validation: description min length + receipt required</text>
+  <text x="1238" y="592" class="small">Shared operational guard patterns</text>
 
   <rect class="box" x="416" y="392" width="430" height="278" fill="url(#ext)" />
   <text x="438" y="424" class="section">Integration Layer</text>
@@ -121,18 +124,21 @@
   <text x="900" y="734" class="section">Data Layer (PostgreSQL + Migration Chain)</text>
   <text x="900" y="762" class="line">Canonical SQL Source: ad-docs/database-script</text>
   <text x="900" y="786" class="small">Core schema, auth, roles/menu grants, gateway/member services tables</text>
-  <text x="900" y="808" class="small">Recent evolution: governance hierarchy, location metrics scope, join-us visibility, SMTP/IMAP config</text>
-  <text x="900" y="830" class="small">analytics_studio_layouts and admin_password_reset_tokens included in current schema chain</text>
-  <text x="900" y="862" class="small">Runtime mode: DB persistence when enabled, in-memory fallback on selected modules</text>
+  <text x="900" y="808" class="small">Recent evolution: location parent_id, enum parent_value, and contact hierarchy tags</text>
+  <text x="900" y="830" class="small">Migration segment 059-064 adds contact_sreni_tags, active flag, nullable sreni_id, parent links</text>
+  <text x="900" y="852" class="small">sreni_contacts now stores zone/sthan/division location tags for hierarchy-aware assignment</text>
+  <text x="900" y="874" class="small">Runtime mode: DB persistence when enabled, in-memory fallback on selected modules</text>
 
   <path class="flow" d="M378 236 L416 236" />
   <path class="flow" d="M846 236 L878 236" />
+  <path class="flow" d="M1050 646 L1050 702" />
   <path class="flow" d="M1222 670 L1222 702" />
   <path class="flow2" d="M846 530 L878 530" />
   <path class="flow2" d="M632 358 L632 392" />
 
   <text x="386" y="220" class="small">HTTPS</text>
   <text x="852" y="220" class="small">REST /api/v1</text>
+  <text x="1064" y="688" class="small">Hierarchy-aware contact writes</text>
   <text x="1238" y="688" class="small">TypeORM + SQL</text>
   <text x="852" y="520" class="small">Config + External Service Flows</text>
 

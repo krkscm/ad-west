@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useToast } from '../../components/common/Toast';
 import { useConfirm } from '../../components/common/ConfirmDialog';
-import { backendApi, LocationDefinitionApi } from '../../utils/backendApi';
+import { backendApi, EnumValueApi, LocationDefinitionApi } from '../../utils/backendApi';
 
 type LocationLevel = LocationDefinitionApi['level'];
 
@@ -12,24 +12,24 @@ const toUiError = (error: unknown, fallback: string): string => {
   return error.message || fallback;
 };
 
-const LevelBadge: React.FC<{ level: LocationLevel }> = ({ level }) => (
-  <span
-    className={level === 'ZONE' ? 'badge badge-info' : 'badge badge-warning'}
-    style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '4px',
-      padding: '3px 8px',
-      fontSize: '0.75rem',
-      fontWeight: 600,
-      border: '1px solid currentColor',
-      background: 'transparent',
-    }}
-  >
-    <span>{level === 'ZONE' ? '🏢' : '📍'}</span>
-    <span>{level === 'ZONE' ? 'Zone' : 'Sthan'}</span>
-  </span>
-);
+const LEVEL_META: Record<LocationLevel, { icon: string; label: string; badgeClass: string }> = {
+  ZONE:     { icon: '🏢', label: 'Zone',     badgeClass: 'badge-info' },
+  STHAN:    { icon: '📍', label: 'Sthan',    badgeClass: 'badge-warning' },
+  DIVISION: { icon: '🗂️', label: 'Division', badgeClass: 'badge-success' },
+};
+
+const LevelBadge: React.FC<{ level: LocationLevel }> = ({ level }) => {
+  const meta = LEVEL_META[level] ?? { icon: '📌', label: level, badgeClass: 'badge-info' };
+  return (
+    <span
+      className={`badge ${meta.badgeClass}`}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', fontSize: '0.75rem', fontWeight: 600, border: '1px solid currentColor', background: 'transparent' }}
+    >
+      <span>{meta.icon}</span>
+      <span>{meta.label}</span>
+    </span>
+  );
+};
 
 export const LocationDefinitionPage: React.FC = () => {
   const { addToast } = useToast();
@@ -51,10 +51,29 @@ export const LocationDefinitionPage: React.FC = () => {
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [level, setLevel] = useState<LocationLevel>('ZONE');
+  const [parentId, setParentId] = useState<string>('');
+  const [allLocations, setAllLocations] = useState<LocationDefinitionApi[]>([]);
+  const [roleLevels, setRoleLevels] = useState<EnumValueApi[]>([]);
+
+  useEffect(() => {
+    backendApi.listLocationDefinitions()
+      .then((locs) => setAllLocations(locs))
+      .catch(() => {});
+    backendApi.listEnumValues('role_level', true)
+      .then((vals) => setRoleLevels(vals))
+      .catch(() => {});
+  }, []);
+
+  // Find the parent level value from the role_level hierarchy for the current level
+  const currentLevelEnum = roleLevels.find((r) => r.value === level);
+  const parentLevelValue = currentLevelEnum?.parentValue ?? null;
+  const parentOptions = parentLevelValue
+    ? allLocations.filter((l) => l.level === parentLevelValue && l.active)
+    : [];
 
   const resetForm = () => {
     setEditingId(null);
-    setCode(''); setName(''); setLevel('ZONE'); setFormOpen(false);
+    setCode(''); setName(''); setLevel('ZONE'); setParentId(''); setFormOpen(false);
   };
 
   const load = (p: number, ps: number, q: string, lv: string) => {
@@ -114,15 +133,17 @@ export const LocationDefinitionPage: React.FC = () => {
     if (!cleanName) { addToast('Name is required.', 'warning'); return; }
     setIsSaving(true);
     try {
+      const cleanParentId = parentId || null;
       if (editingId) {
-        await backendApi.updateLocationDefinition(editingId, { name: cleanName, code: cleanCode, level });
+        await backendApi.updateLocationDefinition(editingId, { name: cleanName, code: cleanCode, level, parentId: cleanParentId });
         addToast('Location updated successfully.', 'success');
       } else {
-        await backendApi.createLocationDefinition({ name: cleanName, code: cleanCode, level });
+        await backendApi.createLocationDefinition({ name: cleanName, code: cleanCode, level, parentId: cleanParentId });
         addToast('Location created successfully.', 'success');
       }
       resetForm();
       load(page, pageSize, search, levelFilter);
+      backendApi.listLocationDefinitions().then((locs) => setAllLocations(locs)).catch(() => {});
     } catch (error) {
       addToast(toUiError(error, 'Failed to save location.'), 'error');
     } finally {
@@ -132,13 +153,14 @@ export const LocationDefinitionPage: React.FC = () => {
 
   const startEdit = (loc: LocationDefinitionApi) => {
     setEditingId(loc.id);
-    setCode(loc.code ?? ''); setName(loc.name); setLevel(loc.level);
+    setCode(loc.code ?? ''); setName(loc.name); setLevel(loc.level); setParentId(loc.parentId ?? '');
     setFormOpen(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const zoneCount = items.filter((l) => l.level === 'ZONE').length;
   const sthanCount = items.filter((l) => l.level === 'STHAN').length;
+  const divisionCount = items.filter((l) => l.level === 'DIVISION').length;
 
   const pageNums = (() => {
     if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -160,7 +182,8 @@ export const LocationDefinitionPage: React.FC = () => {
           <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
             {[{ label: 'Total', count: total, className: 'badge-info' },
               { label: 'Zones (page)', count: zoneCount, className: 'badge-info' },
-              { label: 'Sthans (page)', count: sthanCount, className: 'badge-warning' }].map(({ label, count, className }) => (
+              { label: 'Sthans (page)', count: sthanCount, className: 'badge-warning' },
+              { label: 'Divisions (page)', count: divisionCount, className: 'badge-success' }].map(({ label, count, className }) => (
               <span key={label} className={`badge ${className}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid currentColor', background: 'transparent', fontSize: '0.8rem', fontWeight: 600 }}>
                 <span style={{ fontSize: '0.95rem', fontWeight: 800 }}>{count}</span> {label}
               </span>
@@ -209,11 +232,25 @@ export const LocationDefinitionPage: React.FC = () => {
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-secondary-dark)' }}>Level *</label>
-                <select className="form-input" value={level} onChange={(e) => setLevel(e.target.value as LocationLevel)} style={{ fontSize: '0.875rem', cursor: 'pointer' }}>
-                  <option value="ZONE">Zone</option>
-                  <option value="STHAN">Sthan</option>
+                <select className="form-input" value={level} onChange={(e) => { setLevel(e.target.value as LocationLevel); setParentId(''); }} style={{ fontSize: '0.875rem', cursor: 'pointer' }}>
+                  <option value="ZONE">🏢 Zone</option>
+                  <option value="STHAN">📍 Sthan</option>
+                  <option value="DIVISION">🗂️ Division</option>
                 </select>
               </div>
+              {parentOptions.length > 0 && (
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-secondary-dark)' }}>
+                    Parent {roleLevels.find((r) => r.value === parentLevelValue)?.label ?? parentLevelValue} <span style={{ color: 'var(--text-secondary-dark)', fontWeight: 400 }}>(optional)</span>
+                  </label>
+                  <select className="form-input" value={parentId} onChange={(e) => setParentId(e.target.value)} style={{ fontSize: '0.875rem', cursor: 'pointer' }}>
+                    <option value="">— None —</option>
+                    {parentOptions.map((p) => (
+                      <option key={p.id} value={p.id}>{p.code ? `${p.code} – ` : ''}{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button type="button" className="btn btn-secondary" onClick={resetForm} style={{ flex: 1, fontSize: '0.875rem' }}>Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ flex: 2, fontSize: '0.875rem' }}>
@@ -234,11 +271,16 @@ export const LocationDefinitionPage: React.FC = () => {
           <input className="form-input" style={{ paddingLeft: '34px', marginBottom: 0, fontSize: '0.875rem' }} placeholder="Search by name or code…" value={search} onChange={(e) => handleSearchChange(e.target.value)} />
         </div>
         <div style={{ width: '1px', height: '24px', background: 'var(--border-dark)' }} />
-        <div style={{ display: 'flex', gap: '6px' }}>
-          {(['', 'ZONE', 'STHAN'] as (LocationLevel | '')[]).map((val) => (
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          {([
+            { val: '',         label: 'All' },
+            { val: 'ZONE',     label: '🏢 Zones' },
+            { val: 'STHAN',    label: '📍 Sthans' },
+            { val: 'DIVISION', label: '🗂️ Divisions' },
+          ] as { val: LocationLevel | ''; label: string }[]).map(({ val, label }) => (
             <button key={val} type="button" onClick={() => handleLevelFilter(val)}
               style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid', borderColor: levelFilter === val ? 'var(--primary)' : 'var(--border-dark)', background: levelFilter === val ? 'rgba(99,102,241,0.1)' : 'transparent', color: levelFilter === val ? 'var(--primary)' : 'var(--text-secondary-dark)', fontWeight: levelFilter === val ? 700 : 400, fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              {val === '' ? 'All Levels' : val === 'ZONE' ? 'Zones Only' : 'Sthans Only'}
+              {label}
             </button>
           ))}
         </div>
@@ -261,7 +303,7 @@ export const LocationDefinitionPage: React.FC = () => {
         <table className="custom-table">
           <thead>
             <tr>
-              {['Code', 'Name', 'Level', 'Status', 'Created', 'Actions'].map((col) => (
+              {['Code', 'Name', 'Level', 'Parent', 'Status', 'Created', 'Actions'].map((col) => (
                 <th key={col} style={{ textAlign: col === 'Actions' ? 'right' : 'left' }}>
                   {col}
                 </th>
@@ -272,16 +314,16 @@ export const LocationDefinitionPage: React.FC = () => {
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid var(--border-dark)' }}>
-                  {Array.from({ length: 6 }).map((__, j) => (
+                  {Array.from({ length: 7 }).map((__, j) => (
                     <td key={j} style={{ padding: '14px 20px' }}>
-                      <div style={{ height: '14px', borderRadius: '6px', background: 'var(--border-dark)', width: j === 5 ? '120px' : j === 3 ? '60px' : j === 2 ? '70px' : '100%', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                      <div style={{ height: '14px', borderRadius: '6px', background: 'var(--border-dark)', width: j === 6 ? '120px' : j === 4 ? '60px' : j === 2 ? '70px' : '100%', animation: 'pulse 1.5s ease-in-out infinite' }} />
                     </td>
                   ))}
                 </tr>
               ))
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: '56px 24px', color: 'var(--text-secondary-dark)' }}>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '56px 24px', color: 'var(--text-secondary-dark)' }}>
                   <div style={{ fontSize: '2rem', marginBottom: '10px' }}>🗺️</div>
                   <div style={{ fontWeight: 600, marginBottom: '4px' }}>No locations found</div>
                   <div style={{ fontSize: '0.83rem' }}>{search || levelFilter ? 'Try adjusting your search or filter.' : 'Click "New Location" to create the first zone.'}</div>
@@ -299,6 +341,11 @@ export const LocationDefinitionPage: React.FC = () => {
                   </td>
                   <td style={{ padding: '14px 20px', fontWeight: 600 }}>{loc.name}</td>
                   <td style={{ padding: '14px 20px' }}><LevelBadge level={loc.level} /></td>
+                  <td style={{ padding: '14px 20px', color: 'var(--text-secondary-dark)', fontSize: '0.85rem' }}>
+                    {loc.parentId
+                      ? (() => { const p = allLocations.find((l) => l.id === loc.parentId); return p ? (p.code ? `${p.code} – ${p.name}` : p.name) : <span style={{ fontStyle: 'italic' }}>Unknown</span>; })()
+                      : <span style={{ color: 'var(--text-secondary-dark)', opacity: 0.5 }}>—</span>}
+                  </td>
                   <td style={{ padding: '14px 20px' }}>
                     <span style={{ 
                       display: 'inline-flex', 

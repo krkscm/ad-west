@@ -25,7 +25,7 @@ export interface RoleDefinitionApi {
   code: string
   name: string
   active: boolean
-  level: 'ZONE' | 'STHAN'
+  level: 'ZONE' | 'STHAN' | 'DIVISION'
   createdBy: string
   createdAt: string
   updatedBy: string
@@ -100,7 +100,8 @@ export interface LocationDefinitionApi {
   id: string
   code?: string
   name: string
-  level: 'ZONE' | 'STHAN'
+  level: 'ZONE' | 'STHAN' | 'DIVISION'
+  parentId?: string
   active: boolean
   createdAt: string
   updatedAt: string
@@ -185,17 +186,42 @@ export interface SreniDivisionApi {
 export interface SreniContactRowApi {
   id: string
   sreniId: string
-  /** Populated in the "all contacts" endpoint */
   sreniName?: string
   rowIndex: number
-  /** All columns from the uploaded Excel sheet as key/value pairs */
   data: Record<string, string | number | boolean | null>
+  zoneLocationId?: string
+  sthanLocationId?: string
+  divisionLocationId?: string
   divisionId?: string
   sthanId?: string
+  active: boolean
+  /** True when this contact belongs to another Sreni but is tagged to the current one */
+  isTagged?: boolean
   sourceFile?: string
   uploadedBy?: string
   createdAt: string
   updatedAt: string
+}
+
+export interface ContactSreniTagApi {
+  id: string
+  contactId: string
+  sreniId: string
+  divisionId?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface GlobalContactUploadDuplicateApi {
+  rowIndex: number
+  name: string | null
+  personalNumber: string | null
+  existingSreniId: string | null
+}
+
+export interface GlobalContactUploadResultApi {
+  inserted: number
+  duplicates: GlobalContactUploadDuplicateApi[]
 }
 
 export interface CalendarEventApi {
@@ -596,6 +622,7 @@ export interface EnumValueApi {
   label: string
   sortOrder: number
   active: boolean
+  parentValue: string | null
   createdAt: string
   updatedAt: string
 }
@@ -792,6 +819,9 @@ export interface SthanContactRowApi {
   locationId: string
   rowIndex: number
   data: Record<string, string | number | boolean | null>
+  zoneLocationId?: string
+  sthanLocationId?: string
+  divisionLocationId?: string
   sourceFile?: string
   uploadedBy?: string
   createdAt: string
@@ -924,15 +954,11 @@ export const backendApi = {
   listContacts: () => api.get<ContactApi[]>('/contacts'),
 
   listLocationDefinitions: () =>
-    api.get<{ items: Array<{ id: string; code?: string; name: string; level: string; active: boolean; createdAt: string; updatedAt: string }> }>('/org/locations?page=1&pageSize=9999')
+    api.get<{ items: Array<{ id: string; code?: string; name: string; level: string; parentId?: string; active: boolean; createdAt: string; updatedAt: string }> }>('/org/locations?page=1&pageSize=9999')
       .then((res) => res.items.map((r) => ({
-        id: r.id,
-        code: r.code,
-        name: r.name,
-        level: r.level.toUpperCase() as 'ZONE' | 'STHAN',
-        active: r.active,
-        createdAt: r.createdAt,
-        updatedAt: r.updatedAt,
+        id: r.id, code: r.code, name: r.name,
+        level: r.level.toUpperCase() as 'ZONE' | 'STHAN' | 'DIVISION',
+        parentId: r.parentId, active: r.active, createdAt: r.createdAt, updatedAt: r.updatedAt,
       }))),
 
   listLocationDefinitionsPaginated: (params?: { page?: number; pageSize?: number; search?: string; level?: string }) => {
@@ -941,32 +967,28 @@ export const backendApi = {
     qs.set('pageSize', String(params?.pageSize ?? 20))
     if (params?.search?.trim()) qs.set('search', params.search.trim())
     if (params?.level) qs.set('level', params.level.toLowerCase())
-    return api.get<PaginatedResponse<{ id: string; code?: string; name: string; level: string; active: boolean; createdAt: string; updatedAt: string }>>(`/org/locations?${qs.toString()}`)
+    return api.get<PaginatedResponse<{ id: string; code?: string; name: string; level: string; parentId?: string; active: boolean; createdAt: string; updatedAt: string }>>(`/org/locations?${qs.toString()}`)
       .then((res) => ({
         ...res,
         items: res.items.map((r) => ({
-          id: r.id,
-          code: r.code,
-          name: r.name,
-          level: r.level.toUpperCase() as 'ZONE' | 'STHAN',
-          active: r.active,
-          createdAt: r.createdAt,
-          updatedAt: r.updatedAt,
+          id: r.id, code: r.code, name: r.name,
+          level: r.level.toUpperCase() as 'ZONE' | 'STHAN' | 'DIVISION',
+          parentId: r.parentId, active: r.active, createdAt: r.createdAt, updatedAt: r.updatedAt,
         })),
       }))
   },
 
-  createLocationDefinition: (payload: { name: string; code?: string; level: 'ZONE' | 'STHAN' }) =>
-    api.post<{ id: string; code?: string; name: string; level: string; active: boolean; createdAt: string; updatedAt: string }>(
+  createLocationDefinition: (payload: { name: string; code?: string; level: 'ZONE' | 'STHAN' | 'DIVISION'; parentId?: string | null }) =>
+    api.post<{ id: string; code?: string; name: string; level: string; parentId?: string; active: boolean; createdAt: string; updatedAt: string }>(
       '/org/locations',
-      { name: payload.name, code: payload.code, level: payload.level.toLowerCase() },
-    ).then((r) => ({ id: r.id, code: r.code, name: r.name, level: r.level.toUpperCase() as 'ZONE' | 'STHAN', active: r.active, createdAt: r.createdAt, updatedAt: r.updatedAt })),
+      { name: payload.name, code: payload.code, level: payload.level.toLowerCase(), parentId: payload.parentId ?? null },
+    ).then((r) => ({ id: r.id, code: r.code, name: r.name, level: r.level.toUpperCase() as 'ZONE' | 'STHAN' | 'DIVISION', parentId: r.parentId, active: r.active, createdAt: r.createdAt, updatedAt: r.updatedAt })),
 
-  updateLocationDefinition: (id: string, payload: { name?: string; code?: string; active?: boolean; level?: 'ZONE' | 'STHAN' }) =>
-    api.patch<{ id: string; code?: string; name: string; level: string; active: boolean; createdAt: string; updatedAt: string }>(
+  updateLocationDefinition: (id: string, payload: { name?: string; code?: string; active?: boolean; level?: 'ZONE' | 'STHAN' | 'DIVISION'; parentId?: string | null }) =>
+    api.patch<{ id: string; code?: string; name: string; level: string; parentId?: string; active: boolean; createdAt: string; updatedAt: string }>(
       `/org/locations/${id}`,
-      payload,
-    ).then((r) => ({ id: r.id, code: r.code, name: r.name, level: r.level.toUpperCase() as 'ZONE' | 'STHAN', active: r.active, createdAt: r.createdAt, updatedAt: r.updatedAt })),
+      { ...payload, level: payload.level?.toLowerCase() },
+    ).then((r) => ({ id: r.id, code: r.code, name: r.name, level: r.level.toUpperCase() as 'ZONE' | 'STHAN' | 'DIVISION', parentId: r.parentId, active: r.active, createdAt: r.createdAt, updatedAt: r.updatedAt })),
 
   deleteLocationDefinition: (id: string) => api.delete<void>(`/org/locations/${id}`),
 
@@ -1276,10 +1298,10 @@ export const backendApi = {
   listEnumTypes: () =>
     api.get<string[]>('/settings/enum-values/types'),
 
-  createEnumValue: (payload: { enumType: string; value: string; label: string; sortOrder?: number; active?: boolean }) =>
+  createEnumValue: (payload: { enumType: string; value: string; label: string; sortOrder?: number; active?: boolean; parentValue?: string | null }) =>
     api.post<EnumValueApi>('/settings/enum-values', payload),
 
-  updateEnumValue: (id: string, payload: { value?: string; label?: string; sortOrder?: number; active?: boolean }) =>
+  updateEnumValue: (id: string, payload: { value?: string; label?: string; sortOrder?: number; active?: boolean; parentValue?: string | null }) =>
     api.patch<EnumValueApi>(`/settings/enum-values/${id}`, payload),
 
   deleteEnumValue: (id: string) =>
@@ -1356,8 +1378,32 @@ export const backendApi = {
       { sthanId },
     ),
 
+  toggleContactActive: (sreniId: string, contactId: string, active: boolean) =>
+    api.patch<SreniContactRowApi>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}/active`,
+      { active },
+    ),
+
+  deleteContact: (sreniId: string, contactId: string) =>
+    api.delete<{ deleted: boolean }>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}`,
+    ),
+
   listSthans: (srenyId?: string) =>
     api.get<SthanBasicApi[]>(`/org/sthans${srenyId ? `?srenyId=${encodeURIComponent(srenyId)}` : ''}`),
+
+  uploadGlobalContacts: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.postForm<GlobalContactUploadResultApi>('/org/contacts/upload', form)
+  },
+
+  // Contact Sreni Tags (multi-sreni assignment)
+  listContactSreniTags: (contactId: string) =>
+    api.get<ContactSreniTagApi[]>(`/org/contacts/${encodeURIComponent(contactId)}/sreni-tags`),
+
+  setContactSreniTags: (contactId: string, tags: Array<{ sreniId: string; divisionId?: string | null }>) =>
+    api.put<ContactSreniTagApi[]>(`/org/contacts/${encodeURIComponent(contactId)}/sreni-tags`, { tags }),
 
   // Sreni Divisions
   listSreniDivisions: (sreniId: string) =>

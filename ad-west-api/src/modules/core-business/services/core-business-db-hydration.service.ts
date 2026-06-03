@@ -101,7 +101,7 @@ export class CoreBusinessDbHydrationService {
       eventAttendanceCaptureRows,
     ] = await Promise.all([
       this.ctx.dataSource.query(
-        'SELECT id, code, name, level, active, created_at, updated_at FROM adwest.locations ORDER BY created_at ASC',
+        'SELECT id, code, name, level, parent_id, active, created_at, updated_at FROM adwest.locations ORDER BY created_at ASC',
       ),
       this.ctx.dataSource.query(
         'SELECT id, code, name, created_at, updated_at FROM adwest.zones ORDER BY created_at ASC',
@@ -158,7 +158,7 @@ export class CoreBusinessDbHydrationService {
         'SELECT id, sreni_id, name, display_order, created_at, updated_at FROM adwest.sreni_divisions ORDER BY sreni_id ASC, display_order ASC, created_at ASC',
       ).catch(() => [] as unknown[]),
       this.ctx.dataSource.query(
-        'SELECT id, sreni_id, row_index, data, division_id, sthan_id, source_file, uploaded_by, created_at, updated_at FROM adwest.sreni_contacts ORDER BY sreni_id ASC, row_index ASC',
+        'SELECT id, sreni_id, row_index, data, zone_location_id, sthan_location_id, division_location_id, division_id, sthan_id, source_file, uploaded_by, created_at, updated_at FROM adwest.sreni_contacts ORDER BY sreni_id ASC, row_index ASC',
       ).catch(() => [] as unknown[]),
       this.ctx.dataSource.query(
         'SELECT id, sreni_id, title, event_date, start_time, end_time, color, notes, scope, sthan_ids, created_by, updated_by, created_at, updated_at FROM adwest.sreni_calendar_events ORDER BY event_date ASC, start_time ASC',
@@ -193,12 +193,13 @@ export class CoreBusinessDbHydrationService {
     this.ctx.attendanceMetrics.clear();
     this.ctx.eventAttendanceCaptures.clear();
 
-    for (const row of locationRows as Array<{ id: string; code: string | null; name: string; level: string; active: boolean; created_at: string | Date; updated_at: string | Date }>) {
+    for (const row of locationRows as Array<{ id: string; code: string | null; name: string; level: string; parent_id: string | null; active: boolean; created_at: string | Date; updated_at: string | Date }>) {
       this.ctx.locations.set(row.id, {
         id: row.id,
         code: row.code ?? undefined,
         name: row.name,
-        level: row.level as 'zone' | 'sthan',
+        level: row.level as 'zone' | 'sthan' | 'division',
+        parentId: row.parent_id ?? undefined,
         active: row.active,
         createdAt: this.ctx.toIsoTimestamp(row.created_at),
         updatedAt: this.ctx.toIsoTimestamp(row.updated_at),
@@ -672,6 +673,7 @@ export class CoreBusinessDbHydrationService {
     for (const row of sreniContactRows as Array<{
       id: string; sreni_id: string; row_index: number;
       data: Record<string, string | number | boolean | null>;
+      zone_location_id: string | null; sthan_location_id: string | null; division_location_id: string | null;
       division_id: string | null; sthan_id: string | null;
       source_file: string | null; uploaded_by: string | null;
       created_at: string | Date; updated_at: string | Date;
@@ -681,8 +683,12 @@ export class CoreBusinessDbHydrationService {
         sreniId: row.sreni_id,
         rowIndex: row.row_index,
         data: row.data ?? {},
+        zoneLocationId: row.zone_location_id ?? undefined,
+        sthanLocationId: row.sthan_location_id ?? undefined,
+        divisionLocationId: row.division_location_id ?? undefined,
         divisionId: row.division_id ?? undefined,
         sthanId: row.sthan_id ?? undefined,
+        active: true,
         sourceFile: row.source_file ?? undefined,
         uploadedBy: row.uploaded_by ?? undefined,
         createdAt: this.ctx.toIsoTimestamp(row.created_at),
