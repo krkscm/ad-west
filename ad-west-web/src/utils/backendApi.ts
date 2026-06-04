@@ -150,12 +150,6 @@ export interface AdminMenuGrantsApi {
   menuKeys: string[]
 }
 
-export interface AiChatResponseApi {
-  answer: string
-  provider: 'openai' | 'ollama'
-  model: string
-}
-
 export interface SreniDefinitionApi {
   id: string
   code?: string
@@ -846,7 +840,10 @@ const withDateRangeQuery = (basePath: string, range?: DateRangeQuery, extra?: Re
 }
 
 export const backendApi = {
-  captchaChallenge: () => api.get<CaptchaChallengeResponse>('/auth/captcha'),
+  captchaChallenge: () =>
+    api.get<CaptchaChallengeResponse>('/auth/captcha', {
+      retry: { attempts: 30, delayMs: 2000 },
+    }),
 
   login: (identifier: string, password: string, captchaToken: string, captchaAnswer: string) =>
     api.post<AdminLoginResponse>('/auth/login', { identifier, password, captchaToken, captchaAnswer }),
@@ -1200,9 +1197,6 @@ export const backendApi = {
 
   setAdminMenuGrants: (adminUserId: string, menuKeys: string[]) =>
     api.put<AdminMenuGrantsApi>(`/menu-items/grants/${adminUserId}`, { menuKeys }),
-
-  chatWithAi: (payload: { message: string; context?: string }) =>
-    api.post<AiChatResponseApi>('/ai-chat/query', payload),
 
   // Approval Workflow Definitions (Settings)
   listApprovalWorkflowDefinitions: (params?: {

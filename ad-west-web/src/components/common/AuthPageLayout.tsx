@@ -29,6 +29,13 @@ export const AuthPageLayout: React.FC<AuthPageLayoutProps> = ({ children, title,
       {/* Overlay */}
       <div aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: 1, background: 'var(--public-shell-overlay)' }} />
 
+      {/* Absolute Glowing Background Orbs */}
+      <div className="wow-bg-container" style={{ zIndex: 1 }}>
+        <div className="wow-orb wow-orb-primary" style={{ top: '10%', left: '-5%' }} />
+        <div className="wow-orb wow-orb-accent" style={{ bottom: '10%', right: '-5%' }} />
+        <div className="wow-orb wow-orb-gold" style={{ top: '50%', left: '35%' }} />
+      </div>
+
       {/* Content */}
       <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', height: '100vh' }}>
 

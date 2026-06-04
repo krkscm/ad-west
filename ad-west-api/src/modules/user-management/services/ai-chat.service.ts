@@ -31,18 +31,23 @@ export class AiChatService {
     const model = (process.env.AI_OPENAI_MODEL ?? 'gpt-4o-mini').trim();
     const baseUrl = (process.env.AI_OPENAI_BASE_URL ?? 'https://api.openai.com/v1').trim().replace(/\/+$/, '');
 
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.25,
-        messages: this.buildMessages(principal, message, context),
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.25,
+          messages: this.buildMessages(principal, message, context),
+        }),
+      });
+    } catch (error) {
+      throw new ServiceUnavailableException(this.describeProviderConnectionError('openai', baseUrl, error));
+    }
 
     if (!response.ok) {
       const text = await response.text();
@@ -65,18 +70,23 @@ export class AiChatService {
     const model = (process.env.AI_OLLAMA_MODEL ?? 'llama3.1:8b').trim();
     const baseUrl = (process.env.AI_OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434').trim().replace(/\/+$/, '');
 
-    const response = await fetch(`${baseUrl}/api/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        stream: false,
-        options: { temperature: 0.25 },
-        messages: this.buildMessages(principal, message, context),
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          stream: false,
+          options: { temperature: 0.25 },
+          messages: this.buildMessages(principal, message, context),
+        }),
+      });
+    } catch (error) {
+      throw new ServiceUnavailableException(this.describeProviderConnectionError('ollama', baseUrl, error));
+    }
 
     if (!response.ok) {
       const text = await response.text();
@@ -93,6 +103,14 @@ export class AiChatService {
     }
 
     return { answer, provider: 'ollama', model };
+  }
+
+  private describeProviderConnectionError(provider: 'openai' | 'ollama', baseUrl: string, error: unknown): string {
+    const detail = error instanceof Error ? error.message : 'connection failed';
+    if (provider === 'ollama') {
+      return `Cannot reach Ollama at ${baseUrl} (${detail}). Start Ollama locally or set AI_OLLAMA_BASE_URL. To use OpenAI instead, set AI_CHAT_PROVIDER=openai and AI_OPENAI_API_KEY.`;
+    }
+    return `Cannot reach OpenAI-compatible API at ${baseUrl} (${detail}). Check AI_OPENAI_BASE_URL and network access.`;
   }
 
   private buildMessages(principal: AuthPrincipal, message: string, context?: string): Array<{ role: 'system' | 'user'; content: string }> {

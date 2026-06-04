@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/auth-context';
 import { useToast } from '../components/common/Toast';
 import { ThemeToggle } from '../components/common/ThemeToggle';
@@ -39,7 +39,6 @@ import { NotificationsAdminPage } from './member-services/NotificationsAdminPage
 import { NotificationCarouselModal } from '../components/common/NotificationCarouselModal';
 import { GmailWorkspacePanel } from '../components/features/GmailWorkspacePanel';
 import { InsightsPage } from './InsightsPage';
-import { AiChatbotPage } from './governance/AiChatbotPage';
 import { GlobalContactsPage } from './GlobalContactsPage';
 import {
   ApprovalWorkflowDefinitionApi,
@@ -115,7 +114,6 @@ type ActiveTab =
   | 'settings-google-integration'
   | 'settings-smtp-integration'
   | 'insights'
-  | 'ai-chatbot'
   | 'helpdesk-tickets'
   | 'job-postings'
   | 'job-applications'
@@ -142,7 +140,7 @@ const ALL_TABS: ActiveTab[] = [
   'settings-users', 'settings-approval-workflows', 'settings-approval-workflows-form', 'settings-attendance-metrics',
   'settings-responsibility-chart', 'settings-report-config',
   'settings-google-integration', 'settings-smtp-integration',
-  'insights', 'ai-chatbot',
+  'insights',
   'helpdesk-tickets', 'job-postings', 'job-applications',
   'member-services-reimbursements', 'member-services-events', 'member-services-notifications', 'member-services-gmail',
   'governance-contacts',
@@ -153,6 +151,7 @@ const LEGACY_TAB_REDIRECTS: Record<string, ActiveTab> = {
   'users': 'settings-users',
   'approval-workflows': 'settings-approval-workflows',
   'responsibility-chart': 'settings-responsibility-chart',
+  'ai-chatbot': 'insights',
 };
 
 const resolveTabFromHash = (hash: string): ActiveTab | null => {
@@ -196,7 +195,6 @@ const TAB_METADATA: { [key: string]: { label: string; parent?: 'settings' | 'gov
   'settings-google-integration': { label: 'Google Integration', parent: 'settings' },
   'settings-smtp-integration': { label: 'Email Integration', parent: 'settings' },
   'insights': { label: 'Insights', parent: 'governance' },
-  'ai-chatbot': { label: 'AI Chatbot', parent: 'governance' },
   'helpdesk-tickets': { label: 'Helpdesk Tickets' },
   'job-postings': { label: 'Job Postings' },
   'job-applications': { label: 'Job Applications' },
@@ -611,7 +609,6 @@ export const AdminDashboardPage: React.FC = () => {
   const hasMenuKey = (key: string) => sidebarMenuItems.some((item) => item.active && item.key === key);
 
   const showInsightsTab = isSuperAdmin || hasMenuKey('insights');
-  const showAiChatbotTab = isSuperAdmin || hasMenuKey('ai-chatbot');
   const showMyApprovalsTab = isSuperAdmin || hasMenuKey('my-approvals');
   const showResponsibilityChartTab = isSuperAdmin || hasMenuKey('settings-responsibility-chart');
   const showReimbursementsTab = isSuperAdmin || hasMenuKey('member-services-reimbursements');
@@ -628,7 +625,6 @@ export const AdminDashboardPage: React.FC = () => {
     isSuperAdmin ||
     hasMenuKey('governance') ||
     showInsightsTab ||
-    showAiChatbotTab ||
     showMyApprovalsTab ||
     showResponsibilityChartTab ||
     showReimbursementsTab ||
@@ -644,7 +640,7 @@ export const AdminDashboardPage: React.FC = () => {
   const isGatewayTabActive = activeTab === 'helpdesk-tickets' || activeTab === 'job-postings' || activeTab === 'job-applications';
   const isGatewaySectionOpen = isGatewayOpen || isGatewayTabActive;
 
-  const isGovernanceTabActive = activeTab === 'insights' || activeTab === 'ai-chatbot' || activeTab === 'my-approvals' || activeTab === 'settings-responsibility-chart' || activeTab === 'member-services-reimbursements' || activeTab === 'member-services-events' || activeTab === 'member-services-notifications' || activeTab === 'member-services-gmail' || activeTab === 'governance-contacts';
+  const isGovernanceTabActive = activeTab === 'insights' || activeTab === 'my-approvals' || activeTab === 'settings-responsibility-chart' || activeTab === 'member-services-reimbursements' || activeTab === 'member-services-events' || activeTab === 'member-services-notifications' || activeTab === 'member-services-gmail' || activeTab === 'governance-contacts';
   const isGovernanceSectionOpen = isGovernanceOpen || isGovernanceTabActive;
 
   // Sreni sidebar menu structure — only items whose keys start with 'sreni-'
@@ -1009,7 +1005,6 @@ export const AdminDashboardPage: React.FC = () => {
                     if (showEventsTab) { setActiveTab('member-services-events'); return; }
                     if (showNotificationsTab) { setActiveTab('member-services-notifications'); return; }
                     if (showGmailTab) { setActiveTab('member-services-gmail'); return; }
-                    if (showAiChatbotTab) { setActiveTab('ai-chatbot'); return; }
                     return;
                   }
                   setIsGovernanceOpen((prev) => !prev);
@@ -1117,15 +1112,6 @@ export const AdminDashboardPage: React.FC = () => {
                       style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'member-services-gmail' ? '' : 'transparent', border: 'none', color: activeTab === 'member-services-gmail' ? '#fff' : 'var(--text-secondary-dark)' }}
                     >
                       ✉️ Gmail Workspace
-                    </button>
-                  )}
-                  {showAiChatbotTab && (
-                    <button
-                      onClick={() => setActiveTab('ai-chatbot')}
-                      className={`btn ${activeTab === 'ai-chatbot' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'ai-chatbot' ? '' : 'transparent', border: 'none', color: activeTab === 'ai-chatbot' ? '#fff' : 'var(--text-secondary-dark)' }}
-                    >
-                      🤖 AI Chatbot
                     </button>
                   )}
                 </div>
@@ -1788,7 +1774,7 @@ export const AdminDashboardPage: React.FC = () => {
         </header>
 
         {/* Body content */}
-        <div style={{ padding: '32px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        <div key={activeTab} className="tab-content-wrapper" style={{ padding: '32px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
           
           {/* TAB 1: DASHBOARD VIEW */}
           {activeTab === 'dashboard' && (
@@ -1902,12 +1888,6 @@ export const AdminDashboardPage: React.FC = () => {
                         <span>↗</span>
                       </button>
                     )}
-                    {showAiChatbotTab && (
-                      <button className="btn btn-secondary" style={{ justifyContent: 'space-between' }} onClick={() => setActiveTab('ai-chatbot')}>
-                        <span>AI Chatbot</span>
-                        <span>↗</span>
-                      </button>
-                    )}
                     {showGatewaySection && (
                       <button className="btn btn-secondary" style={{ justifyContent: 'space-between' }} onClick={() => setActiveTab(showHelpdeskTicketsTab ? 'helpdesk-tickets' : showJobPostingsTab ? 'job-postings' : 'job-applications')}>
                         <span>Helpdesk Workspace</span>
@@ -1922,8 +1902,6 @@ export const AdminDashboardPage: React.FC = () => {
           )}
 
           {activeTab === 'insights' && <InsightsPage />}
-
-          {activeTab === 'ai-chatbot' && <AiChatbotPage />}
 
           {/* TAB 2: ADMINS LIST (now under Settings) */}
           {activeTab === 'settings-admins' && showAdminsTab && (

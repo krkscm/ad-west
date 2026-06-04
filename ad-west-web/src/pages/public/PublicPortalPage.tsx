@@ -77,6 +77,13 @@ export function PublicPortalPage() {
         }}
       />
 
+      {/* Absolute Glowing Background Orbs */}
+      <div className="wow-bg-container" style={{ zIndex: 1 }}>
+        <div className="wow-orb wow-orb-primary" style={{ top: '5%', left: '-8%' }} />
+        <div className="wow-orb wow-orb-accent" style={{ bottom: '8%', right: '-8%' }} />
+        <div className="wow-orb wow-orb-gold" style={{ top: '45%', left: '30%' }} />
+      </div>
+
       {/* All content above the overlay */}
       <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
 
@@ -208,25 +215,12 @@ export function PublicPortalPage() {
                   padding: '28px 24px',
                   textAlign: 'left',
                   cursor: 'pointer',
-                  borderRadius: '16px',
+                  borderRadius: '18px',
                   backdropFilter: 'blur(20px)',
                   WebkitBackdropFilter: 'blur(20px)',
-                  transition: 'transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '14px',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)'
-                  e.currentTarget.style.boxShadow = '0 16px 40px rgba(0,0,0,0.35)'
-                  e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.52)'
-                  e.currentTarget.style.background = 'var(--public-panel-bg-hover)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = ''
-                  e.currentTarget.style.borderColor = 'var(--public-panel-border)'
-                  e.currentTarget.style.background = 'var(--public-panel-bg)'
                 }}
               >
                 {/* Icon + badge */}

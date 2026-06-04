@@ -103,15 +103,69 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = () => {
             />
           </div>
 
-          <div className="form-group">
+          <div className="form-group" style={{ marginBottom: '22px' }}>
             <label className="form-label">Security Check</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
               {captchaImage ? (
-                <img src={captchaImage} alt="Captcha" style={{ borderRadius: '6px', border: '1px solid #dde', display: 'block' }} />
+                <div style={{
+                  padding: '4px',
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  boxShadow: '0 8px 20px rgba(0, 0, 0, 0.2)',
+                  display: 'inline-flex',
+                }}>
+                  <img src={captchaImage} alt="Captcha" style={{ borderRadius: '8px', height: '40px', display: 'block' }} />
+                </div>
               ) : (
-                <div style={{ width: '200px', height: '60px', background: '#eef0f8', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '13px' }}>Loading...</div>
+                <div style={{
+                  width: '150px',
+                  height: '50px',
+                  background: 'rgba(15, 23, 42, 0.4)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'rgba(255, 255, 255, 0.4)',
+                  fontSize: '13px',
+                  animation: 'pulse 1.5s infinite',
+                }}>
+                  Loading security...
+                </div>
               )}
-              <button type="button" onClick={() => void loadCaptcha()} title="Get a new captcha" style={{ padding: '6px 10px', background: 'none', border: '1px solid #ccd', borderRadius: '6px', cursor: 'pointer', color: '#555', fontSize: '18px', lineHeight: 1 }}>↺</button>
+              <button
+                type="button"
+                onClick={() => void loadCaptcha()}
+                title="Get a new captcha"
+                style={{
+                  padding: '0',
+                  width: '50px',
+                  height: '50px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  color: '#fff',
+                  fontSize: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), background 0.3s ease, border-color 0.3s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'rotate(180deg) scale(1.05)'
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.14)'
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'rotate(0deg) scale(1)'
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)'
+                }}
+              >
+                ↺
+              </button>
             </div>
             <input
               type="text"

@@ -18,7 +18,6 @@ const DEFAULT_MENUS: Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>[] = [
   { key: 'governance',                   label: 'General Services',    parentKey: null,       icon: '🧭', sortOrder: 15, active: true },
   { key: 'insights',                     label: 'Insights',            parentKey: 'governance', icon: null, sortOrder: 10, active: true },
   { key: 'my-approvals',                 label: 'My Approvals',        parentKey: 'governance', icon: null, sortOrder: 20, active: true },
-  { key: 'ai-chatbot',                   label: 'AI Chatbot',          parentKey: 'governance', icon: null, sortOrder: 90, active: true },
   { key: 'settings',                     label: 'Settings',            parentKey: null,       icon: '⚙️', sortOrder: 20, active: true },
   { key: 'settings-roles-definition',    label: 'Roles Definition',    parentKey: 'settings', icon: null, sortOrder: 10, active: true },
   { key: 'settings-location-definition', label: 'Location Definition', parentKey: 'settings', icon: null, sortOrder: 20, active: true },
@@ -120,9 +119,6 @@ export class MenuManagementService {
 
       const grants = await this.grantRepo!.find({ where: { adminUserId: principal.userId } });
       const grantedKeys = new Set(grants.map((grant) => grant.menuKey));
-      if (grantedKeys.has('governance')) {
-        grantedKeys.add('ai-chatbot');
-      }
       if (grantedKeys.size === 0) {
         return [];
       }
@@ -157,9 +153,6 @@ export class MenuManagementService {
 
     const grants = this.memGrants.get(principal.userId) ?? [];
     const grantedKeys = new Set(grants.map((grant) => grant.menuKey));
-    if (grantedKeys.has('governance')) {
-      grantedKeys.add('ai-chatbot');
-    }
     if (grantedKeys.size === 0) {
       return [];
     }
@@ -453,8 +446,14 @@ export class MenuManagementService {
       { key: 'insights', label: 'Insights', sortOrder: 10 },
       { key: 'my-approvals', label: 'My Approvals', sortOrder: 20 },
       { key: 'settings-responsibility-chart', label: 'Responsibility Chart', sortOrder: 40 },
-      { key: 'ai-chatbot', label: 'AI Chatbot', sortOrder: 90 },
     ];
+
+    const retiredAiChatbot = byKey.get('ai-chatbot');
+    if (retiredAiChatbot?.active) {
+      retiredAiChatbot.active = false;
+      retiredAiChatbot.updatedAt = now;
+      await this.menuRepo!.save(retiredAiChatbot);
+    }
 
     for (const definition of childDefinitions) {
       const existing = byKey.get(definition.key);
