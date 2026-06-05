@@ -32,7 +32,6 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1');
 
-  // Enable CORS
   app.enableCors({
     origin: (origin, callback) => {
       if (!origin || isOriginAllowed(origin)) {

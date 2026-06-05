@@ -28,6 +28,10 @@ function createTypeOrmModule() {
   }
 
   const parsed = new URL(databaseUrl);
+  const useSsl =
+    process.env.DATABASE_SSL === 'true'
+    || parsed.hostname.includes('supabase.com')
+    || parsed.searchParams.get('sslmode') === 'require';
 
   return TypeOrmModule.forRoot({
     type: 'postgres',
@@ -38,7 +42,7 @@ function createTypeOrmModule() {
     database: parsed.pathname.replace(/^\//, ''),
     synchronize: false,
     autoLoadEntities: true,
-    ssl: false,
+    ssl: useSsl ? { rejectUnauthorized: false } : false,
   });
 }
 
