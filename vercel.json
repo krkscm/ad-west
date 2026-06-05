@@ -1,6 +1,7 @@
 {
+  "framework": null,
   "installCommand": "npm install --prefix ad-west-web",
-  "buildCommand": "npm run build --prefix ad-west-web",
+  "buildCommand": "npm run build",
   "outputDirectory": "ad-west-web/dist",
   "rewrites": [
     {
