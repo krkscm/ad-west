@@ -1,4 +1,5 @@
 import { api } from './api'
+import { normalizeApiBaseUrl } from './apiBaseUrl'
 
 export interface AdminRoleAssignment {
   role: 'SUPER_ADMIN' | 'ZONE_ADMIN' | 'SRENY_ADMIN'
@@ -855,7 +856,7 @@ export const backendApi = {
     api.post<{ success: boolean }>('/auth/reset-password', { token, newPassword }),
 
   buildGoogleStartUrl: (returnOrigin: string) =>
-    `${import.meta.env.VITE_API_URL || '/api/v1'}/auth/google/start?returnOrigin=${encodeURIComponent(returnOrigin)}`,
+    `${normalizeApiBaseUrl(import.meta.env.VITE_API_URL)}/auth/google/start?returnOrigin=${encodeURIComponent(returnOrigin)}`,
 
   adminLogout: () => api.post<{ success: boolean }>('/auth/admin/logout', {}),
 

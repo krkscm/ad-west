@@ -17,12 +17,25 @@ async function bootstrap() {
     .map((item) => item.trim())
     .filter(Boolean);
 
+  const isOriginAllowed = (origin: string): boolean => {
+    if (corsOrigins.includes(origin)) {
+      return true;
+    }
+    return corsOrigins.some((entry) => {
+      if (!entry.includes('*')) {
+        return false;
+      }
+      const pattern = `^${entry.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`;
+      return new RegExp(pattern).test(origin);
+    });
+  };
+
   app.setGlobalPrefix('api/v1');
 
   // Enable CORS
   app.enableCors({
     origin: (origin, callback) => {
-      if (!origin || corsOrigins.includes(origin)) {
+      if (!origin || isOriginAllowed(origin)) {
         callback(null, true);
         return;
       }

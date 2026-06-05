@@ -1,4 +1,6 @@
-const API_URL = import.meta.env.VITE_API_URL || '/api/v1'
+import { isCrossOriginApiBaseUrl, normalizeApiBaseUrl } from './apiBaseUrl'
+
+const API_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_URL)
 const REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 15000)
 
 export interface RequestRetryOptions {
@@ -39,6 +41,11 @@ function isTransientFetchError(error: unknown): boolean {
 
 function toFetchError(error: unknown): Error {
   if (error instanceof Error && isTransientFetchError(error)) {
+    if (isCrossOriginApiBaseUrl(API_URL)) {
+      return new Error(
+        'Cannot reach the API server. Use VITE_API_URL=/api/v1 on Vercel (with vercel.json proxy) or add your site to CORS_ORIGIN on Railway.',
+      )
+    }
     return new Error(
       'Cannot reach the API server. Start ad-west-api (npm run start:dev on port 3001) and retry.',
     )
@@ -117,6 +124,9 @@ async function requestOnce<T>(endpoint: string, init: RequestInit, timeoutMs: nu
 function shouldRetryRequest(error: unknown): boolean {
   if (error && typeof error === 'object' && 'transient' in error) {
     return true
+  }
+  if (isCrossOriginApiBaseUrl(API_URL) && isTransientFetchError(error)) {
+    return false
   }
   return isTransientFetchError(error)
 }
