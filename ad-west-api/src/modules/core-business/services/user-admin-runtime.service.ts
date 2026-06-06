@@ -161,6 +161,7 @@ export class UserAdminRuntimeService {
       sthan_id: string | null;
       permission_set_id: string | null;
       admin_management: string | null;
+      gender: string | null;
       password_hash: string | null;
       is_super_admin: boolean;
       must_reset_password: boolean;
@@ -325,6 +326,7 @@ export class UserAdminRuntimeService {
       sthan_id: string | null;
       permission_set_id: string | null;
       admin_management: string | null;
+      gender: string | null;
       password_hash: string | null;
       is_super_admin: boolean;
       must_reset_password: boolean;
