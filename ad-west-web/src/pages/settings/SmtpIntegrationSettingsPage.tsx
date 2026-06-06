@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useToast } from '../../components/common/Toast';
 import { SwitchToggle } from '../../components/common/SwitchToggle';
+import { PageHeader } from '../../components/common/PageHeader';
+import { FormSection } from '../../components/common/FormSection';
+import { FormActions } from '../../components/common/FormActions';
 import { backendApi, SmtpIntegrationConfigApi } from '../../utils/backendApi';
 
 export const SmtpIntegrationSettingsPage: React.FC = () => {
@@ -72,31 +75,22 @@ export const SmtpIntegrationSettingsPage: React.FC = () => {
     }
   };
 
-  const labelStyle: React.CSSProperties = {
-    display: 'block', fontSize: '0.82rem', fontWeight: 600,
-    color: 'var(--text-secondary-dark)', marginBottom: '4px',
-  };
-
   return (
     <div className="animate-slide-up" style={{ width: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>Email Integration</h2>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.9rem', margin: '6px 0 0' }}>
-            Configure SMTP settings for outgoing email. Credentials are stored securely in the database.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon="📧"
+        title="Email Integration"
+        subtitle="Configure SMTP settings for outgoing email. Credentials are stored securely in the database."
+      />
 
       {isLoading ? (
-        <div style={{ color: 'var(--text-secondary-dark)', padding: '20px' }}>Loading configuration…</div>
+        <div className="loading-state">Loading configuration…</div>
       ) : (
         <form onSubmit={handleSave} style={{ maxWidth: '680px' }}>
-          <div className="glass-panel" style={{ padding: '24px', borderLeft: '3px solid var(--primary)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
+          <FormSection title="SMTP Configuration" accent="primary">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: '12px' }}>
-              <div>
-                <label style={labelStyle}>SMTP Host <span style={{ color: 'var(--error)' }}>*</span></label>
+              <div className="form-group">
+                <label className="form-label">SMTP Host <span style={{ color: 'var(--error)' }}>*</span></label>
                 <input
                   className="form-input"
                   type="text"
@@ -106,8 +100,8 @@ export const SmtpIntegrationSettingsPage: React.FC = () => {
                   required
                 />
               </div>
-              <div>
-                <label style={labelStyle}>Port <span style={{ color: 'var(--error)' }}>*</span></label>
+              <div className="form-group">
+                <label className="form-label">Port <span style={{ color: 'var(--error)' }}>*</span></label>
                 <input
                   className="form-input"
                   type="number"
@@ -120,8 +114,8 @@ export const SmtpIntegrationSettingsPage: React.FC = () => {
               </div>
             </div>
 
-            <div>
-              <label style={labelStyle}>Encryption</label>
+            <div className="form-group">
+              <label className="form-label">Encryption</label>
               <select
                 className="form-input"
                 value={encryption}
@@ -134,8 +128,8 @@ export const SmtpIntegrationSettingsPage: React.FC = () => {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: '12px' }}>
-              <div>
-                <label style={labelStyle}>IMAP Host</label>
+              <div className="form-group">
+                <label className="form-label">IMAP Host</label>
                 <input
                   className="form-input"
                   type="text"
@@ -144,8 +138,8 @@ export const SmtpIntegrationSettingsPage: React.FC = () => {
                   placeholder="e.g. imap.gmail.com"
                 />
               </div>
-              <div>
-                <label style={labelStyle}>IMAP Port</label>
+              <div className="form-group">
+                <label className="form-label">IMAP Port</label>
                 <input
                   className="form-input"
                   type="number"
@@ -157,8 +151,8 @@ export const SmtpIntegrationSettingsPage: React.FC = () => {
               </div>
             </div>
 
-            <div>
-              <label style={labelStyle}>Username / Email <span style={{ color: 'var(--error)' }}>*</span></label>
+            <div className="form-group">
+              <label className="form-label">Username / Email <span style={{ color: 'var(--error)' }}>*</span></label>
               <input
                 className="form-input"
                 type="email"
@@ -169,8 +163,8 @@ export const SmtpIntegrationSettingsPage: React.FC = () => {
               />
             </div>
 
-            <div>
-              <label style={labelStyle}>Password / App Password</label>
+            <div className="form-group">
+              <label className="form-label">Password / App Password</label>
               <input
                 className="form-input"
                 type="password"
@@ -178,18 +172,16 @@ export const SmtpIntegrationSettingsPage: React.FC = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-              <div style={{ marginTop: '8px' }}>
-                <SwitchToggle
-                  checked={clearPassword}
-                  onChange={setClearPassword}
-                  labelOn="Clear stored password"
-                  labelOff="Keep stored password"
-                />
-              </div>
+              <SwitchToggle
+                checked={clearPassword}
+                onChange={setClearPassword}
+                labelOn="Clear stored password"
+                labelOff="Keep stored password"
+              />
             </div>
 
-            <div>
-              <label style={labelStyle}>From Name</label>
+            <div className="form-group">
+              <label className="form-label">From Name</label>
               <input
                 className="form-input"
                 type="text"
@@ -197,13 +189,13 @@ export const SmtpIntegrationSettingsPage: React.FC = () => {
                 onChange={(e) => setFromName(e.target.value)}
                 placeholder="e.g. AD West Helpdesk"
               />
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary-dark)', marginTop: '4px', display: 'block' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary-dark)' }}>
                 Displayed as the sender name in outgoing emails. Defaults to the username if left empty.
               </span>
             </div>
 
-            <div>
-              <label style={labelStyle}>Integration Status</label>
+            <div className="form-group">
+              <label className="form-label">Integration Status</label>
               <SwitchToggle
                 checked={enabled}
                 onChange={setEnabled}
@@ -212,15 +204,14 @@ export const SmtpIntegrationSettingsPage: React.FC = () => {
               />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', flexWrap: 'wrap', gap: '10px' }}>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>
-                {config?.updatedAt ? `Last updated: ${new Date(config.updatedAt).toLocaleString()}` : 'Not saved yet'}
-              </span>
+            <FormActions
+              hint={config?.updatedAt ? `Last updated: ${new Date(config.updatedAt).toLocaleString()}` : 'Not saved yet'}
+            >
               <button className="btn btn-primary" type="submit" disabled={isSaving}>
                 {isSaving ? 'Saving…' : 'Save Configuration'}
               </button>
-            </div>
-          </div>
+            </FormActions>
+          </FormSection>
         </form>
       )}
     </div>

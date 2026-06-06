@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Modal } from './Modal';
+import { SwitchToggle } from './SwitchToggle';
 import { buildColumnItems, ColumnItem } from '../../hooks/useTableLayout';
 import { TableLayoutApi } from '../../utils/backendApi';
 
@@ -283,12 +284,12 @@ export const TableLayoutModal: React.FC<Props> = ({
                   >▼</button>
                 </div>
 
-                {/* Visibility checkbox */}
-                <input
-                  type="checkbox"
+                {/* Visibility toggle */}
+                <SwitchToggle
+                  variant="inline"
                   checked={col.visible}
                   onChange={() => toggle(i)}
-                  style={{ cursor: 'pointer', width: '15px', height: '15px', flexShrink: 0, accentColor: 'var(--primary)' }}
+                  ariaLabel={`${col.visible ? 'Hide' : 'Show'} ${col.label} column`}
                 />
 
                 {/* Label */}

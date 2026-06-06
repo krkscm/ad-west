@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useToast } from '../../components/common/Toast';
 import { useConfirm } from '../../components/common/ConfirmDialog';
+import { PageHeader } from '../../components/common/PageHeader';
+import { EmptyState } from '../../components/common/EmptyState';
 import { backendApi, EnumValueApi, LocationDefinitionApi } from '../../utils/backendApi';
 
 type LocationLevel = LocationDefinitionApi['level'];
@@ -169,40 +171,37 @@ export const LocationDefinitionPage: React.FC = () => {
     return [1, '…', page - 1, page, page + 1, '…', totalPages];
   })();
 
+  const hasTable = !isLoading && items.length > 0;
+
   return (
     <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column' }}>
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0 }}>Location Definition</h2>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginTop: '4px', margin: '4px 0 0' }}>
-            Manage zones and sthans — the geographic hierarchy of your organisation.
-          </p>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
-            {[{ label: 'Total', count: total, className: 'badge-info' },
-              { label: 'Zones (page)', count: zoneCount, className: 'badge-info' },
-              { label: 'Sthans (page)', count: sthanCount, className: 'badge-warning' },
-              { label: 'Divisions (page)', count: divisionCount, className: 'badge-success' }].map(({ label, count, className }) => (
-              <span key={label} className={`badge ${className}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid currentColor', background: 'transparent', fontSize: '0.8rem', fontWeight: 600 }}>
-                <span style={{ fontSize: '0.95rem', fontWeight: 800 }}>{count}</span> {label}
-              </span>
-            ))}
-          </div>
-        </div>
-        <button
-          type="button" className="btn btn-primary"
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '16px', paddingRight: '16px' }}
-          onClick={() => { if (formOpen && !editingId) setFormOpen(false); else { resetForm(); setFormOpen(true); } }}
-        >
-          {formOpen && !editingId ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-          )}
-          {formOpen && !editingId ? 'Close' : 'New Location'}
-        </button>
-      </div>
+      <PageHeader
+        icon="📍"
+        title="Location Definition"
+        subtitle="Manage zones and sthans — the geographic hierarchy of your organisation."
+        stats={[
+          { label: 'Total', value: total, variant: 'info' },
+          { label: 'Zones (page)', value: zoneCount, variant: 'info' },
+          { label: 'Sthans (page)', value: sthanCount, variant: 'warning' },
+          { label: 'Divisions (page)', value: divisionCount, variant: 'success' },
+        ]}
+        actions={
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '16px', paddingRight: '16px' }}
+            onClick={() => { if (formOpen && !editingId) setFormOpen(false); else { resetForm(); setFormOpen(true); } }}
+          >
+            {formOpen && !editingId ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            )}
+            {formOpen && !editingId ? 'Close' : 'New Location'}
+          </button>
+        }
+      />
 
       {/* Form */}
       {formOpen && (
@@ -262,15 +261,11 @@ export const LocationDefinitionPage: React.FC = () => {
         </div>
       )}
 
-      {/* Toolbar */}
-      <div className="glass-panel" style={{ padding: '14px 18px', marginBottom: '0', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottom: '1px solid var(--border-dark)' }}>
-        <div style={{ flex: '1 1 240px', position: 'relative', maxWidth: '360px' }}>
-          <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary-dark)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          </span>
-          <input className="form-input" style={{ paddingLeft: '34px', marginBottom: 0, fontSize: '0.875rem' }} placeholder="Search by name or code…" value={search} onChange={(e) => handleSearchChange(e.target.value)} />
+      <div className={`glass-panel list-toolbar${hasTable ? ' list-toolbar--fused' : ''}`} style={{ marginBottom: hasTable ? 0 : '16px' }}>
+        <div className="list-toolbar__search">
+          <span className="list-toolbar__search-icon" aria-hidden="true">🔍</span>
+          <input className="form-input" placeholder="Search by name or code…" value={search} onChange={(e) => handleSearchChange(e.target.value)} />
         </div>
-        <div style={{ width: '1px', height: '24px', background: 'var(--border-dark)' }} />
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {([
             { val: '',         label: 'All' },
@@ -284,21 +279,30 @@ export const LocationDefinitionPage: React.FC = () => {
             </button>
           ))}
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="list-toolbar__meta">
           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>Rows:</span>
           {[10, 20, 50].map((ps) => (
-            <button key={ps} type="button" onClick={() => { setPageSize(ps); setPage(1); }}
-              style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid', borderColor: pageSize === ps ? 'var(--primary)' : 'var(--border-dark)', background: pageSize === ps ? 'var(--primary)' : 'transparent', color: pageSize === ps ? '#fff' : 'var(--text-secondary-dark)', fontSize: '0.78rem', fontWeight: pageSize === ps ? 700 : 400, cursor: 'pointer' }}>
+            <button key={ps} type="button" className={`page-size-pill${pageSize === ps ? ' is-active' : ''}`} onClick={() => { setPageSize(ps); setPage(1); }}>
               {ps}
             </button>
           ))}
-          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)', marginLeft: '4px' }}>
-            {isLoading ? 'Loading…' : `${total} location${total !== 1 ? 's' : ''}`}
-          </span>
+          {!isLoading && (
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>
+              {total} location{total !== 1 ? 's' : ''}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Table */}
+      {isLoading ? (
+        <div className="glass-panel loading-state">Loading locations…</div>
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon="🗺️"
+          title="No locations found"
+          copy={search || levelFilter ? 'Try adjusting your search or filter.' : 'Click "New Location" to create the first zone.'}
+        />
+      ) : (
       <div className="table-container" style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0, boxShadow: 'none' }}>
         <table className="custom-table">
           <thead>
@@ -311,26 +315,7 @@ export const LocationDefinitionPage: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid var(--border-dark)' }}>
-                  {Array.from({ length: 7 }).map((__, j) => (
-                    <td key={j} style={{ padding: '14px 20px' }}>
-                      <div style={{ height: '14px', borderRadius: '6px', background: 'var(--border-dark)', width: j === 6 ? '120px' : j === 4 ? '60px' : j === 2 ? '70px' : '100%', animation: 'pulse 1.5s ease-in-out infinite' }} />
-                    </td>
-                  ))}
-                </tr>
-              ))
-            ) : items.length === 0 ? (
-              <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: '56px 24px', color: 'var(--text-secondary-dark)' }}>
-                  <div style={{ fontSize: '2rem', marginBottom: '10px' }}>🗺️</div>
-                  <div style={{ fontWeight: 600, marginBottom: '4px' }}>No locations found</div>
-                  <div style={{ fontSize: '0.83rem' }}>{search || levelFilter ? 'Try adjusting your search or filter.' : 'Click "New Location" to create the first zone.'}</div>
-                </td>
-              </tr>
-            ) : (
-              items.map((loc) => (
+            {items.map((loc) => (
                 <tr key={loc.id} style={{ opacity: loc.active ? 1 : 0.55 }}>
                   <td style={{ padding: '14px 20px' }}>
                     {loc.code ? (
@@ -410,14 +395,14 @@ export const LocationDefinitionPage: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ))
-            )}
+              ))}
           </tbody>
         </table>
       </div>
+      )}
 
       {/* Pagination */}
-      {!isLoading && totalPages > 1 && (
+      {hasTable && totalPages > 1 && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '14px 18px', borderTop: '1px solid var(--border-dark)' }}>
           <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
             style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid var(--border-dark)', background: 'transparent', color: page === 1 ? 'var(--text-secondary-dark)' : 'var(--text-primary-dark)', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1, fontSize: '0.82rem' }}>

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useToast } from '../common/Toast'
 import { backendApi, AdminUserApi, MenuItemApi, RoleDefinitionApi } from '../../utils/backendApi'
+import { SwitchToggle } from '../common/SwitchToggle'
 
 const toUiError = (e: unknown, fallback: string): string => {
   if (!(e instanceof Error)) return fallback
@@ -230,7 +231,7 @@ export const AdminUserForm: React.FC<Props> = ({ editingId, onBack, onSaved }) =
         </button>
         <div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>
-            {editingId ? 'Edit Administrator' : 'New Administrator'}
+            👤 {editingId ? 'Edit Administrator' : 'New Administrator'}
           </h2>
           {editingId && name && (
             <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginTop: '2px' }}>
@@ -355,32 +356,42 @@ export const AdminUserForm: React.FC<Props> = ({ editingId, onBack, onSaved }) =
                 const parentGranted = grantedKeys.has(parent.key)
                 return (
                   <div key={parent.key}>
-                    <label style={{
-                      display: 'flex', alignItems: 'center', gap: '10px',
-                      padding: '8px 10px', borderRadius: '8px', cursor: 'pointer',
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
+                      padding: '8px 10px', borderRadius: '8px',
                       background: parentGranted ? 'rgba(99,102,241,0.07)' : 'transparent',
                     }}>
-                      <CheckBox checked={parentGranted} onChange={() => handleToggleKey(parent.key)} size={16} />
                       <span style={{ fontSize: '0.875rem', fontWeight: 600, flex: 1 }}>{parent.label}</span>
                       {children.length > 0 && (
                         <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary-dark)' }}>
                           {children.filter(c => grantedKeys.has(c.key)).length}/{children.length}
                         </span>
                       )}
-                    </label>
+                      <SwitchToggle
+                        variant="inline"
+                        checked={parentGranted}
+                        onChange={() => handleToggleKey(parent.key)}
+                        ariaLabel={`Toggle menu access for ${parent.label}`}
+                      />
+                    </div>
                     {children.map(child => {
                       const childGranted = grantedKeys.has(child.key)
                       return (
-                        <label key={child.key} style={{
-                          display: 'flex', alignItems: 'center', gap: '10px',
-                          padding: '6px 10px 6px 30px', borderRadius: '8px', cursor: 'pointer',
+                        <div key={child.key} style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
+                          padding: '6px 10px 6px 30px', borderRadius: '8px',
                           background: childGranted ? 'rgba(99,102,241,0.05)' : 'transparent',
                         }}>
-                          <CheckBox checked={childGranted} onChange={() => handleToggleKey(child.key)} size={14} />
                           <span style={{ fontSize: '0.82rem', color: childGranted ? 'var(--text-primary-dark)' : 'var(--text-secondary-dark)' }}>
                             {child.label}
                           </span>
-                        </label>
+                          <SwitchToggle
+                            variant="inline"
+                            checked={childGranted}
+                            onChange={() => handleToggleKey(child.key)}
+                            ariaLabel={`Toggle menu access for ${child.label}`}
+                          />
+                        </div>
                       )
                     })}
                   </div>
@@ -413,21 +424,3 @@ const SectionLabel: React.FC<{ children: React.ReactNode; color?: string }> = ({
   </div>
 )
 
-const CheckBox: React.FC<{ checked: boolean; onChange: () => void; size: number }> = ({ checked, onChange, size }) => (
-  <div
-    onClick={e => { e.preventDefault(); onChange() }}
-    style={{
-      width: `${size}px`, height: `${size}px`, borderRadius: '4px', flexShrink: 0,
-      border: `2px solid ${checked ? 'var(--primary)' : 'var(--border-dark)'}`,
-      background: checked ? 'var(--primary)' : 'transparent',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      transition: 'all 0.15s',
-    }}
-  >
-    {checked && (
-      <svg width={size - 6} height={size - 6} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="20 6 9 17 4 12" />
-      </svg>
-    )}
-  </div>
-)

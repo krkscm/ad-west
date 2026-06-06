@@ -620,7 +620,7 @@ export const ApprovalWorkflowFormPage: React.FC<ApprovalWorkflowFormPageProps> =
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0 }}>
-            {editingId ? 'Edit Approval Workflow' : 'New Approval Workflow'}
+            ✅ {editingId ? 'Edit Approval Workflow' : 'New Approval Workflow'}
           </h2>
           <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', margin: '4px 0 0' }}>
             Configure workflow details and design approval flow visually with node connectors.

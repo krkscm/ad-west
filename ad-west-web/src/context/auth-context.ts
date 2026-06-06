@@ -7,6 +7,7 @@ export interface AdminSessionUser {
   name: string
   email: string
   picture?: string
+  gender?: string
   authProvider?: 'password' | 'google'
   roles: Array<{
     role: 'Super Admin' | 'Zone Admin' | 'Sreny Admin'

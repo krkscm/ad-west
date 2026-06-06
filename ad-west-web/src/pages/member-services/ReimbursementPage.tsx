@@ -5,6 +5,10 @@ import { useToast } from '../../components/common/Toast'
 import { SwitchToggle } from '../../components/common/SwitchToggle'
 import { useConfirm } from '../../components/common/ConfirmDialog'
 import { FileUploadZone } from '../../components/common/FileUploadZone'
+import { PageHeader } from '../../components/common/PageHeader'
+import { FormSection } from '../../components/common/FormSection'
+import { FormActions } from '../../components/common/FormActions'
+import { EmptyState } from '../../components/common/EmptyState'
 import { useEnumOptions } from '../../hooks/useEnumOptions'
 
 const STATUS_COLORS: Record<ReimbursementStatus, string> = {
@@ -127,38 +131,41 @@ export function ReimbursementPage() {
   if (mode === 'create') {
     return (
       <div className="animate-slide-up" style={{ maxWidth: '680px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-          <button className="btn btn-secondary" onClick={() => { setMode('list'); setForm(BLANK) }}>← Back</button>
-          <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800 }}>New Reimbursement Request</h2>
-        </div>
-        <div className="glass-panel" style={{ padding: '24px', borderLeft: '3px solid var(--primary)' }}>
-          <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <PageHeader
+          icon="💰"
+          title="New Reimbursement Request"
+          actions={
+            <button className="btn btn-secondary" onClick={() => { setMode('list'); setForm(BLANK) }}>← Back</button>
+          }
+        />
+        <FormSection title="Request Details" accent="primary">
+          <form onSubmit={handleCreate}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Category</label>
+              <div className="form-group">
+                <label className="form-label">Category</label>
                 <select className="form-input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as ReimbursementCategory })}>
                   {categoryOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Amount <span style={{ color: 'var(--error)' }}>*</span></label>
+                <div className="form-group">
+                  <label className="form-label">Amount <span style={{ color: 'var(--error)' }}>*</span></label>
                   <input className="form-input" type="number" min="0.01" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="0.00" required />
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Currency</label>
+                <div className="form-group">
+                  <label className="form-label">Currency</label>
                   <select className="form-input" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
                     <option>AED</option><option>USD</option><option>INR</option>
                   </select>
                 </div>
               </div>
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Description <span style={{ color: 'var(--error)' }}>*</span></label>
+            <div className="form-group">
+              <label className="form-label">Description <span style={{ color: 'var(--error)' }}>*</span></label>
               <textarea className="form-input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Describe the expense and purpose…" rows={4} required style={{ resize: 'vertical' }} />
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>
+            <div className="form-group">
+              <label className="form-label">
                 Receipt / Proof of Payment <span style={{ color: 'var(--error)' }}>*</span>
               </label>
               <FileUploadZone
@@ -171,9 +178,8 @@ export function ReimbursementPage() {
                 onChange={(f, err) => { setReceiptFile(f); setReceiptError(err ?? '') }}
               />
             </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Submission Mode</label>
+            <div className="form-group">
+              <label className="form-label">Submission Mode</label>
               <SwitchToggle
                 checked={form.asDraft}
                 onChange={(v) => setForm({ ...form, asDraft: v })}
@@ -181,39 +187,34 @@ export function ReimbursementPage() {
                 labelOff="Submit immediately for review"
               />
             </div>
-            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+            <FormActions>
               <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Create Request'}</button>
               <button type="button" className="btn btn-secondary" onClick={() => { setMode('list'); setForm(BLANK) }}>Cancel</button>
-            </div>
+            </FormActions>
           </form>
-        </div>
+        </FormSection>
       </div>
     )
   }
 
   return (
     <div className="animate-slide-up" style={{ width: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>Reimbursements</h2>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.9rem', margin: '6px 0 0' }}>Raise and track expense reimbursement requests.</p>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
-              <span style={{ fontWeight: 800 }}>{items.length}</span>Total
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(245,158,11,0.1)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.25)' }}>
-              <span style={{ fontWeight: 800 }}>{submittedCount}</span>Pending
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)' }}>
-              <span style={{ fontWeight: 800 }}>{approvedCount}</span>Approved
-            </span>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" onClick={load} disabled={loading}>Refresh</button>
-          <button className="btn btn-primary" onClick={() => { setMode('create'); setSelected(null) }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Request</button>
-        </div>
-      </div>
+      <PageHeader
+        icon="💰"
+        title="Reimbursements"
+        subtitle="Raise and track expense reimbursement requests."
+        stats={[
+          { label: 'Total', value: items.length, variant: 'info' },
+          { label: 'Pending', value: submittedCount, variant: 'warning' },
+          { label: 'Approved', value: approvedCount, variant: 'success' },
+        ]}
+        actions={
+          <>
+            <button className="btn btn-secondary" onClick={load} disabled={loading}>Refresh</button>
+            <button className="btn btn-primary" onClick={() => { setMode('create'); setSelected(null) }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Request</button>
+          </>
+        }
+      />
 
       {isSuperAdmin && (
         <div className="glass-panel" style={{ padding: '14px 18px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -229,11 +230,9 @@ export function ReimbursementPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: selected ? 'minmax(0,1fr) 360px' : '1fr', gap: '16px', alignItems: 'start' }}>
         <div>
-          {loading && <div style={{ color: 'var(--text-secondary-dark)', padding: '20px' }}>Loading…</div>}
+          {loading && <div className="loading-state">Loading…</div>}
           {!loading && items.length === 0 && (
-            <div className="glass-panel" style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary-dark)' }}>
-              No reimbursement requests found.
-            </div>
+            <EmptyState title="No reimbursement requests found" />
           )}
           {!loading && items.length > 0 && (
             <div className="table-container">
@@ -331,14 +330,14 @@ export function ReimbursementPage() {
             )}
             {isSuperAdmin && ['submitted', 'pending_review'].includes(selected.status) && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Decision</label>
+                <div className="form-group">
+                  <label className="form-label">Decision</label>
                   <select className="form-input" value={reviewStatus} onChange={(e) => setReviewStatus(e.target.value as ReimbursementStatus)}>
                     {reviewStatusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Notes</label>
+                <div className="form-group">
+                  <label className="form-label">Notes</label>
                   <textarea className="form-input" value={reviewNotes} onChange={(e) => setReviewNotes(e.target.value)} rows={3} style={{ resize: 'vertical' }} />
                 </div>
                 <button className="btn btn-primary" onClick={handleReview} disabled={reviewing}>{reviewing ? 'Saving…' : 'Save Review'}</button>

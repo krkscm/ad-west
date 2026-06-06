@@ -1,23 +1,21 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../../components/common/Toast';
 import { useConfirm } from '../../components/common/ConfirmDialog';
+import { PageHeader } from '../../components/common/PageHeader';
+import { FormSection } from '../../components/common/FormSection';
+import { FormActions } from '../../components/common/FormActions';
+import { EmptyState } from '../../components/common/EmptyState';
+import { PaginationBar } from '../../components/common/PaginationBar';
 import { backendApi, LocationDefinitionApi, PermissionApi, PermissionSetApi } from '../../utils/backendApi';
+import { SwitchToggle } from '../../components/common/SwitchToggle';
+
+const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
 const toUiError = (error: unknown, fallback: string): string => {
   if (!(error instanceof Error)) return fallback;
   const match = error.message.match(/^API error \(\d+\):\s*(.*)$/i);
   if (match?.[1]) return match[1];
   return error.message || fallback;
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '10px 14px', borderRadius: '8px',
-  border: '1px solid var(--border-dark)', background: 'var(--surface-dark-elevated)',
-  color: 'var(--text-primary-dark)', fontSize: '0.9rem', fontFamily: 'inherit', boxSizing: 'border-box',
-};
-const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.05em',
-  textTransform: 'uppercase', color: 'var(--text-secondary-dark)', marginBottom: '6px',
 };
 
 export const PermissionSetsPage: React.FC = () => {
@@ -69,6 +67,12 @@ export const PermissionSetsPage: React.FC = () => {
     setSearch(q);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => { setPage(1); loadSets(1, pageSize, q); }, 400);
+  };
+
+  const handlePageSizeChange = (ps: number) => {
+    setPageSize(ps);
+    setPage(1);
+    loadSets(1, ps, search);
   };
 
   const permById = useMemo(() => {
@@ -158,63 +162,59 @@ export const PermissionSetsPage: React.FC = () => {
     });
   };
 
-  const pageNums = (() => {
-    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
-    if (page <= 4) return [1, 2, 3, 4, 5, '…', totalPages];
-    if (page >= totalPages - 3) return [1, '…', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-    return [1, '…', page - 1, page, page + 1, '…', totalPages];
-  })();
+  const toggleFormOpen = () => {
+    if (formOpen && !editingId) setFormOpen(false);
+    else { resetForm(); setFormOpen(true); }
+  };
+
+  const hasTable = !isLoading && sets.length > 0;
+  const activePermCount = allPermissions.filter((p) => p.active).length;
 
   return (
     <div className="animate-slide-up">
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>Permission Sets</h2>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.9rem', margin: '6px 0 0' }}>
-            Bundle atomic permissions into named sets that can be granted to roles or users.
-          </p>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
-            {[{ label: 'Total', count: total, color: '#818cf8', bg: 'rgba(99,102,241,0.1)', border: 'rgba(99,102,241,0.25)' },
-              { label: 'Available Permissions', count: allPermissions.filter((p) => p.active).length, color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)' }].map(({ label, count, color, bg, border }) => (
-              <span key={label} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: bg, color, border: `1px solid ${border}` }}>
-                <span style={{ fontWeight: 800 }}>{count}</span>{label}
-              </span>
-            ))}
-          </div>
-        </div>
-        <button type="button" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-          onClick={() => { if (formOpen && !editingId) setFormOpen(false); else { resetForm(); setFormOpen(true); } }}>
-          <span style={{ fontSize: '1.15rem' }}>{formOpen && !editingId ? '✕' : '+'}</span>
-          {formOpen && !editingId ? 'Close' : 'New Set'}
-        </button>
-      </div>
+      <PageHeader
+        icon="🗂️"
+        title="Permission Sets"
+        subtitle="Bundle atomic permissions into named sets that can be granted to roles or users."
+        stats={[
+          { label: 'Total', value: total, variant: 'info' },
+          { label: 'Available Permissions', value: activePermCount, variant: 'warning' },
+        ]}
+        actions={
+          <button type="button" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={toggleFormOpen}>
+            <span style={{ fontSize: '1.15rem' }}>{formOpen && !editingId ? '✕' : '+'}</span>
+            {formOpen && !editingId ? 'Close' : 'New Set'}
+          </button>
+        }
+      />
 
-      {/* Form */}
       {formOpen && (
-        <div className="glass-panel" style={{ padding: '20px 24px', marginBottom: '20px', borderLeft: '3px solid var(--primary)', animation: 'slideUp 0.22s ease' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 18px' }}>{editingId ? 'Edit Permission Set' : 'New Permission Set'}</h3>
+        <FormSection title={editingId ? 'Edit Permission Set' : 'New Permission Set'} accent="primary">
           <form onSubmit={(e) => void handleSave(e)}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '20px' }}>
-              <div>
-                <label style={labelStyle}>Name <span style={{ color: 'var(--error)' }}>*</span></label>
-                <input style={inputStyle} placeholder="e.g. Zone Admin Full Access" value={formName} onChange={(e) => setFormName(e.target.value)} required />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+              <div className="form-group">
+                <label className="form-label">Name <span style={{ color: 'var(--error)' }}>*</span></label>
+                <input className="form-input" placeholder="e.g. Zone Admin Full Access" value={formName} onChange={(e) => setFormName(e.target.value)} required />
               </div>
-              <div>
-                <label style={labelStyle}>Description</label>
-                <input style={inputStyle} placeholder="What does this set grant?" value={formDescription} onChange={(e) => setFormDescription(e.target.value)} />
+              <div className="form-group">
+                <label className="form-label">Description</label>
+                <input className="form-input" placeholder="What does this set grant?" value={formDescription} onChange={(e) => setFormDescription(e.target.value)} />
               </div>
             </div>
 
-            {/* Permission picker */}
-            <div style={{ marginBottom: '20px' }}>
+            <div className="form-group">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
-                <label style={{ ...labelStyle, marginBottom: 0 }}>
+                <label className="form-label" style={{ marginBottom: 0 }}>
                   Permissions &nbsp;
                   <span style={{ fontWeight: 600, color: 'var(--text-primary-dark)', textTransform: 'none', letterSpacing: 0 }}>({selectedPermIds.size} selected)</span>
                 </label>
-                <input style={{ ...inputStyle, maxWidth: '240px', padding: '6px 12px', fontSize: '0.83rem' }}
-                  placeholder="Filter permissions…" value={permSearch} onChange={(e) => setPermSearch(e.target.value)} />
+                <input
+                  className="form-input"
+                  style={{ maxWidth: '240px', marginBottom: 0 }}
+                  placeholder="Filter permissions…"
+                  value={permSearch}
+                  onChange={(e) => setPermSearch(e.target.value)}
+                />
               </div>
 
               {selectedPermIds.size > 0 && (
@@ -242,12 +242,17 @@ export const PermissionSetsPage: React.FC = () => {
                     {groupItems.map((p) => {
                       const checked = selectedPermIds.has(p.id);
                       return (
-                        <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '9px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border-dark)', background: checked ? 'rgba(99,102,241,0.06)' : 'transparent', transition: 'background 0.15s' }}>
-                          <input type="checkbox" checked={checked} onChange={() => togglePerm(p.id)} style={{ accentColor: '#818cf8', width: '15px', height: '15px', flexShrink: 0 }} />
+                        <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '9px 14px', borderBottom: '1px solid var(--border-dark)', background: checked ? 'rgba(99,102,241,0.06)' : 'transparent', transition: 'background 0.15s' }}>
+                          <SwitchToggle
+                            variant="inline"
+                            checked={checked}
+                            onChange={() => togglePerm(p.id)}
+                            ariaLabel={`Toggle permission ${p.name}`}
+                          />
                           <code style={{ fontSize: '0.76rem', fontWeight: 700, background: 'var(--chip-bg-soft)', padding: '2px 7px', borderRadius: '4px', letterSpacing: '0.03em', flexShrink: 0 }}>{p.code}</code>
                           <span style={{ fontSize: '0.87rem', fontWeight: 600, flex: 1 }}>{p.name}</span>
                           {p.description && <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.description}</span>}
-                        </label>
+                        </div>
                       );
                     })}
                   </div>
@@ -255,25 +260,23 @@ export const PermissionSetsPage: React.FC = () => {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            <FormActions>
               <button type="button" className="btn btn-secondary" onClick={resetForm}>Cancel</button>
               <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Set'}</button>
-            </div>
+            </FormActions>
           </form>
-        </div>
+        </FormSection>
       )}
 
-      {/* Toolbar */}
-      <div className="glass-panel" style={{ padding: '12px 16px', marginBottom: '0', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottom: '1px solid var(--border-subtle, rgba(255,255,255,0.06))' }}>
-        <div style={{ flex: '1 1 200px', position: 'relative' }}>
-          <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary-dark)', pointerEvents: 'none', fontSize: '0.9rem' }}>🔍</span>
-          <input className="form-input" style={{ paddingLeft: '32px', marginBottom: 0 }} placeholder="Search sets by name or description…" value={search} onChange={(e) => handleSearchChange(e.target.value)} />
+      <div className={`glass-panel list-toolbar${hasTable ? ' list-toolbar--fused' : ''}`} style={{ marginBottom: hasTable ? 0 : '16px' }}>
+        <div className="list-toolbar__search">
+          <span className="list-toolbar__search-icon" aria-hidden="true">🔍</span>
+          <input className="form-input" placeholder="Search sets by name or description…" value={search} onChange={(e) => handleSearchChange(e.target.value)} />
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="list-toolbar__meta">
           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>Rows:</span>
-          {[10, 20, 50].map((ps) => (
-            <button key={ps} type="button" onClick={() => { setPageSize(ps); setPage(1); }}
-              style={{ padding: '3px 9px', borderRadius: '5px', border: '1px solid', borderColor: pageSize === ps ? 'var(--accent-primary, #6366f1)' : 'var(--border-subtle, rgba(255,255,255,0.12))', background: pageSize === ps ? 'rgba(99,102,241,0.15)' : 'transparent', color: pageSize === ps ? '#818cf8' : 'var(--text-secondary-dark)', fontSize: '0.78rem', fontWeight: pageSize === ps ? 700 : 400, cursor: 'pointer' }}>
+          {PAGE_SIZE_OPTIONS.map((ps) => (
+            <button key={ps} type="button" className={`page-size-pill${pageSize === ps ? ' is-active' : ''}`} onClick={() => handlePageSizeChange(ps)}>
               {ps}
             </button>
           ))}
@@ -283,92 +286,90 @@ export const PermissionSetsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="glass-panel" style={{ padding: 0, overflow: 'hidden', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
-        {isLoading ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary-dark)' }}>Loading…</div>
-        ) : sets.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary-dark)' }}>
-            {search ? 'No sets match your search.' : 'No permission sets defined yet.'}
-          </div>
-        ) : (
-          <>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-              <thead>
-                <tr style={{ background: 'var(--table-head-bg)', borderBottom: '1px solid var(--border-dark)' }}>
-                  {['Name', 'Description', 'Permissions', 'Status', 'Actions'].map((h) => (
-                    <th key={h} style={{ padding: '10px 18px', textAlign: 'left', fontSize: '0.76rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-secondary-dark)' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sets.map((s) => (
-                  <tr key={s.id} style={{ borderBottom: '1px solid var(--border-dark)' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--table-row-hover)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-                    <td style={{ padding: '12px 18px', fontWeight: 700 }}>{s.name}</td>
-                    <td style={{ padding: '12px 18px', color: 'var(--text-secondary-dark)', fontSize: '0.83rem' }}>{s.description ?? <span style={{ opacity: 0.4 }}>—</span>}</td>
-                    <td style={{ padding: '12px 18px' }}>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                        {s.permissionIds.length === 0 ? (
-                          <span style={{ opacity: 0.4, fontSize: '0.83rem' }}>None</span>
-                        ) : s.permissionIds.slice(0, 4).map((pid) => {
-                          const p = permById.get(pid);
-                          return (
-                            <span key={pid} style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700, background: 'var(--chip-bg-soft)', letterSpacing: '0.03em' }}>
-                              {p?.code ?? pid.slice(0, 8)}
-                            </span>
-                          );
-                        })}
-                        {s.permissionIds.length > 4 && (
-                          <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600, background: 'rgba(99,102,241,0.1)', color: '#818cf8' }}>
-                            +{s.permissionIds.length - 4} more
+      {isLoading ? (
+        <div className="glass-panel loading-state">Loading permission sets…</div>
+      ) : sets.length === 0 ? (
+        <EmptyState
+          icon="🔐"
+          title={search ? 'No sets match your search' : 'No permission sets defined yet'}
+          copy={search ? 'Try a different search term.' : 'Click "New Set" to create your first permission set.'}
+          action={!search ? (
+            <button type="button" className="btn btn-primary" onClick={toggleFormOpen}>New Set</button>
+          ) : undefined}
+        />
+      ) : (
+        <div className="table-container" style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
+          <table className="custom-table">
+            <thead>
+              <tr>
+                {['Name', 'Description', 'Permissions', 'Status', 'Actions'].map((h) => (
+                  <th key={h}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sets.map((s) => (
+                <tr key={s.id}>
+                  <td style={{ fontWeight: 700 }}>{s.name}</td>
+                  <td style={{ color: 'var(--text-secondary-dark)', fontSize: '0.83rem' }}>{s.description ?? <span style={{ opacity: 0.4 }}>—</span>}</td>
+                  <td>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {s.permissionIds.length === 0 ? (
+                        <span style={{ opacity: 0.4, fontSize: '0.83rem' }}>None</span>
+                      ) : s.permissionIds.slice(0, 4).map((pid) => {
+                        const p = permById.get(pid);
+                        return (
+                          <span key={pid} style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700, background: 'var(--chip-bg-soft)', letterSpacing: '0.03em' }}>
+                            {p?.code ?? pid.slice(0, 8)}
                           </span>
-                        )}
-                      </div>
-                    </td>
-                    <td style={{ padding: '12px 18px', width: '90px' }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem', fontWeight: 600, color: s.active ? '#10b981' : '#94a3b8' }}>
-                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: s.active ? '#10b981' : '#94a3b8' }} />
-                        {s.active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 18px', width: '240px' }}>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button type="button" className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.8rem' }} onClick={() => startEdit(s)}>✎ Edit</button>
-                        <button type="button" style={{ background: 'transparent', border: `1px solid ${s.active ? 'rgba(239,68,68,0.4)' : 'rgba(16,185,129,0.4)'}`, borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', fontSize: '0.8rem', color: s.active ? '#f87171' : '#34d399' }}
-                          onClick={() => void handleToggleActive(s)}>{s.active ? '⊘ Deactivate' : '✓ Activate'}</button>
-                        <button type="button" style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.35)', borderRadius: '6px', padding: '4px 9px', cursor: 'pointer', fontSize: '0.85rem', color: '#f87171' }}
-                          onClick={() => void handleDelete(s)}>🗑</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '14px 18px', borderTop: '1px solid var(--border-subtle, rgba(255,255,255,0.06))' }}>
-                <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-                  style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid var(--border-subtle, rgba(255,255,255,0.12))', background: 'transparent', color: page === 1 ? 'var(--text-secondary-dark)' : 'var(--text-primary-dark)', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1, fontSize: '0.82rem' }}>
-                  ← Prev
-                </button>
-                {pageNums.map((n, i) => (
-                  <button key={i} type="button" onClick={() => typeof n === 'number' && setPage(n)} disabled={n === '…'}
-                    style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid', minWidth: '34px', borderColor: n === page ? 'var(--accent-primary, #6366f1)' : 'var(--border-subtle, rgba(255,255,255,0.12))', background: n === page ? 'rgba(99,102,241,0.18)' : 'transparent', color: n === page ? '#818cf8' : 'var(--text-primary-dark)', fontWeight: n === page ? 700 : 400, cursor: n === '…' ? 'default' : 'pointer', fontSize: '0.82rem' }}>
-                    {n}
-                  </button>
-                ))}
-                <button type="button" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                  style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid var(--border-subtle, rgba(255,255,255,0.12))', background: 'transparent', color: page === totalPages ? 'var(--text-secondary-dark)' : 'var(--text-primary-dark)', cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.4 : 1, fontSize: '0.82rem' }}>
-                  Next →
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+                        );
+                      })}
+                      {s.permissionIds.length > 4 && (
+                        <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600, background: 'rgba(99,102,241,0.1)', color: '#818cf8' }}>
+                          +{s.permissionIds.length - 4} more
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td style={{ width: '90px' }}>
+                    <span className={`badge ${s.active ? 'badge-success' : 'badge-info'}`} style={{ fontSize: '0.8rem' }}>
+                      {s.active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td style={{ width: '240px' }}>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button type="button" className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.8rem' }} onClick={() => startEdit(s)}>✎ Edit</button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ padding: '4px 10px', fontSize: '0.8rem', color: s.active ? 'var(--error)' : 'var(--success)', borderColor: s.active ? 'var(--error)' : 'var(--success)' }}
+                        onClick={() => void handleToggleActive(s)}
+                      >
+                        {s.active ? '⊘ Deactivate' : '✓ Activate'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ padding: '4px 9px', fontSize: '0.85rem', color: 'var(--error)', borderColor: 'var(--error)' }}
+                        onClick={() => void handleDelete(s)}
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <PaginationBar
+            page={page}
+            totalPages={totalPages}
+            totalItems={total}
+            pageSize={pageSize}
+            onPageChange={setPage}
+          />
+        </div>
+      )}
     </div>
   );
 };

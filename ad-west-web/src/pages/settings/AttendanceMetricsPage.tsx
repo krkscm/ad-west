@@ -287,7 +287,7 @@ export const AttendanceMetricsPage: React.FC = () => {
   return (
     <div className="animate-slide-up">
       <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>Attendance Config</h2>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>📏 Attendance Config</h2>
         <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginTop: '4px', marginBottom: 0 }}>
           Configure attendance metrics per Sreni using the same settings workflow as report configuration.
         </p>

@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useToast } from '../../components/common/Toast'
 import { useConfirm } from '../../components/common/ConfirmDialog'
+import { PageHeader } from '../../components/common/PageHeader'
+import { PaginationBar } from '../../components/common/PaginationBar'
 import { backendApi, EnumValueApi } from '../../utils/backendApi'
 import { formatEnumTypeName } from '../../constants/enumTypeLabels'
+import { SwitchToggle } from '../../components/common/SwitchToggle'
 
 interface FormState {
   value: string
@@ -16,83 +19,6 @@ const BLANK_FORM: FormState = { value: '', label: '', sortOrder: '0', active: tr
 
 const TYPE_PAGE_SIZE = 12
 const VALUE_PAGE_SIZE = 15
-
-const buildPageNums = (page: number, totalPages: number): (number | '…')[] => {
-  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1)
-  if (page <= 4) return [1, 2, 3, 4, 5, '…', totalPages]
-  if (page >= totalPages - 3) return [1, '…', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
-  return [1, '…', page - 1, page, page + 1, '…', totalPages]
-}
-
-function PaginationBar({
-  page,
-  totalPages,
-  totalItems,
-  pageSize,
-  onPageChange,
-}: {
-  page: number
-  totalPages: number
-  totalItems: number
-  pageSize: number
-  onPageChange: (p: number) => void
-}) {
-  if (totalPages <= 1) return null
-  const nums = buildPageNums(page, totalPages)
-  const from = (page - 1) * pageSize + 1
-  const to = Math.min(page * pageSize, totalItems)
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px 8px 4px', borderTop: '1px solid var(--border-dark)' }}>
-      <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary-dark)', textAlign: 'center' }}>
-        {from}–{to} of {totalItems}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          onClick={() => onPageChange(page - 1)}
-          disabled={page <= 1}
-          style={{
-            padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--border-dark)', background: 'transparent',
-            fontSize: '0.75rem', cursor: page <= 1 ? 'not-allowed' : 'pointer', opacity: page <= 1 ? 0.4 : 1,
-          }}
-        >
-          ←
-        </button>
-        {nums.map((n, i) => (
-          n === '…' ? (
-            <span key={`e-${i}`} style={{ padding: '4px 2px', color: 'var(--text-secondary-dark)', fontSize: '0.75rem' }}>…</span>
-          ) : (
-            <button
-              key={n}
-              type="button"
-              onClick={() => onPageChange(n)}
-              style={{
-                padding: '4px 8px', borderRadius: '6px', border: '1px solid', minWidth: '28px',
-                borderColor: n === page ? 'var(--primary)' : 'var(--border-dark)',
-                background: n === page ? 'var(--primary)' : 'transparent',
-                color: n === page ? '#fff' : 'var(--text-primary-dark)',
-                fontWeight: n === page ? 700 : 400, fontSize: '0.75rem', cursor: 'pointer',
-              }}
-            >
-              {n}
-            </button>
-          )
-        ))}
-        <button
-          type="button"
-          onClick={() => onPageChange(page + 1)}
-          disabled={page >= totalPages}
-          style={{
-            padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--border-dark)', background: 'transparent',
-            fontSize: '0.75rem', cursor: page >= totalPages ? 'not-allowed' : 'pointer', opacity: page >= totalPages ? 0.4 : 1,
-          }}
-        >
-          →
-        </button>
-      </div>
-    </div>
-  )
-}
 
 const toUiError = (e: unknown, fallback: string): string => {
   if (!(e instanceof Error)) return fallback
@@ -281,21 +207,20 @@ export const EnumValuesPage: React.FC = () => {
 
   return (
     <div className="animate-slide-up">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Reference Data</h2>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginTop: '4px' }}>
-            Centralised enum values used across all modules — {allValues.length} values across {types.length} types
-          </p>
-        </div>
-        <button
-          className="btn btn-primary"
-          onClick={openAdd}
-          style={{ padding: '10px 20px', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-        >
-          + Add Value
-        </button>
-      </div>
+      <PageHeader
+        icon="🏷️"
+        title="Reference Data"
+        subtitle="Centralised enum values used across all modules."
+        stats={[
+          { label: 'Values', value: allValues.length, variant: 'info' },
+          { label: 'Types', value: types.length, variant: 'warning' },
+        ]}
+        actions={
+          <button className="btn btn-primary" onClick={openAdd} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            + Add Value
+          </button>
+        }
+      />
 
       {isLoading ? (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '40vh', color: 'var(--text-secondary-dark)' }}>
@@ -448,18 +373,13 @@ export const EnumValuesPage: React.FC = () => {
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label">Status</label>
-                    <button
-                      type="button"
-                      className={`switch-toggle ${form.active ? 'is-on' : ''}`}
-                      onClick={() => setForm((f) => ({ ...f, active: !f.active }))}
-                      aria-pressed={form.active}
-                      aria-label="Toggle enum value status"
-                    >
-                      <span className={`switch-toggle-label ${form.active ? 'is-on' : ''}`}>{form.active ? 'Active' : 'Inactive'}</span>
-                      <span className={`switch-toggle-track ${form.active ? 'is-on' : ''}`}>
-                        <span className={`switch-toggle-thumb ${form.active ? 'is-on' : ''}`} />
-                      </span>
-                    </button>
+                    <SwitchToggle
+                      checked={form.active}
+                      onChange={(active) => setForm((f) => ({ ...f, active }))}
+                      labelOn="Active"
+                      labelOff="Inactive"
+                      ariaLabel="Toggle enum value status"
+                    />
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>

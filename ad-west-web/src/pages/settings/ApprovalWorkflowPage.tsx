@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../../components/common/Toast';
 import { useConfirm } from '../../components/common/ConfirmDialog';
+import { PageHeader } from '../../components/common/PageHeader';
+import { EmptyState } from '../../components/common/EmptyState';
 import {
   ApprovalWorkflowDefinitionApi,
   RoleDefinitionApi,
@@ -135,44 +137,53 @@ export const ApprovalWorkflowPage: React.FC<ApprovalWorkflowPageProps> = ({
     return [1, '…', page - 1, page, page + 1, '…', totalPages];
   })();
 
+  const hasTable = !isLoading && items.length > 0;
+
   return (
     <div className="animate-slide-up">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0 }}>Approval Workflows</h2>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', margin: '4px 0 0' }}>
-            Define named approval chains with organization-chart style permission-set mapping.
-          </p>
-        </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '16px', paddingRight: '16px' }}
-          onClick={onAdd}
-        >
-          New Workflow
-        </button>
-      </div>
+      <PageHeader
+        icon="✅"
+        title="Approval Workflows"
+        subtitle="Define named approval chains with organization-chart style permission-set mapping."
+        actions={
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '16px', paddingRight: '16px' }}
+            onClick={onAdd}
+          >
+            New Workflow
+          </button>
+        }
+      />
 
-      <div className="glass-panel" style={{ padding: '14px 18px', marginBottom: '0', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottom: '1px solid var(--border-dark)' }}>
-        <div style={{ flex: '1 1 200px', position: 'relative', maxWidth: '300px' }}>
-          <input className="form-input" style={{ marginBottom: 0, fontSize: '0.875rem' }} placeholder="Search code or name..." value={search} onChange={(e) => handleSearchChange(e.target.value)} />
+      <div className={`glass-panel list-toolbar${hasTable ? ' list-toolbar--fused' : ''}`} style={{ marginBottom: hasTable ? 0 : '16px' }}>
+        <div className="list-toolbar__search">
+          <input className="form-input" placeholder="Search code or name..." value={search} onChange={(e) => handleSearchChange(e.target.value)} />
         </div>
         {search && (
           <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.82rem' }} onClick={() => { setSearch(''); loadWorkflows(1, pageSize, ''); }}>
             Clear
           </button>
         )}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="list-toolbar__meta">
           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>Rows:</span>
           {[10, 20, 50].map((ps) => (
-            <button key={ps} type="button" onClick={() => { setPageSize(ps); setPage(1); }} style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid', minWidth: '34px', borderColor: pageSize === ps ? 'var(--primary)' : 'var(--border-dark)', background: pageSize === ps ? 'var(--primary)' : 'transparent', color: pageSize === ps ? '#fff' : 'var(--text-secondary-dark)', fontSize: '0.78rem', fontWeight: pageSize === ps ? 700 : 400, cursor: 'pointer' }}>
+            <button key={ps} type="button" className={`page-size-pill${pageSize === ps ? ' is-active' : ''}`} onClick={() => { setPageSize(ps); setPage(1); }}>
               {ps}
             </button>
           ))}
         </div>
       </div>
 
+      {isLoading ? (
+        <div className="glass-panel loading-state">Loading workflows…</div>
+      ) : items.length === 0 ? (
+        <EmptyState
+          title={search ? 'No workflows match your search' : 'No approval workflows defined yet'}
+          copy={search ? 'Try a different search term.' : 'Click "New Workflow" to add one.'}
+        />
+      ) : (
       <div className="table-container" style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0, boxShadow: 'none' }}>
         <table className="custom-table">
           <thead>
@@ -183,24 +194,7 @@ export const ApprovalWorkflowPage: React.FC<ApprovalWorkflowPageProps> = ({
             </tr>
           </thead>
           <tbody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid var(--border-dark)' }}>
-                  {Array.from({ length: 6 }).map((__, j) => (
-                    <td key={j} style={{ padding: '13px 20px' }}>
-                      <div style={{ height: '14px', borderRadius: '6px', background: 'var(--border-dark)', width: j === 5 ? '120px' : '80%', animation: 'pulse 1.5s ease-in-out infinite' }} />
-                    </td>
-                  ))}
-                </tr>
-              ))
-            ) : items.length === 0 ? (
-              <tr>
-                <td colSpan={6} style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary-dark)' }}>
-                  {search ? 'No workflows match your search.' : 'No approval workflows defined yet. Click New Workflow to add one.'}
-                </td>
-              </tr>
-            ) : (
-              items.map((w) => {
+            {items.map((w) => {
                 const sortedStages = [...w.stages].sort((a, b) => a.stageOrder - b.stageOrder);
                 const wModeMeta = MODE_META[w.approvalMode] ?? { label: w.approvalMode, description: 'Configured via enum values.', color: '#0ea5e9' };
                 const isBeingEdited = editingWorkflowId === w.id;
@@ -261,13 +255,13 @@ export const ApprovalWorkflowPage: React.FC<ApprovalWorkflowPageProps> = ({
                     </td>
                   </tr>
                 );
-              })
-            )}
+              })}
           </tbody>
         </table>
       </div>
+      )}
 
-      {!isLoading && totalPages > 1 && (
+      {hasTable && totalPages > 1 && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '14px 18px', borderTop: '1px solid var(--border-dark)' }}>
           <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid var(--border-dark)', background: 'transparent', color: page === 1 ? 'var(--text-secondary-dark)' : 'var(--text-primary-dark)', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1, fontSize: '0.82rem' }}>
             Prev

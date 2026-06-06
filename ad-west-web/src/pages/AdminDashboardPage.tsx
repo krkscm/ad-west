@@ -4,6 +4,7 @@ import { useAuth } from '../context/auth-context';
 import { useToast } from '../components/common/Toast';
 import { ThemeToggle } from '../components/common/ThemeToggle';
 import { NotificationBell } from '../components/common/NotificationBell';
+import { AdminUserMenu } from '../components/common/AdminUserMenu';
 import { ResetPasswordModal } from '../components/common/ResetPasswordModal';
 import { AdminUsersList } from '../components/features/AdminUsersList';
 import { AdminUserForm } from '../components/features/AdminUserForm';
@@ -971,7 +972,7 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   return (
-    <div className="admin-theme" style={{ display: 'flex', minHeight: '100vh', width: '100vw' }}>
+    <div className="admin-theme admin-layout" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', height: '100vh', width: '100vw', overflow: 'hidden' }}>
       <NotificationCarouselModal userType="admin" />
       {isMobileLayout && isMobileNavOpen && (
         <button
@@ -981,13 +982,166 @@ export const AdminDashboardPage: React.FC = () => {
           onClick={() => setIsMobileNavOpen(false)}
         />
       )}
+
+      {/* Top Header — full width above sidebar */}
+      <header
+        className="admin-header"
+        style={{
+          height: '72px',
+          minHeight: '72px',
+          maxHeight: '72px',
+          flexShrink: 0,
+          borderBottom: '1px solid var(--border-dark)',
+          backgroundColor: 'var(--glass-bg)',
+          padding: '0 32px 0 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          boxSizing: 'border-box',
+          backdropFilter: 'blur(8px)',
+        }}
+      >
+        <div className="admin-header__left">
+          <button
+            type="button"
+            className="admin-header__brand"
+            onClick={() => setActiveTab('dashboard')}
+            title="IFCA Abu Dhabi — Home"
+            aria-label="IFCA Abu Dhabi — go to dashboard"
+          >
+            <img src="/favicon.png" alt="" className="admin-header__brand-logo" />
+            <span className="admin-header__brand-name">IFCA Abu Dhabi</span>
+          </button>
+          <button
+            type="button"
+            className="admin-nav-toggle"
+            onClick={() => {
+              if (isMobileLayout) {
+                setIsMobileNavOpen((prev) => !prev);
+                return;
+              }
+              setIsSidebarCollapsed((prev) => !prev);
+            }}
+            aria-label={
+              isMobileLayout
+                ? (isMobileNavOpen ? 'Close navigation' : 'Open navigation')
+                : (isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar')
+            }
+            aria-expanded={isMobileLayout ? isMobileNavOpen : undefined}
+            title={
+              isMobileLayout
+                ? (isMobileNavOpen ? 'Close navigation' : 'Open navigation')
+                : (isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar')
+            }
+            style={{
+              width: '34px',
+              height: '34px',
+              minWidth: '34px',
+              minHeight: '34px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '8px',
+              border: '1px solid var(--border-dark)',
+              background: 'var(--glass-bg)',
+              color: 'var(--text-secondary-dark)',
+              fontSize: '1.05rem',
+              cursor: 'pointer',
+              padding: 0,
+              flexShrink: 0,
+            }}
+          >
+            {isMobileLayout && isMobileNavOpen ? '✕' : '≡'}
+          </button>
+          <span className="admin-header__crumb-sep" aria-hidden="true">/</span>
+          <div className="admin-header__breadcrumbs">
+            {breadcrumbItems.map((item, index) => {
+              const isLast = index === breadcrumbItems.length - 1;
+              return (
+                <React.Fragment key={`${item.label}-${index}`}>
+                  {item.targetTab ? (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab(item.targetTab!)}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        padding: 0,
+                        cursor: 'pointer',
+                        color: isLast ? 'var(--text-primary-dark)' : '#8ea0bd',
+                        fontWeight: isLast ? 700 : 500,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        fontSize: '0.88rem',
+                        lineHeight: 1,
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  ) : (
+                    <span
+                      style={{
+                        color: isLast ? 'var(--text-primary-dark)' : '#8ea0bd',
+                        fontWeight: isLast ? 700 : 500,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {item.label}
+                    </span>
+                  )}
+                  {!isLast && <span style={{ color: '#bcc7d9', fontSize: '0.78rem' }}>{'>'}</span>}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="admin-header__actions">
+          <NotificationBell />
+          <button
+            type="button"
+            className="admin-header__icon-btn"
+            onClick={() => setShowResetPassword(true)}
+            aria-label="Reset password"
+            title="Reset password"
+            style={{
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              color: 'var(--text-secondary-dark)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: '36px', height: '36px', borderRadius: '8px', transition: 'background 0.15s, color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(148,163,184,0.1)'; e.currentTarget.style.color = 'var(--text-primary-dark)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary-dark)'; }}
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </button>
+          <div className="admin-header__divider" style={{ width: '1px', height: '24px', background: 'var(--border-dark)', margin: '0 4px' }} />
+          <ThemeToggle iconOnly placement="header" />
+          <AdminUserMenu
+            name={adminUser.name}
+            email={adminUser.email}
+            picture={adminUser.picture}
+            gender={adminUser.gender}
+            roleLabel={userRole}
+            roleBadgeClass={isSuperAdmin ? 'badge-error' : isZoneAdmin ? 'badge-warning' : 'badge-info'}
+          />
+        </div>
+
+        <ResetPasswordModal isOpen={showResetPassword} onClose={() => setShowResetPassword(false)} />
+      </header>
+
+      <div className="admin-shell" style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
       
       {/* Sidebar navigation */}
       <aside
         className={`admin-sidebar${isMobileLayout && isMobileNavOpen ? ' admin-sidebar--open' : ''}`}
         style={{
           width: isMobileLayout ? 'min(86vw, 320px)' : sidebarWidth,
-          height: '100vh',
+          height: isMobileLayout ? 'calc(100vh - 72px)' : '100%',
           flexShrink: 0,
           borderRight: '1px solid var(--border-dark)',
           backgroundColor: 'var(--glass-bg)',
@@ -998,8 +1152,8 @@ export const AdminDashboardPage: React.FC = () => {
           transition: isMobileLayout ? 'transform 0.22s ease' : 'width 0.2s ease',
           overflowY: 'auto',
           overflowX: 'hidden',
-          position: isMobileLayout ? 'fixed' : 'sticky',
-          top: 0,
+          position: isMobileLayout ? 'fixed' : 'relative',
+          top: isMobileLayout ? 72 : undefined,
           left: isMobileLayout ? 0 : undefined,
           zIndex: isMobileLayout ? 1200 : undefined,
           transform: isMobileLayout ? (isMobileNavOpen ? 'translateX(0)' : 'translateX(-104%)') : undefined,
@@ -1007,18 +1161,6 @@ export const AdminDashboardPage: React.FC = () => {
           boxShadow: isMobileLayout && isMobileNavOpen ? '0 24px 56px -20px rgba(2, 6, 23, 0.6)' : undefined,
         }}
       >
-        {/* Brand */}
-        <div style={{ padding: isSidebarCollapsed ? '0 12px' : '0 24px', marginBottom: '40px', display: 'flex', alignItems: 'center', gap: '12px', justifyContent: isSidebarCollapsed ? 'center' : 'flex-start' }}>
-          <img
-            src="/favicon.png"
-            alt="IFCA Abu Dhabi"
-            style={{ width: '38px', height: '38px', borderRadius: '8px', objectFit: 'contain', flexShrink: 0 }}
-          />
-          {!isSidebarCollapsed && (
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary-dark)', lineHeight: 1 }}>IFCA Abu Dhabi</h3>
-          )}
-        </div>
-
         {/* Navigation Items */}
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', padding: '0 12px' }}>
           <button 
@@ -1663,164 +1805,7 @@ export const AdminDashboardPage: React.FC = () => {
       </aside>
 
       {/* Main Content Pane */}
-      <main className="admin-main" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: isMobileLayout ? 'auto' : '100vh', overflow: isMobileLayout ? 'visible' : 'hidden' }}>
-        
-        {/* Top Header bar */}
-        <header 
-          className="admin-header"
-          style={{
-            height: '72px',
-            minHeight: '72px',
-            maxHeight: '72px',
-            borderBottom: '1px solid var(--border-dark)',
-            backgroundColor: 'var(--glass-bg)',
-            padding: '0 32px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            boxSizing: 'border-box',
-            backdropFilter: 'blur(8px)'
-          }}
-        >
-          <div className="admin-header__left">
-            <button
-              type="button"
-              className="admin-nav-toggle"
-              onClick={() => {
-                if (isMobileLayout) {
-                  setIsMobileNavOpen((prev) => !prev);
-                  return;
-                }
-                setIsSidebarCollapsed((prev) => !prev);
-              }}
-              aria-label={isMobileLayout ? (isMobileNavOpen ? 'Close navigation' : 'Open navigation') : isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              aria-expanded={isMobileLayout ? isMobileNavOpen : undefined}
-              title={isMobileLayout ? (isMobileNavOpen ? 'Close navigation' : 'Open navigation') : isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              style={{
-                width: '34px',
-                height: '34px',
-                minWidth: '34px',
-                minHeight: '34px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '8px',
-                border: '1px solid var(--border-dark)',
-                background: 'var(--glass-bg)',
-                color: 'var(--text-secondary-dark)',
-                fontSize: '1.05rem',
-                cursor: 'pointer',
-                padding: 0,
-              }}
-            >
-              {isMobileLayout && isMobileNavOpen ? '✕' : '≡'}
-            </button>
-            <div className="admin-header__breadcrumbs">
-              {breadcrumbItems.map((item, index) => {
-                const isLast = index === breadcrumbItems.length - 1;
-                return (
-                  <React.Fragment key={`${item.label}-${index}`}>
-                    {item.targetTab ? (
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab(item.targetTab!)}
-                        style={{
-                          border: 'none',
-                          background: 'transparent',
-                          padding: 0,
-                          cursor: 'pointer',
-                          color: isLast ? 'var(--text-primary-dark)' : '#8ea0bd',
-                          fontWeight: isLast ? 700 : 500,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          fontSize: '0.88rem',
-                          lineHeight: 1,
-                        }}
-                      >
-                        {item.label}
-                      </button>
-                    ) : (
-                      <span
-                        style={{
-                          color: isLast ? 'var(--text-primary-dark)' : '#8ea0bd',
-                          fontWeight: isLast ? 700 : 500,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                        }}
-                      >
-                        {item.label}
-                      </span>
-                    )}
-                    {!isLast && <span style={{ color: '#bcc7d9', fontSize: '0.78rem' }}>{'>'}</span>}
-                  </React.Fragment>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="admin-header__actions">
-            <NotificationBell />
-            <button
-              type="button"
-              className="admin-header__icon-btn"
-              onClick={() => setShowResetPassword(true)}
-              aria-label="Reset password"
-              title="Reset password"
-              style={{
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                color: 'var(--text-secondary-dark)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: '36px', height: '36px', borderRadius: '8px', transition: 'background 0.15s, color 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(148,163,184,0.1)'; e.currentTarget.style.color = 'var(--text-primary-dark)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary-dark)'; }}
-            >
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-            </button>
-            <div className="admin-header__divider" style={{ width: '1px', height: '24px', background: 'var(--border-dark)', margin: '0 4px' }} />
-            <ThemeToggle iconOnly placement="header" />
-            {adminUser.picture ? (
-              <img
-                src={adminUser.picture}
-                alt={adminUser.name}
-                className="admin-header__avatar"
-                style={{ width: '36px', height: '36px', borderRadius: '999px', border: '1px solid var(--border-dark)' }}
-              />
-            ) : (
-              <div
-                className="admin-header__avatar"
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '999px',
-                  border: '1px solid var(--border-dark)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'rgba(59,130,246,0.18)',
-                  fontSize: '0.9rem',
-                }}
-              >
-                👤
-              </div>
-            )}
-            <div className="admin-header__user-details" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-              <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, lineHeight: 1.2 }}>{adminUser.name}</h4>
-              <span style={{ marginTop: '2px', fontSize: '0.75rem', lineHeight: 1.2, color: 'var(--text-secondary-dark)' }}>{adminUser.email}</span>
-              <span
-                className={`badge ${isSuperAdmin ? 'badge-error' : isZoneAdmin ? 'badge-warning' : 'badge-info'}`}
-                style={{ marginTop: '5px', padding: '3px 8px', fontSize: '0.7rem', lineHeight: 1.4 }}
-              >
-                🛡️ {userRole}
-              </span>
-            </div>
-          </div>
-
-          <ResetPasswordModal isOpen={showResetPassword} onClose={() => setShowResetPassword(false)} />
-        </header>
+      <main className="admin-main" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
         {/* Body content */}
         <div key={activeTab} className="tab-content-wrapper admin-content" style={{ padding: '32px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
@@ -1829,25 +1814,23 @@ export const AdminDashboardPage: React.FC = () => {
           {activeTab === 'dashboard' && (
             <div className="animate-slide-up" style={{ display: 'grid', gap: '18px' }}>
               <div>
-                <h2 style={{ fontSize: '1.72rem', fontWeight: 800, margin: 0 }}>{dashboardHeading}</h2>
-                <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.9rem', margin: '6px 0 0' }}>
-                  {dashboardSubtitle}
-                </p>
+                <h2 className="page-title">{dashboardHeading}</h2>
+                <p className="page-subtitle">{dashboardSubtitle}</p>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+              <div className="dashboard-grid">
                 {dashboardMetrics.map((metric) => (
-                  <div key={metric.label} className="glass-panel" style={{ padding: '16px', borderLeft: `3px solid ${signalStyles[metric.signal].accent}` }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)', fontWeight: 600 }}>{metric.label}</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '1rem' }}>{metric.icon}</span>
-                        <span className={`badge ${signalStyles[metric.signal].badgeClass}`} style={{ fontSize: '0.68rem', padding: '2px 7px' }}>
-                          {signalStyles[metric.signal].label}
-                        </span>
-                      </div>
+                  <div key={metric.label} className="glass-panel widget-card" style={{ borderLeft: `3px solid ${signalStyles[metric.signal].accent}` }}>
+                    <div className="widget-icon" style={{ background: `${signalStyles[metric.signal].accent}18`, color: signalStyles[metric.signal].accent }}>
+                      {metric.icon}
                     </div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '8px', lineHeight: 1.1, color: signalStyles[metric.signal].accent }}>{metric.value}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                      <span className="widget-label">{metric.label}</span>
+                      <span className={`badge ${signalStyles[metric.signal].badgeClass}`} style={{ fontSize: '0.68rem', padding: '2px 7px' }}>
+                        {signalStyles[metric.signal].label}
+                      </span>
+                    </div>
+                    <div className="widget-value" style={{ color: signalStyles[metric.signal].accent, marginTop: '4px' }}>{metric.value}</div>
                     {metric.hint && (
                       <div style={{ marginTop: '4px', fontSize: '0.72rem', color: 'var(--text-secondary-dark)' }}>{metric.hint}</div>
                     )}
@@ -1855,7 +1838,7 @@ export const AdminDashboardPage: React.FC = () => {
                 ))}
               </div>
 
-              <div className="glass-panel" style={{ padding: '14px 16px', display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div className="glass-panel glass-panel--flat" style={{ padding: '14px 16px', display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>
                   Contacts baseline: <strong style={{ color: 'var(--text-primary-dark)' }}>{contactCoverageTotal}</strong>
                 </span>
@@ -1868,7 +1851,7 @@ export const AdminDashboardPage: React.FC = () => {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '16px' }}>
-                <div className="glass-panel" style={{ padding: '18px' }}>
+                <div className="glass-panel glass-panel--flat" style={{ padding: '18px' }}>
                   <h3 style={{ fontSize: '1.02rem', fontWeight: 700, marginBottom: '12px' }}>Priority Queue</h3>
                   <div style={{ display: 'grid', gap: '10px' }}>
                     {dashboardPriorities.map((priority) => (
@@ -1878,7 +1861,7 @@ export const AdminDashboardPage: React.FC = () => {
                           <span style={{ color: priority.tone, fontWeight: 800 }}>{priority.value}</span>
                         </div>
                         <p style={{ margin: '6px 0 10px', fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>{priority.note}</p>
-                        <button className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 12px' }} onClick={() => setActiveTab(priority.targetTab)}>
+                        <button type="button" className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 12px' }} onClick={() => setActiveTab(priority.targetTab)}>
                           Open
                         </button>
                       </div>
@@ -1886,7 +1869,7 @@ export const AdminDashboardPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="glass-panel" style={{ padding: '18px' }}>
+                <div className="glass-panel glass-panel--flat" style={{ padding: '18px' }}>
                   <h3 style={{ fontSize: '1.02rem', fontWeight: 700, marginBottom: '12px' }}>Operational Focus</h3>
                   <div style={{ display: 'grid', gap: '8px' }}>
                     {dashboardPipelineRows.map((row) => (
@@ -1905,7 +1888,7 @@ export const AdminDashboardPage: React.FC = () => {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div className="glass-panel" style={{ padding: '18px' }}>
+                <div className="glass-panel glass-panel--flat" style={{ padding: '18px' }}>
                   <h3 style={{ fontSize: '1.02rem', fontWeight: 700, marginBottom: '12px' }}>Sreni Directory Snapshot</h3>
                   <div style={{ display: 'grid', gap: '8px', maxHeight: '240px', overflowY: 'auto' }}>
                     {programs.length === 0 && (
@@ -1922,23 +1905,23 @@ export const AdminDashboardPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="glass-panel" style={{ padding: '18px' }}>
+                <div className="glass-panel glass-panel--flat" style={{ padding: '18px' }}>
                   <h3 style={{ fontSize: '1.02rem', fontWeight: 700, marginBottom: '12px' }}>Quick Navigation</h3>
                   <div style={{ display: 'grid', gap: '8px' }}>
                     {showMyApprovalsTab && (
-                      <button className="btn btn-secondary" style={{ justifyContent: 'space-between' }} onClick={() => setActiveTab('my-approvals')}>
+                      <button type="button" className="btn btn-secondary" style={{ justifyContent: 'space-between' }} onClick={() => setActiveTab('my-approvals')}>
                         <span>My Approvals</span>
                         <span className="badge badge-warning" style={{ marginLeft: '8px' }}>{pendingApprovalsCount}</span>
                       </button>
                     )}
                     {showResponsibilityChartTab && (
-                      <button className="btn btn-secondary" style={{ justifyContent: 'space-between' }} onClick={() => setActiveTab('settings-responsibility-chart')}>
+                      <button type="button" className="btn btn-secondary" style={{ justifyContent: 'space-between' }} onClick={() => setActiveTab('settings-responsibility-chart')}>
                         <span>Responsibility Chart</span>
                         <span>↗</span>
                       </button>
                     )}
                     {showGatewaySection && (
-                      <button className="btn btn-secondary" style={{ justifyContent: 'space-between' }} onClick={() => setActiveTab(showHelpdeskTicketsTab ? 'helpdesk-tickets' : showJobPostingsTab ? 'job-postings' : 'job-applications')}>
+                      <button type="button" className="btn btn-secondary" style={{ justifyContent: 'space-between' }} onClick={() => setActiveTab(showHelpdeskTicketsTab ? 'helpdesk-tickets' : showJobPostingsTab ? 'job-postings' : 'job-applications')}>
                         <span>Helpdesk Workspace</span>
                         <span>↗</span>
                       </button>
@@ -2164,6 +2147,7 @@ export const AdminDashboardPage: React.FC = () => {
           </span>
         </footer>
       </main>
+      </div>
     </div>
   );
 };

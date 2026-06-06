@@ -22,19 +22,8 @@ export const MemberPortalPage: React.FC<MemberPortalPageProps> = ({ onBack }) =>
   }
 
   return (
-    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <header
-        className="member-portal-header"
-        style={{
-          height: '72px',
-          backgroundColor: '#ffffff',
-          borderBottom: '1px solid var(--border-light)',
-          padding: '0 32px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
+    <div className="member-portal-shell">
+      <header className="member-portal-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div
             style={{
@@ -53,8 +42,8 @@ export const MemberPortalPage: React.FC<MemberPortalPageProps> = ({ onBack }) =>
             {(memberUser.firstName?.[0] ?? 'M').toUpperCase()}
           </div>
           <div>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary-light)' }}>{profileName}</h3>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary-light)' }}>Member Portal Workspace</span>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary-dark)', margin: 0 }}>{profileName}</h3>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary-dark)' }}>Member Portal Workspace</span>
           </div>
         </div>
 
@@ -84,63 +73,51 @@ export const MemberPortalPage: React.FC<MemberPortalPageProps> = ({ onBack }) =>
       >
         <aside className="member-portal-sidebar" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <button
+            type="button"
             onClick={() => setActiveSection('profile')}
-            className="btn"
-            style={{
-              justifyContent: 'flex-start',
-              padding: '12px 16px',
-              fontSize: '0.9rem',
-              backgroundColor: activeSection === 'profile' ? 'var(--primary-light)' : 'transparent',
-              color: activeSection === 'profile' ? 'var(--primary)' : 'var(--text-secondary-light)',
-            }}
+            className={`btn member-portal-nav-btn${activeSection === 'profile' ? ' is-active' : ''}`}
           >
             My Profile
           </button>
 
           <button
+            type="button"
             onClick={() => setActiveSection('workspace')}
-            className="btn"
-            style={{
-              justifyContent: 'flex-start',
-              padding: '12px 16px',
-              fontSize: '0.9rem',
-              backgroundColor: activeSection === 'workspace' ? 'var(--primary-light)' : 'transparent',
-              color: activeSection === 'workspace' ? 'var(--primary)' : 'var(--text-secondary-light)',
-            }}
+            className={`btn member-portal-nav-btn${activeSection === 'workspace' ? ' is-active' : ''}`}
           >
             Workspace Notice
           </button>
         </aside>
 
-        <div className="member-portal-content" style={{ backgroundColor: '#ffffff', border: '1px solid var(--border-light)', borderRadius: '16px', padding: '32px', boxShadow: 'var(--shadow-md)' }}>
+        <div className="member-portal-card member-portal-content">
           {activeSection === 'profile' && (
             <div className="animate-slide-up">
-              <div style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '18px', marginBottom: '24px' }}>
-                <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>Profile Directory Card</h2>
-                <p style={{ color: 'var(--text-secondary-light)', fontSize: '0.85rem', marginTop: '2px' }}>
+              <div style={{ borderBottom: '1px solid var(--border-dark)', paddingBottom: '18px', marginBottom: '24px' }}>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary-dark)', margin: 0 }}>Profile Directory Card</h2>
+                <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.85rem', marginTop: '2px' }}>
                   Existing visual framework is preserved while deprecated modules are removed.
                 </p>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                 <div>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary-light)' }}>EMAIL ADDRESS</span>
-                  <p style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '2px' }}>{memberUser.emailPrimary || '-'}</p>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary-dark)' }}>EMAIL ADDRESS</span>
+                  <p style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '2px', color: 'var(--text-primary-dark)' }}>{memberUser.emailPrimary || '-'}</p>
                 </div>
 
                 <div>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary-light)' }}>PRIMARY PHONE</span>
-                  <p style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '2px' }}>{memberUser.phonePrimary || '-'}</p>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary-dark)' }}>PRIMARY PHONE</span>
+                  <p style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '2px', color: 'var(--text-primary-dark)' }}>{memberUser.phonePrimary || '-'}</p>
                 </div>
 
                 <div>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary-light)' }}>ADDRESS</span>
-                  <p style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '2px' }}>{memberUser.address || '-'}</p>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary-dark)' }}>ADDRESS</span>
+                  <p style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '2px', color: 'var(--text-primary-dark)' }}>{memberUser.address || '-'}</p>
                 </div>
 
                 <div>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary-light)' }}>MEMBERSHIPS</span>
-                  <p style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '2px' }}>{memberUser.memberships.length}</p>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary-dark)' }}>MEMBERSHIPS</span>
+                  <p style={{ fontSize: '0.95rem', fontWeight: 600, marginTop: '2px', color: 'var(--text-primary-dark)' }}>{memberUser.memberships.length}</p>
                 </div>
               </div>
             </div>
@@ -148,10 +125,10 @@ export const MemberPortalPage: React.FC<MemberPortalPageProps> = ({ onBack }) =>
 
           {activeSection === 'workspace' && (
             <div className="animate-slide-up">
-              <div style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '18px', marginBottom: '24px' }}>
-                <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>Workspace Transition</h2>
+              <div style={{ borderBottom: '1px solid var(--border-dark)', paddingBottom: '18px', marginBottom: '24px' }}>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary-dark)', margin: 0 }}>Workspace Transition</h2>
               </div>
-              <div className="helper-box" style={{ backgroundColor: 'var(--info-light)', borderColor: 'rgba(59, 130, 246, 0.2)', color: '#1e3a8a' }}>
+              <div className="helper-box">
                 Deprecated modules (profile edit-request workflow, helpdesk/tickets, programs/session legacy attendance, jobs/resumes) were removed and will be redesigned.
               </div>
             </div>

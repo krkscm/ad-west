@@ -56,7 +56,7 @@ export class UserAdminRuntimeService {
         [searchParam],
       ),
       this.ctx.dataSource.query(
-        `SELECT id, code, name, phone, email, role_id, sthan_id, permission_set_id, admin_management, is_super_admin, must_reset_password, active, created_at, updated_at, created_by, updated_by
+        `SELECT id, code, name, phone, email, role_id, sthan_id, permission_set_id, admin_management, gender, is_super_admin, must_reset_password, active, created_at, updated_at, created_by, updated_by
          FROM adwest.users
          WHERE ($1::text IS NULL OR name ILIKE $1 OR email ILIKE $1 OR phone ILIKE $1 OR code ILIKE $1)
          ORDER BY created_at DESC
@@ -76,6 +76,7 @@ export class UserAdminRuntimeService {
       sthan_id: string | null;
       permission_set_id: string | null;
       admin_management: string | null;
+      gender: string | null;
       is_super_admin: boolean;
       must_reset_password: boolean;
       active: boolean;
@@ -93,6 +94,7 @@ export class UserAdminRuntimeService {
       sthanId: r.sthan_id ?? undefined,
       permissionSetId: r.permission_set_id ?? undefined,
       adminManagement: r.admin_management ?? undefined,
+      gender: r.gender ?? undefined,
       isSuperAdmin: r.is_super_admin,
       mustResetPassword: r.must_reset_password,
       active: r.active,
@@ -129,6 +131,7 @@ export class UserAdminRuntimeService {
         sthanId: dto.sthanId,
         permissionSetId: dto.permissionSetId,
         adminManagement: dto.adminManagement,
+        gender: dto.gender,
         passwordHash,
         isSuperAdmin: dto.isSuperAdmin ?? false,
         mustResetPassword: true,
@@ -144,10 +147,10 @@ export class UserAdminRuntimeService {
 
     const passwordHash = this.ctx.cryptoService.hashPassword(dto.password);
     const rows = (await this.ctx.dataSource.query(
-      `INSERT INTO adwest.users (code, name, phone, email, role_id, sthan_id, permission_set_id, admin_management, password_hash, is_super_admin, must_reset_password, reporting_to_role_ids, created_by, updated_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, $11, $12, $12)
-       RETURNING id, code, name, phone, email, role_id, sthan_id, permission_set_id, admin_management, password_hash, is_super_admin, must_reset_password, active, reporting_to_role_ids, created_at, updated_at, created_by, updated_by`,
-      [code, dto.name, dto.phone ?? null, dto.email ?? null, dto.roleId ?? null, dto.sthanId ?? null, dto.permissionSetId ?? null, dto.adminManagement ?? null, passwordHash, dto.isSuperAdmin ?? false, dto.reportingToRoleIds ?? [], actorEmail ?? null],
+      `INSERT INTO adwest.users (code, name, phone, email, role_id, sthan_id, permission_set_id, admin_management, gender, password_hash, is_super_admin, must_reset_password, reporting_to_role_ids, created_by, updated_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true, $12, $13, $13)
+       RETURNING id, code, name, phone, email, role_id, sthan_id, permission_set_id, admin_management, gender, password_hash, is_super_admin, must_reset_password, active, reporting_to_role_ids, created_at, updated_at, created_by, updated_by`,
+      [code, dto.name, dto.phone ?? null, dto.email ?? null, dto.roleId ?? null, dto.sthanId ?? null, dto.permissionSetId ?? null, dto.adminManagement ?? null, dto.gender ?? null, passwordHash, dto.isSuperAdmin ?? false, dto.reportingToRoleIds ?? [], actorEmail ?? null],
     )) as Array<{
       id: string;
       code: string;
@@ -179,6 +182,7 @@ export class UserAdminRuntimeService {
       sthanId: r.sthan_id ?? undefined,
       permissionSetId: r.permission_set_id ?? undefined,
       adminManagement: r.admin_management ?? undefined,
+      gender: r.gender ?? undefined,
       passwordHash: r.password_hash ?? undefined,
       isSuperAdmin: r.is_super_admin,
       mustResetPassword: r.must_reset_password,
@@ -210,7 +214,7 @@ export class UserAdminRuntimeService {
   async updateUser(userId: string, dto: UpdateUserDto, actorEmail?: string): Promise<UserRecord> {
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource && !this.ctx.users.has(userId)) {
       const rows = await this.ctx.dataSource.query(
-        'SELECT id, code, name, phone, email, role_id, sthan_id, permission_set_id, admin_management, password_hash, is_super_admin, must_reset_password, active, created_by, updated_by, created_at, updated_at FROM adwest.users WHERE id=$1',
+        'SELECT id, code, name, phone, email, role_id, sthan_id, permission_set_id, admin_management, gender, password_hash, is_super_admin, must_reset_password, active, created_by, updated_by, created_at, updated_at FROM adwest.users WHERE id=$1',
         [userId],
       ) as Array<{
         id: string;
@@ -222,6 +226,7 @@ export class UserAdminRuntimeService {
         sthan_id: string | null;
         permission_set_id: string | null;
         admin_management: string | null;
+        gender: string | null;
         password_hash: string | null;
         is_super_admin: boolean;
         must_reset_password: boolean;
@@ -243,6 +248,7 @@ export class UserAdminRuntimeService {
         sthanId: r.sthan_id ?? undefined,
         permissionSetId: r.permission_set_id ?? undefined,
         adminManagement: r.admin_management ?? undefined,
+        gender: r.gender ?? undefined,
         passwordHash: r.password_hash ?? undefined,
         isSuperAdmin: r.is_super_admin,
         mustResetPassword: r.must_reset_password,
@@ -275,6 +281,7 @@ export class UserAdminRuntimeService {
         sthanId: dto.sthanId !== undefined ? dto.sthanId : current.sthanId,
         permissionSetId: dto.permissionSetId !== undefined ? dto.permissionSetId : current.permissionSetId,
         adminManagement: dto.adminManagement !== undefined ? dto.adminManagement : current.adminManagement,
+        gender: dto.gender !== undefined ? dto.gender : current.gender,
         passwordHash: newPasswordHash ?? current.passwordHash,
         isSuperAdmin: dto.isSuperAdmin !== undefined ? dto.isSuperAdmin : current.isSuperAdmin,
         mustResetPassword: nextMustReset,
@@ -288,9 +295,9 @@ export class UserAdminRuntimeService {
 
     const rows = (await this.ctx.dataSource.query(
       `UPDATE adwest.users
-       SET name=$2, phone=$3, email=$4, role_id=$5, sthan_id=$6, permission_set_id=$7, admin_management=$8, password_hash=$9, is_super_admin=$10, active=$11, must_reset_password=$12, reporting_to_role_ids=$13, updated_by=$14, updated_at=now()
+       SET name=$2, phone=$3, email=$4, role_id=$5, sthan_id=$6, permission_set_id=$7, admin_management=$8, gender=$9, password_hash=$10, is_super_admin=$11, active=$12, must_reset_password=$13, reporting_to_role_ids=$14, updated_by=$15, updated_at=now()
        WHERE id=$1
-       RETURNING id, code, name, phone, email, role_id, sthan_id, permission_set_id, admin_management, password_hash, is_super_admin, must_reset_password, active, reporting_to_role_ids, created_at, updated_at, created_by, updated_by`,
+       RETURNING id, code, name, phone, email, role_id, sthan_id, permission_set_id, admin_management, gender, password_hash, is_super_admin, must_reset_password, active, reporting_to_role_ids, created_at, updated_at, created_by, updated_by`,
       [
         userId,
         dto.name ?? current.name,
@@ -300,6 +307,7 @@ export class UserAdminRuntimeService {
         dto.sthanId !== undefined ? dto.sthanId : current.sthanId ?? null,
         dto.permissionSetId !== undefined ? dto.permissionSetId : current.permissionSetId ?? null,
         dto.adminManagement !== undefined ? dto.adminManagement : current.adminManagement ?? null,
+        dto.gender !== undefined ? dto.gender : current.gender ?? null,
         newPasswordHash ?? current.passwordHash ?? null,
         dto.isSuperAdmin !== undefined ? dto.isSuperAdmin : current.isSuperAdmin ?? false,
         dto.active !== undefined ? dto.active : current.active,
@@ -338,6 +346,7 @@ export class UserAdminRuntimeService {
       sthanId: r.sthan_id ?? undefined,
       permissionSetId: r.permission_set_id ?? undefined,
       adminManagement: r.admin_management ?? undefined,
+      gender: r.gender ?? undefined,
       passwordHash: r.password_hash ?? undefined,
       isSuperAdmin: r.is_super_admin,
       mustResetPassword: r.must_reset_password,

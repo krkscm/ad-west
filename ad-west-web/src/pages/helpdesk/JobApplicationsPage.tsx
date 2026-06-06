@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { backendApi, ApplicationStatus, JobApplicationApi, JobApplicationActivityApi } from '../../utils/backendApi'
 import { useToast } from '../../components/common/Toast'
+import { PageHeader } from '../../components/common/PageHeader'
+import { EmptyState } from '../../components/common/EmptyState'
 import { useEnumOptions } from '../../hooks/useEnumOptions'
 
-const STATUS_COLORS: Record<ApplicationStatus, string> = {
-  new: 'var(--info)',
-  under_review: 'var(--warning)',
-  shortlisted: 'var(--primary)',
-  rejected: 'var(--error)',
-  accepted: 'var(--success)',
+const STATUS_BADGE: Record<ApplicationStatus, string> = {
+  new: 'badge-info',
+  under_review: 'badge-warning',
+  shortlisted: 'badge-info',
+  rejected: 'badge-error',
+  accepted: 'badge-success',
 }
 
 function describeActivity(
@@ -125,29 +127,21 @@ export function JobApplicationsPage() {
 
   return (
     <div className="animate-slide-up" style={{ width: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>Job Applications</h2>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.9rem', margin: '6px 0 0' }}>
-            Review applications and track each candidate&apos;s progress through the hiring pipeline.
-          </p>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
-              <span style={{ fontWeight: 800 }}>{applications.length}</span>Total
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(14,165,233,0.1)', color: 'var(--info)', border: '1px solid rgba(14,165,233,0.25)' }}>
-              <span style={{ fontWeight: 800 }}>{newCount}</span>New
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(245,158,11,0.12)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.28)' }}>
-              <span style={{ fontWeight: 800 }}>{underReviewCount}</span>Under Review
-            </span>
-          </div>
-        </div>
+      <PageHeader
+        icon="📄"
+        title="Job Applications"
+        subtitle="Review applications and track each candidate's progress through the hiring pipeline."
+        stats={[
+          { label: 'Total', value: applications.length, variant: 'info' },
+          { label: 'New', value: newCount, variant: 'info' },
+          { label: 'Under Review', value: underReviewCount, variant: 'warning' },
+        ]}
+        actions={
+          <button className="btn btn-secondary" onClick={() => void loadApplications()} disabled={loading}>Refresh</button>
+        }
+      />
 
-        <button className="btn btn-secondary" onClick={() => void loadApplications()} disabled={loading}>Refresh</button>
-      </div>
-
-      <div className="glass-panel" style={{ padding: '14px 18px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className="glass-panel list-toolbar" style={{ marginBottom: '16px' }}>
         <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)' }}>Status</label>
         <div style={{ width: '240px', maxWidth: '100%' }}>
           <select
@@ -164,11 +158,9 @@ export function JobApplicationsPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: selected ? 'minmax(0,1fr) 420px' : '1fr', gap: '16px', alignItems: 'start' }}>
         <div>
-          {loading && <div style={{ color: 'var(--text-secondary-dark)', padding: '20px' }}>Loading…</div>}
+          {loading && <div className="loading-state">Loading applications…</div>}
           {!loading && filtered.length === 0 && (
-            <div className="glass-panel" style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary-dark)' }}>
-              No applications found.
-            </div>
+            <EmptyState title="No applications found" />
           )}
           {!loading && filtered.length > 0 && (
             <div className="table-container">
@@ -199,7 +191,7 @@ export function JobApplicationsPage() {
                         </td>
                         <td style={{ fontWeight: 600 }}>{app.jobTitle}</td>
                         <td>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: STATUS_COLORS[app.status], background: `${STATUS_COLORS[app.status]}18`, borderRadius: '20px', padding: '2px 8px' }}>
+                          <span className={`badge ${STATUS_BADGE[app.status]}`}>
                             {statusLabel(app.status)}
                           </span>
                         </td>

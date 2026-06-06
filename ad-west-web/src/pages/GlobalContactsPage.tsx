@@ -3,6 +3,9 @@ import { useToast } from '../components/common/Toast';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { Modal } from '../components/common/Modal';
 import { TableLayoutModal } from '../components/common/TableLayoutModal';
+import { SwitchToggle } from '../components/common/SwitchToggle';
+import { PageHeader } from '../components/common/PageHeader';
+import { EmptyState } from '../components/common/EmptyState';
 import { useTableLayout } from '../hooks/useTableLayout';
 import {
   backendApi,
@@ -151,15 +154,15 @@ const AssignTagsModal: React.FC<AssignTagsModalProps> = ({
                 const sreniDivisions = divisionsBySreni.get(sreni.id) ?? [];
                 return (
                   <div key={sreni.id} style={{ padding: '10px 12px', borderRadius: '8px', border: `1px solid ${isChecked ? 'rgba(99,102,241,0.35)' : 'var(--border-dark)'}`, background: isChecked ? 'rgba(99,102,241,0.06)' : 'var(--surface-dark)' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={(e) => toggleSreni(sreni.id, e.target.checked)}
-                        style={{ width: '16px', height: '16px', accentColor: 'var(--primary)', cursor: 'pointer' }}
-                      />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
                       <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{sreni.name}</span>
-                    </label>
+                      <SwitchToggle
+                        variant="inline"
+                        checked={isChecked}
+                        onChange={(checked) => toggleSreni(sreni.id, checked)}
+                        ariaLabel={`Tag contact to ${sreni.name}`}
+                      />
+                    </div>
 
                     {isChecked && (
                       <div style={{ marginTop: '8px', paddingLeft: '26px' }}>
@@ -633,41 +636,37 @@ export const GlobalContactsPage: React.FC = () => {
         }}
       />
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>📋 Contacts</h2>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', margin: '6px 0 0' }}>
-            All contacts across every Sreni. Tag each contact to multiple srenies, assign groups and sthans.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: 'var(--text-secondary-dark)', cursor: 'pointer', userSelect: 'none' }}>
-            <input
-              type="checkbox"
-              checked={showInactive}
-              onChange={(e) => setShowInactive(e.target.checked)}
-              style={{ accentColor: 'var(--primary)', width: '15px', height: '15px' }}
-            />
-            Show inactive
-          </label>
-          <span className="badge badge-info" style={{ padding: '5px 14px', fontSize: '0.82rem', fontWeight: 700 }}>
-            {total} contacts
-          </span>
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{ fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-            onClick={() => setShowUploadModal(true)}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="16 16 12 12 8 16" /><line x1="12" y1="12" x2="12" y2="21" />
-              <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
-            </svg>
-            Upload Contacts
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        icon="📋"
+        title="Contacts"
+        subtitle="All contacts across every Sreni. Tag each contact to multiple srenies, assign groups and sthans."
+        stats={[{ label: 'contacts', value: total, variant: 'info' }]}
+        actions={
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.82rem', color: 'var(--text-secondary-dark)', userSelect: 'none' }}>
+              <span>Show inactive</span>
+              <SwitchToggle
+                variant="inline"
+                checked={showInactive}
+                onChange={setShowInactive}
+                ariaLabel="Show inactive contacts"
+              />
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+              onClick={() => setShowUploadModal(true)}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="16 16 12 12 8 16" /><line x1="12" y1="12" x2="12" y2="21" />
+                <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
+              </svg>
+              Upload Contacts
+            </button>
+          </>
+        }
+      />
 
       {/* Filters */}
       <div className="glass-panel" style={{ padding: '14px 16px', marginBottom: '18px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -729,17 +728,18 @@ export const GlobalContactsPage: React.FC = () => {
 
       {/* Table */}
       {(isLoading && rows.length === 0) || layout.loading ? (
-        <div className="glass-panel" style={{ padding: '60px 24px', textAlign: 'center', color: 'var(--text-secondary-dark)' }}>
-          Loading contacts…
-        </div>
+        <div className="glass-panel loading-state">Loading contacts…</div>
       ) : !isLoading && total === 0 ? (
-        <div className="glass-panel" style={{ padding: '60px 24px', textAlign: 'center' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📋</div>
-          <h3 style={{ fontWeight: 700, marginBottom: '8px' }}>No contacts found</h3>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', margin: '0 auto', maxWidth: '380px' }}>
-            Upload contacts from any Sreni's contact page, or adjust the filters above.
-          </p>
-        </div>
+        <EmptyState
+          icon="📋"
+          title="No contacts found"
+          copy="Upload contacts from any Sreni's contact page, or adjust the filters above."
+          action={
+            <button type="button" className="btn btn-primary" onClick={() => setShowUploadModal(true)}>
+              Upload Contacts
+            </button>
+          }
+        />
       ) : (
         <>
           <div className="table-container" style={{ overflowX: 'auto' }}>

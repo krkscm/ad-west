@@ -47,6 +47,13 @@ export function PublicPageShell({ subtitle, children }: Props) {
         }}
       />
 
+      {/* Ambient orbs — match portal landing */}
+      <div className="wow-bg-container" style={{ zIndex: 1 }}>
+        <div className="wow-orb wow-orb-primary" style={{ top: '10%', left: '-5%' }} />
+        <div className="wow-orb wow-orb-accent" style={{ bottom: '10%', right: '-5%' }} />
+        <div className="wow-orb wow-orb-gold" style={{ top: '50%', left: '35%' }} />
+      </div>
+
       {/* Foreground content */}
       <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
 

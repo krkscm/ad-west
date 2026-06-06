@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useToast } from '../../components/common/Toast';
 import { useConfirm } from '../../components/common/ConfirmDialog';
+import { PageHeader } from '../../components/common/PageHeader';
+import { EmptyState } from '../../components/common/EmptyState';
 import { backendApi, RoleDefinitionApi } from '../../utils/backendApi';
 
 type RoleLevel = RoleDefinitionApi['level'];
@@ -178,47 +180,38 @@ export const RolesDefinitionPage: React.FC = () => {
     return pages;
   }, [page, totalPages]);
 
+  const hasTable = !isLoading && sortedRoles.length > 0;
+
   return (
     <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
 
-      {/* ── Page header ── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '20px',
-          flexWrap: 'wrap',
-          gap: '12px',
-        }}
-      >
-        <div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0 }}>Roles Definition</h2>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginTop: '4px', margin: '4px 0 0' }}>
-            Configure and maintain standard roles and administrative level assignments.
-          </p>
-        </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '16px', paddingRight: '16px' }}
-          onClick={() => {
-            if (formOpen && !editingRoleId) {
-              setFormOpen(false);
-            } else {
-              resetForm();
-              setFormOpen(true);
-            }
-          }}
-        >
-          {formOpen && !editingRoleId ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-          )}
-          {formOpen && !editingRoleId ? 'Close' : 'New Role'}
-        </button>
-      </div>
+      <PageHeader
+        icon="🎭"
+        title="Roles Definition"
+        subtitle="Configure and maintain standard roles and administrative level assignments."
+        actions={
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '16px', paddingRight: '16px' }}
+            onClick={() => {
+              if (formOpen && !editingRoleId) {
+                setFormOpen(false);
+              } else {
+                resetForm();
+                setFormOpen(true);
+              }
+            }}
+          >
+            {formOpen && !editingRoleId ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            )}
+            {formOpen && !editingRoleId ? 'Close' : 'New Role'}
+          </button>
+        }
+      />
 
       {/* ── Collapsible form ── */}
       {formOpen && (
@@ -308,38 +301,13 @@ export const RolesDefinitionPage: React.FC = () => {
 
       {/* ── Toolbar: search + filters ── */}
       <div
-        className="glass-panel"
-        style={{
-          padding: '14px 18px',
-          marginBottom: '0',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          flexWrap: 'wrap',
-          borderBottomLeftRadius: 0,
-          borderBottomRightRadius: 0,
-          borderBottom: '1px solid var(--border-dark)',
-        }}
+        className={`glass-panel list-toolbar${hasTable ? ' list-toolbar--fused' : ''}`}
+        style={{ marginBottom: hasTable ? 0 : '16px' }}
       >
-        {/* Search */}
-        <div style={{ flex: '1 1 240px', position: 'relative', maxWidth: '360px' }}>
-          <span
-            style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--text-secondary-dark)',
-              pointerEvents: 'none',
-              display: 'flex',
-              alignItems: 'center',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          </span>
+        <div className="list-toolbar__search">
+          <span className="list-toolbar__search-icon" aria-hidden="true">🔍</span>
           <input
             className="form-input"
-            style={{ paddingLeft: '34px', marginBottom: 0, fontSize: '0.875rem' }}
             placeholder="Search by code or name…"
             value={search}
             onChange={(event) => {
@@ -349,10 +317,6 @@ export const RolesDefinitionPage: React.FC = () => {
           />
         </div>
 
-        {/* Divider */}
-        <div style={{ width: '1px', height: '24px', background: 'var(--border-dark)' }} />
-
-        {/* Page size */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>Show</span>
           <select
@@ -371,20 +335,24 @@ export const RolesDefinitionPage: React.FC = () => {
           </select>
         </div>
 
-        {/* Record count */}
-        {!isLoading && (
-          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-            {total} {total === 1 ? 'role' : 'roles'}
-          </span>
-        )}
-        {isLoading && (
-          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-            Loading…
-          </span>
-        )}
+        <div className="list-toolbar__meta">
+          {!isLoading && (
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)', whiteSpace: 'nowrap' }}>
+              {total} {total === 1 ? 'role' : 'roles'}
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* ── Table ── */}
+      {isLoading ? (
+        <div className="glass-panel loading-state">Loading roles…</div>
+      ) : sortedRoles.length === 0 ? (
+        <EmptyState
+          icon="🗂️"
+          title="No roles found"
+          copy={search ? 'Try a different search term.' : 'Click "New Role" to create the first one.'}
+        />
+      ) : (
       <div
         className="table-container"
         style={{
@@ -409,46 +377,7 @@ export const RolesDefinitionPage: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {isLoading ? (
-              Array.from({ length: pageSize > 5 ? 5 : pageSize }).map((_, i) => (
-                <tr
-                  key={i}
-                  style={{ borderBottom: '1px solid var(--border-dark)' }}
-                >
-                  {Array.from({ length: 5 }).map((__, j) => (
-                    <td key={j} style={{ padding: '14px 20px' }}>
-                      <div
-                        style={{
-                          height: '14px',
-                          borderRadius: '6px',
-                          background: 'var(--border-dark)',
-                          width: j === 4 ? '120px' : j === 3 ? '60px' : j === 2 ? '60px' : '100%',
-                          animation: 'pulse 1.5s ease-in-out infinite',
-                        }}
-                      />
-                    </td>
-                  ))}
-                </tr>
-              ))
-            ) : sortedRoles.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={5}
-                  style={{
-                    textAlign: 'center',
-                    padding: '56px 24px',
-                    color: 'var(--text-secondary-dark)',
-                  }}
-                >
-                  <div style={{ fontSize: '2rem', marginBottom: '10px' }}>🗂️</div>
-                  <div style={{ fontWeight: 600, marginBottom: '4px' }}>No roles found</div>
-                  <div style={{ fontSize: '0.83rem' }}>
-                    {search ? 'Try a different search term.' : 'Click "New Role" to create the first one.'}
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              sortedRoles.map((role) => (
+            {sortedRoles.map((role) => (
                 <tr
                   key={role.id}
                   style={{ opacity: role.active ? 1 : 0.55 }}
@@ -561,14 +490,14 @@ export const RolesDefinitionPage: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ))
-            )}
+              ))}
           </tbody>
         </table>
       </div>
+      )}
 
       {/* Pagination */}
-      {!isLoading && totalPages > 0 && (
+      {hasTable && totalPages > 0 && (
         <div
           style={{
             marginTop: '14px',

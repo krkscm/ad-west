@@ -152,7 +152,7 @@ export class CoreBusinessDbHydrationService {
       ),
       this.ctx.dataSource.query('SELECT permission_set_id, permission_id FROM adwest.permission_set_items'),
       this.ctx.dataSource.query(
-        'SELECT id, code, name, phone, email, role_id, sthan_id, permission_set_id, admin_management, password_hash, is_super_admin, must_reset_password, active, created_at, updated_at, created_by, updated_by FROM adwest.users ORDER BY created_at ASC',
+        'SELECT id, code, name, phone, email, role_id, sthan_id, permission_set_id, admin_management, password_hash, is_super_admin, must_reset_password, active, gender, created_at, updated_at, created_by, updated_by FROM adwest.users ORDER BY created_at ASC',
       ),
       this.ctx.dataSource.query(
         'SELECT id, sreni_id, name, display_order, created_at, updated_at FROM adwest.sreni_divisions ORDER BY sreni_id ASC, display_order ASC, created_at ASC',
@@ -640,6 +640,7 @@ export class CoreBusinessDbHydrationService {
     for (const row of userRows as Array<{
       id: string; code: string; name: string; phone: string | null; email: string | null;
       role_id: string | null; sthan_id: string | null; permission_set_id: string | null; admin_management: string | null;
+      gender: string | null;
       password_hash: string | null; is_super_admin: boolean; must_reset_password: boolean; active: boolean;
       created_at: string | Date; updated_at: string | Date; created_by: string | null; updated_by: string | null;
     }>) {
@@ -649,6 +650,7 @@ export class CoreBusinessDbHydrationService {
         roleId: row.role_id ?? undefined, sthanId: row.sthan_id ?? undefined,
         permissionSetId: row.permission_set_id ?? undefined,
         adminManagement: row.admin_management ?? undefined,
+        gender: row.gender ?? undefined,
         passwordHash: row.password_hash ?? undefined,
         isSuperAdmin: row.is_super_admin,
         mustResetPassword: row.must_reset_password,

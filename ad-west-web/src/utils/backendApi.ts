@@ -362,6 +362,7 @@ export interface UserApi {
   createdBy?: string
   updatedBy?: string
   reportingToRoleIds?: string[]
+  gender?: 'male' | 'female'
 }
 
 export interface ResponsibilityChartNodeApi {
@@ -1133,9 +1134,9 @@ export const backendApi = {
   },
   getResponsibilityChart: (year?: number) =>
     api.get<ResponsibilityChartApi>(`/org/responsibility-chart${year ? `?year=${encodeURIComponent(String(year))}` : ''}`),
-  createUser: (payload: { name: string; password: string; phone?: string; email?: string; roleId?: string; sthanId?: string; permissionSetId?: string; adminManagement?: string; isSuperAdmin?: boolean; reportingToRoleIds?: string[] }) =>
+  createUser: (payload: { name: string; password: string; phone?: string; email?: string; roleId?: string; sthanId?: string; permissionSetId?: string; adminManagement?: string; isSuperAdmin?: boolean; reportingToRoleIds?: string[]; gender?: 'male' | 'female' }) =>
     api.post<UserApi>('/org/users', payload),
-  updateUser: (id: string, payload: { name?: string; password?: string; phone?: string; email?: string; roleId?: string; sthanId?: string; permissionSetId?: string; adminManagement?: string; isSuperAdmin?: boolean; active?: boolean; reportingToRoleIds?: string[] }) =>
+  updateUser: (id: string, payload: { name?: string; password?: string; phone?: string; email?: string; roleId?: string; sthanId?: string; permissionSetId?: string; adminManagement?: string; isSuperAdmin?: boolean; active?: boolean; reportingToRoleIds?: string[]; gender?: 'male' | 'female' }) =>
     api.patch<UserApi>(`/org/users/${id}`, payload),
   deleteUser: (id: string) => api.delete<void>(`/org/users/${id}`),
   changeOwnPassword: (currentPassword: string, newPassword: string) => api.post<void>('/org/users/me/change-password', { currentPassword, newPassword }),

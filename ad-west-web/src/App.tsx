@@ -14,6 +14,7 @@ import { PublicJobsPage } from './pages/public/PublicJobsPage';
 import { PublicEventRegistrationPage } from './pages/public/PublicEventRegistrationPage';
 import { PublicContactRegistrationPage } from './pages/public/PublicContactRegistrationPage';
 import { PublicPortalPage } from './pages/public/PublicPortalPage';
+import { AppLoader } from './components/common/AppLoader';
 
 function PublicRouteContent() {
   const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
@@ -71,23 +72,7 @@ function AppContent() {
   }
 
   if (isInitializing) {
-    return (
-      <div className="app-bootstrap-screen admin-theme">
-        <div className="app-bootstrap-orb app-bootstrap-orb-primary" />
-        <div className="app-bootstrap-orb app-bootstrap-orb-accent" />
-        <div className="glass-panel app-bootstrap-card">
-          <div className="app-bootstrap-spinner" aria-hidden="true">
-            <span className="app-bootstrap-spinner-ring app-bootstrap-spinner-ring-outer" />
-            <span className="app-bootstrap-spinner-ring app-bootstrap-spinner-ring-inner" />
-            <span className="app-bootstrap-spinner-dot" />
-          </div>
-          <div className="app-bootstrap-copy">
-            <h2>Preparing your workspace</h2>
-            <p>Signing you in and loading your dashboard.</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <AppLoader />;
   }
 
   // Admin/member login path — render only after session initialization completes.
@@ -115,24 +100,8 @@ function AppContent() {
     return <PublicPortalPage />;
   }
 
-  // Loading spinner while auth initialises
-  return (
-    <div className="app-bootstrap-screen admin-theme">
-      <div className="app-bootstrap-orb app-bootstrap-orb-primary" />
-      <div className="app-bootstrap-orb app-bootstrap-orb-accent" />
-      <div className="glass-panel app-bootstrap-card">
-        <div className="app-bootstrap-spinner" aria-hidden="true">
-          <span className="app-bootstrap-spinner-ring app-bootstrap-spinner-ring-outer" />
-          <span className="app-bootstrap-spinner-ring app-bootstrap-spinner-ring-inner" />
-          <span className="app-bootstrap-spinner-dot" />
-        </div>
-        <div className="app-bootstrap-copy">
-          <h2>Preparing your workspace</h2>
-          <p>Signing you in and loading your dashboard.</p>
-        </div>
-      </div>
-    </div>
-  );
+  // Loading while auth initialises
+  return <AppLoader />;
 }
 
 function App() {

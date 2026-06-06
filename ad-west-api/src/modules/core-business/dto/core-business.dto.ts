@@ -775,6 +775,10 @@ export class CreateUserDto {
   @IsArray()
   @IsString({ each: true })
   reportingToRoleIds?: string[];
+
+  @IsOptional()
+  @IsIn(['male', 'female'])
+  gender?: 'male' | 'female';
 }
 
 export class ChangeOwnPasswordDto {
@@ -834,6 +838,10 @@ export class UpdateUserDto {
   @IsArray()
   @IsString({ each: true })
   reportingToRoleIds?: string[];
+
+  @IsOptional()
+  @IsIn(['male', 'female'])
+  gender?: 'male' | 'female';
 }
 
 // ── Report Metric Definitions ─────────────────────────────────────────────────

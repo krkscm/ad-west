@@ -37,28 +37,13 @@ export const ConfirmDialogProvider: React.FC<{ children: React.ReactNode }> = ({
     <ConfirmContext.Provider value={showConfirm}>
       {children}
       {pending && (
-        <div
-          style={{
-            position: 'fixed', top: 0, left: 0,
-            width: '100vw', height: '100vh',
-            backgroundColor: 'rgba(9, 13, 24, 0.65)',
-            backdropFilter: 'blur(8px)',
-            zIndex: 2000,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '20px',
-            animation: 'fadeIn 0.2s ease',
-          }}
-          onClick={() => respond(false)}
-        >
+        <div className="modal-overlay" style={{ zIndex: 2000 }} onClick={() => respond(false)}>
           <div
-            className="glass-panel"
+            className="modal-panel animate-slide-up"
             style={{
               width: '100%', maxWidth: '420px',
-              backgroundColor: 'var(--surface-dark)',
               color: 'var(--text-primary-dark)',
               padding: '28px',
-              boxShadow: 'var(--shadow-xl)',
-              animation: 'slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
             }}
             onClick={(e) => e.stopPropagation()}
           >

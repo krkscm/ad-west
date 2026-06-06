@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../../components/common/Toast';
 import { useConfirm } from '../../components/common/ConfirmDialog';
+import { PageHeader } from '../../components/common/PageHeader';
+import { EmptyState } from '../../components/common/EmptyState';
 import { backendApi, LocationDefinitionApi, PermissionApi, SreniDefinitionApi } from '../../utils/backendApi';
 
 const toUiError = (error: unknown, fallback: string): string => {
@@ -129,33 +131,27 @@ export const PermissionDefinitionsPage: React.FC = () => {
     return [1, '…', page - 1, page, page + 1, '…', totalPages];
   })();
 
+  const hasTable = !isLoading && items.length > 0;
+
   return (
     <div className="animate-slide-up">
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0 }}>Permission Definitions</h2>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginTop: '4px', margin: '4px 0 0' }}>
-            Each permission maps a Location to a Sreni and defines an operational scope.
-          </p>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '12px', flexWrap: 'wrap' }}>
-            {[{ label: 'Total', count: total, className: 'badge-info' }].map(({ label, count, className }) => (
-              <span key={label} className={`badge ${className}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid currentColor', background: 'transparent', fontSize: '0.8rem', fontWeight: 600 }}>
-                <span style={{ fontWeight: 800 }}>{count}</span>{label}
-              </span>
-            ))}
-          </div>
-        </div>
-        <button type="button" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '16px', paddingRight: '16px' }}
-          onClick={() => { if (formOpen && !editingId) setFormOpen(false); else { resetForm(); setFormOpen(true); } }}>
-          {formOpen && !editingId ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-          )}
-          {formOpen && !editingId ? 'Close' : 'New Permission'}
-        </button>
-      </div>
+      <PageHeader
+        icon="🔒"
+        title="Permission Definitions"
+        subtitle="Each permission maps a Location to a Sreni and defines an operational scope."
+        stats={[{ label: 'Total', value: total, variant: 'info' }]}
+        actions={
+          <button type="button" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '16px', paddingRight: '16px' }}
+            onClick={() => { if (formOpen && !editingId) setFormOpen(false); else { resetForm(); setFormOpen(true); } }}>
+            {formOpen && !editingId ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            )}
+            {formOpen && !editingId ? 'Close' : 'New Permission'}
+          </button>
+        }
+      />
 
       {/* Form */}
       {formOpen && (
@@ -215,13 +211,10 @@ export const PermissionDefinitionsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Toolbar */}
-      <div className="glass-panel" style={{ padding: '14px 18px', marginBottom: '0', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottom: '1px solid var(--border-dark)' }}>
-        <div style={{ flex: '1 1 200px', position: 'relative', maxWidth: '300px' }}>
-          <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary-dark)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          </span>
-          <input className="form-input" style={{ paddingLeft: '34px', marginBottom: 0, fontSize: '0.875rem' }} placeholder="Search code or name…" value={search} onChange={(e) => handleSearchChange(e.target.value)} />
+      <div className={`glass-panel list-toolbar${hasTable ? ' list-toolbar--fused' : ''}`} style={{ marginBottom: hasTable ? 0 : '16px' }}>
+        <div className="list-toolbar__search">
+          <span className="list-toolbar__search-icon" aria-hidden="true">🔍</span>
+          <input className="form-input" placeholder="Search code or name…" value={search} onChange={(e) => handleSearchChange(e.target.value)} />
         </div>
         <select className="form-input" style={{ maxWidth: '200px', marginBottom: 0, fontSize: '0.875rem', cursor: 'pointer' }} value={locationFilter} onChange={(e) => handleLocationFilter(e.target.value)}>
           <option value="">All locations</option>
@@ -230,21 +223,29 @@ export const PermissionDefinitionsPage: React.FC = () => {
         {(search || locationFilter) && (
           <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.82rem' }} onClick={() => { setSearch(''); handleLocationFilter(''); }}>Clear Filters</button>
         )}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="list-toolbar__meta">
           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>Rows:</span>
           {[10, 20, 50].map((ps) => (
-            <button key={ps} type="button" onClick={() => { setPageSize(ps); setPage(1); }}
-              style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid', borderColor: pageSize === ps ? 'var(--primary)' : 'var(--border-dark)', background: pageSize === ps ? 'var(--primary)' : 'transparent', color: pageSize === ps ? '#fff' : 'var(--text-secondary-dark)', fontSize: '0.78rem', fontWeight: pageSize === ps ? 700 : 400, cursor: 'pointer' }}>
+            <button key={ps} type="button" className={`page-size-pill${pageSize === ps ? ' is-active' : ''}`} onClick={() => { setPageSize(ps); setPage(1); }}>
               {ps}
             </button>
           ))}
-          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)', marginLeft: '4px' }}>
-            {isLoading ? 'Loading…' : `${total} permission${total !== 1 ? 's' : ''}`}
-          </span>
+          {!isLoading && (
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>
+              {total} permission{total !== 1 ? 's' : ''}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Table */}
+      {isLoading ? (
+        <div className="glass-panel loading-state">Loading permissions…</div>
+      ) : items.length === 0 ? (
+        <EmptyState
+          title={search || locationFilter ? 'No permissions match your search' : 'No permissions defined yet'}
+          copy={search || locationFilter ? 'Try adjusting your filters.' : 'Click "New Permission" to add one.'}
+        />
+      ) : (
       <div className="table-container" style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0, boxShadow: 'none' }}>
         <table className="custom-table">
           <thead>
@@ -257,24 +258,7 @@ export const PermissionDefinitionsPage: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid var(--border-dark)' }}>
-                  {Array.from({ length: 7 }).map((__, j) => (
-                    <td key={j} style={{ padding: '13px 20px' }}>
-                      <div style={{ height: '14px', borderRadius: '6px', background: 'var(--border-dark)', width: j === 6 ? '120px' : j === 5 ? '60px' : '80%', animation: 'pulse 1.5s ease-in-out infinite' }} />
-                    </td>
-                  ))}
-                </tr>
-              ))
-            ) : items.length === 0 ? (
-              <tr>
-                <td colSpan={7} style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary-dark)' }}>
-                  {search || locationFilter ? 'No permissions match your search.' : 'No permissions defined yet. Click "New Permission" to add one.'}
-                </td>
-              </tr>
-            ) : (
-              items.map((p) => {
+            {items.map((p) => {
                 const loc = locationById.get(p.locationId);
                 const sreni = sreniById.get(p.sreniId);
                 const locLevel = loc?.level ?? '';
@@ -369,14 +353,14 @@ export const PermissionDefinitionsPage: React.FC = () => {
                     </td>
                   </tr>
                 );
-              })
-            )}
+              })}
           </tbody>
         </table>
       </div>
+      )}
 
       {/* Pagination */}
-      {!isLoading && totalPages > 1 && (
+      {hasTable && totalPages > 1 && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '14px 18px', borderTop: '1px solid var(--border-dark)' }}>
           <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
             style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid var(--border-dark)', background: 'transparent', color: page === 1 ? 'var(--text-secondary-dark)' : 'var(--text-primary-dark)', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1, fontSize: '0.82rem' }}>

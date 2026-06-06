@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react'
 import { backendApi, EventFormFieldApi, SpecialEventApi } from '../../utils/backendApi'
 import { DateField } from '../../components/common/DateFields'
 import { PublicPageShell } from './PublicPageShell'
+import { SwitchToggle } from '../../components/common/SwitchToggle'
+import { PublicFormSection } from '../../components/common/PublicFormSection'
+import { InlineAlert } from '../../components/common/InlineAlert'
 
 const fieldLabelStyle = {
   display: 'block',
@@ -35,10 +38,16 @@ function FormField({ field, value, onChange }: {
 
   if (field.fieldType === 'checkbox') {
     return (
-      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', cursor: 'pointer' }}>
-        <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} />
-        {field.label} {field.isRequired && <span style={{ color: 'var(--error)' }}>*</span>}
-      </label>
+      <div>
+        <SwitchToggle
+          checked={!!value}
+          onChange={onChange}
+          label={field.label}
+          labelOn="Yes"
+          labelOff="No"
+        />
+        {field.isRequired && <span style={{ display: 'block', marginTop: '4px', fontSize: '0.75rem', color: 'var(--error)' }}>Required</span>}
+      </div>
     )
   }
 
@@ -151,14 +160,13 @@ export function PublicEventRegistrationPage() {
         )}
 
         {!loading && error && (
-          <div style={{ textAlign: 'center', color: 'var(--error)', padding: '60px' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '12px' }}>⚠️</div>
-            <p style={{ fontWeight: 600 }}>{error}</p>
+          <div className="public-page-card animate-slide-up" style={{ padding: '36px' }}>
+            <InlineAlert variant="error">{error}</InlineAlert>
           </div>
         )}
 
         {!loading && !error && event && (
-          <div className="public-page-card" style={{ padding: '36px' }}>
+          <div className="public-page-card animate-slide-up" style={{ padding: '36px' }}>
               {submitted ? (
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '3rem', marginBottom: '16px' }}>✅</div>
@@ -189,9 +197,7 @@ export function PublicEventRegistrationPage() {
                   <hr style={{ border: 'none', borderTop: '1px solid rgba(255, 237, 213, 0.14)', margin: '0 0 20px' }} />
 
                   {submitError && (
-                    <div style={{ background: 'var(--error-light)', border: '1px solid var(--error)', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', color: 'var(--error)', fontSize: '0.88rem' }}>
-                      {submitError}
-                    </div>
+                    <InlineAlert variant="error">{submitError}</InlineAlert>
                   )}
 
                   {event.formFields.length === 0 ? (
@@ -212,17 +218,24 @@ export function PublicEventRegistrationPage() {
                       </button>
                     </div>
                   ) : (
-                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      {event.formFields
-                        .sort((a, b) => a.sortOrder - b.sortOrder)
-                        .map((f) => (
-                          <FormField
-                            key={f.id}
-                            field={f}
-                            value={formValues[f.label]}
-                            onChange={(v) => setFormValues((prev) => ({ ...prev, [f.label]: v }))}
-                          />
-                        ))}
+                    <form onSubmit={handleSubmit}>
+                      <PublicFormSection
+                        title="Registration Details"
+                        description="Please complete all required fields to register for this event."
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          {event.formFields
+                            .sort((a, b) => a.sortOrder - b.sortOrder)
+                            .map((f) => (
+                              <FormField
+                                key={f.id}
+                                field={f}
+                                value={formValues[f.label]}
+                                onChange={(v) => setFormValues((prev) => ({ ...prev, [f.label]: v }))}
+                              />
+                            ))}
+                        </div>
+                      </PublicFormSection>
                       <button type="submit" className="btn btn-primary" disabled={submitting} style={{ marginTop: '4px' }}>
                         {submitting ? 'Submitting…' : 'Register'}
                       </button>

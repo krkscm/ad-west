@@ -2,6 +2,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { backendApi, ReportMetricDefinitionApi } from '../../utils/backendApi';
 import { useToast } from '../../components/common/Toast';
 import { useConfirm } from '../../components/common/ConfirmDialog';
+import { SwitchToggle } from '../../components/common/SwitchToggle';
+import { PageHeader } from '../../components/common/PageHeader';
+import { FormSection } from '../../components/common/FormSection';
+import { FormActions } from '../../components/common/FormActions';
+import { EmptyState } from '../../components/common/EmptyState';
 
 const toUiError = (error: unknown, fallback: string): string => {
   if (!(error instanceof Error)) return fallback;
@@ -108,41 +113,31 @@ export const ReportMetricsPage: React.FC = () => {
 
   return (
     <div className="animate-slide-up">
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>📋 Report Metrics</h2>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginTop: '4px', marginBottom: 0 }}>
-            Define the fields that appear in each sreni's monthly report submission.
-          </p>
-          <div style={{ marginTop: '12px' }}>
-            <span className="badge badge-info" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid currentColor', background: 'transparent', fontSize: '0.8rem', fontWeight: 600 }}>
-              <span style={{ fontSize: '0.95rem', fontWeight: 800 }}>{metrics.filter(m => m.active).length}</span> Active metrics
-            </span>
-          </div>
-        </div>
-        <button type="button" className="btn btn-primary" style={{ fontSize: '0.875rem' }} onClick={openAdd}>
-          + Add Metric
-        </button>
-      </div>
+      <PageHeader
+        icon="📋"
+        title="Report Metrics"
+        subtitle="Define the fields that appear in each sreni's monthly report submission."
+        stats={[{ label: 'Active metrics', value: metrics.filter(m => m.active).length, variant: 'info' }]}
+        actions={
+          <button type="button" className="btn btn-primary" style={{ fontSize: '0.875rem' }} onClick={openAdd}>
+            + Add Metric
+          </button>
+        }
+      />
 
-      {/* Inline form */}
       {(isAdding || editingId) && (
-        <div className="glass-panel" style={{ padding: '24px', marginBottom: '28px', borderLeft: '3px solid var(--primary)' }}>
-          <h4 style={{ margin: '0 0 20px', fontSize: '1rem', fontWeight: 700 }}>
-            {editingId ? 'Edit Metric' : 'Add New Metric'}
-          </h4>
+        <FormSection title={editingId ? 'Edit Metric' : 'Add New Metric'} accent="primary">
           <form onSubmit={(e) => void handleSave(e)}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-              <div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
                 <label className="form-label">Metric Name <span style={{ color: 'var(--error)' }}>*</span></label>
                 <input className="form-input" placeholder="e.g. Members Present" value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} required />
               </div>
-              <div>
+              <div className="form-group">
                 <label className="form-label">Unit <span style={{ color: 'var(--text-secondary-dark)', fontWeight: 400 }}>(optional)</span></label>
                 <input className="form-input" placeholder="e.g. count, %, AED" value={form.unit} onChange={(e) => setForm(f => ({ ...f, unit: e.target.value }))} />
               </div>
-              <div>
+              <div className="form-group">
                 <label className="form-label">
                   Monthly Target Per Sreni
                   {form.inputType !== 'number' && <span style={{ color: 'var(--text-secondary-dark)', fontWeight: 400 }}> (number metrics only)</span>}
@@ -160,55 +155,49 @@ export const ReportMetricsPage: React.FC = () => {
                 />
               </div>
             </div>
-            <div style={{ marginBottom: '16px' }}>
+            <div className="form-group">
               <label className="form-label">Description <span style={{ color: 'var(--text-secondary-dark)', fontWeight: 400 }}>(optional)</span></label>
               <input className="form-input" placeholder="Explain what this metric captures" value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '160px 120px 1fr', gap: '16px', marginBottom: '20px', alignItems: 'end' }}>
-              <div>
+            <div style={{ display: 'grid', gridTemplateColumns: '160px 120px 1fr', gap: '16px', alignItems: 'end' }}>
+              <div className="form-group">
                 <label className="form-label">Input Type</label>
                 <select className="form-input" value={form.inputType} onChange={(e) => setForm(f => ({ ...f, inputType: e.target.value as 'number' | 'text' }))} style={{ cursor: 'pointer' }}>
                   <option value="number">Number</option>
                   <option value="text">Text</option>
                 </select>
               </div>
-              <div>
+              <div className="form-group">
                 <label className="form-label">Sort Order</label>
                 <input className="form-input" type="number" value={form.sortOrder} onChange={(e) => setForm(f => ({ ...f, sortOrder: e.target.value }))} min="0" />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingBottom: '2px' }}>
-                <input
-                  id="metric-required"
-                  type="checkbox"
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Required field</label>
+                <SwitchToggle
                   checked={form.isRequired}
-                  onChange={(e) => setForm(f => ({ ...f, isRequired: e.target.checked }))}
-                  style={{ width: '16px', height: '16px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                  onChange={(isRequired) => setForm((f) => ({ ...f, isRequired }))}
+                  labelOn="Required"
+                  labelOff="Optional"
                 />
-                <label htmlFor="metric-required" style={{ fontSize: '0.875rem', cursor: 'pointer', fontWeight: 600 }}>
-                  Required field
-                </label>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+            <FormActions>
               <button type="button" className="btn btn-secondary" onClick={closeForm}>Cancel</button>
               <button type="submit" className="btn btn-primary" disabled={isSaving}>
                 {isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Add Metric'}
               </button>
-            </div>
+            </FormActions>
           </form>
-        </div>
+        </FormSection>
       )}
 
-      {/* Empty state */}
       {!isLoading && metrics.length === 0 && !isAdding && (
-        <div className="glass-panel" style={{ padding: '60px 24px', textAlign: 'center' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📋</div>
-          <h3 style={{ fontWeight: 700, marginBottom: '8px' }}>No metrics defined</h3>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', maxWidth: '400px', margin: '0 auto 24px' }}>
-            Add metrics that srenies will fill in when submitting their monthly reports.
-          </p>
-          <button type="button" className="btn btn-primary" onClick={openAdd}>Add First Metric</button>
-        </div>
+        <EmptyState
+          icon="📋"
+          title="No metrics defined"
+          copy="Add metrics that srenies will fill in when submitting their monthly reports."
+          action={<button type="button" className="btn btn-primary" onClick={openAdd}>Add First Metric</button>}
+        />
       )}
 
       {/* Metrics table */}
@@ -283,9 +272,7 @@ export const ReportMetricsPage: React.FC = () => {
       )}
 
       {isLoading && (
-        <div className="glass-panel" style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--text-secondary-dark)', fontSize: '0.9rem' }}>
-          Loading…
-        </div>
+        <div className="loading-state">Loading…</div>
       )}
     </div>
   );

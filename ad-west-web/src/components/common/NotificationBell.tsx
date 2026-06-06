@@ -1,13 +1,20 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { backendApi, ApprovalNotificationApi } from '../../utils/backendApi';
 import { useAuth } from '../../context/auth-context';
+
+const POPOVER_WIDTH = 320;
+const POPOVER_GAP = 8;
+const VIEWPORT_PADDING = 12;
 
 export const NotificationBell: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [items, setItems] = useState<ApprovalNotificationApi[]>([]);
   const [loading, setLoading] = useState(false);
+  const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
   const { adminUser } = useAuth();
-  const ref = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   const readStorageKey = adminUser ? `adwest-approval-notifications-read-${adminUser.sub}` : '';
   const [readIds, setReadIds] = useState<string[]>([]);
@@ -46,133 +53,130 @@ export const NotificationBell: React.FC = () => {
     localStorage.setItem(readStorageKey, JSON.stringify(ids));
   }, [isOpen, items, readIds, readStorageKey]);
 
+  const updatePopoverPosition = useCallback(() => {
+    const button = buttonRef.current;
+    if (!button) return;
+
+    const rect = button.getBoundingClientRect();
+    const width = Math.min(POPOVER_WIDTH, window.innerWidth - VIEWPORT_PADDING * 2);
+    let left = rect.left + rect.width / 2 - width / 2;
+    const maxLeft = window.innerWidth - width - VIEWPORT_PADDING;
+    left = Math.max(VIEWPORT_PADDING, Math.min(left, maxLeft));
+
+    setPopoverStyle({
+      top: rect.bottom + POPOVER_GAP,
+      left,
+      width,
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    updatePopoverPosition();
+  }, [isOpen, updatePopoverPosition]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleReposition = () => updatePopoverPosition();
+    window.addEventListener('resize', handleReposition);
+    window.addEventListener('scroll', handleReposition, true);
+    return () => {
+      window.removeEventListener('resize', handleReposition);
+      window.removeEventListener('scroll', handleReposition, true);
+    };
+  }, [isOpen, updatePopoverPosition]);
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
+      const target = e.target as Node;
+      if (buttonRef.current?.contains(target)) return;
+      if (popoverRef.current?.contains(target)) return;
+      setIsOpen(false);
     };
     if (isOpen) document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isOpen]);
+
   const unreadCount = items.filter((item) => !readIds.includes(item.id)).length;
 
+  const statusLabel = loading
+    ? 'Loading…'
+    : unreadCount > 0
+      ? `${unreadCount} unread`
+      : items.length > 0
+        ? 'All caught up'
+        : null;
+
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div className="notification-bell">
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setIsOpen(v => !v)}
+        onClick={() => setIsOpen((v) => !v)}
         aria-label="Notifications"
-        style={{
-          position: 'relative',
-          background: isOpen ? 'rgba(148,163,184,0.1)' : 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          color: isOpen ? 'var(--text-primary-dark)' : 'var(--text-secondary-dark)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: '36px',
-          height: '36px',
-          borderRadius: '8px',
-          transition: 'background 0.15s, color 0.15s',
-        }}
-        onMouseEnter={e => {
-          e.currentTarget.style.background = 'rgba(148,163,184,0.1)';
-          e.currentTarget.style.color = 'var(--text-primary-dark)';
-        }}
-        onMouseLeave={e => {
-          if (!isOpen) {
-            e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.color = 'var(--text-secondary-dark)';
-          }
-        }}
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        className={`notification-bell__trigger${isOpen ? ' notification-bell__trigger--open' : ''}`}
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
         {unreadCount > 0 && (
-          <span
-            style={{
-              position: 'absolute',
-              top: '4px',
-              right: '4px',
-              minWidth: '16px',
-              height: '16px',
-              padding: '0 4px',
-              borderRadius: '999px',
-              background: 'var(--error)',
-              color: '#fff',
-              fontSize: '0.68rem',
-              fontWeight: 700,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              lineHeight: 1,
-            }}
-          >
+          <span className="notification-bell__badge">
+            <span className="pulse-indicator" style={{ position: 'absolute', inset: '-2px', borderRadius: '999px', opacity: 0.45 }} aria-hidden="true" />
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>
 
-      {isOpen && (
+      {isOpen && createPortal(
         <div
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 8px)',
-            right: 0,
-            width: '320px',
-            zIndex: 500,
-            padding: 0,
-            overflow: 'hidden',
-            background: 'var(--surface-dark-elevated)',
-            border: '1px solid var(--border-dark)',
-            borderRadius: '14px',
-            boxShadow: '0 16px 40px -8px rgba(0,0,0,0.3)',
-          }}
+          ref={popoverRef}
+          className="notification-popover animate-slide-up"
+          style={popoverStyle}
+          role="dialog"
+          aria-label="Notifications"
         >
-          <div style={{
-            padding: '14px 18px',
-            borderBottom: '1px solid var(--border-dark)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-            <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Notifications</span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary-dark)' }}>{unreadCount} unread</span>
+          <div className="notification-popover__header">
+            <span className="notification-popover__title">Notifications</span>
+            {statusLabel && (
+              <span className="notification-popover__status">{statusLabel}</span>
+            )}
           </div>
+
           {loading ? (
-            <div style={{ padding: '20px 18px', textAlign: 'center', color: 'var(--text-secondary-dark)', fontSize: '0.85rem' }}>
-              Loading notifications...
-            </div>
+            <div className="notification-popover__loading">Loading notifications…</div>
           ) : items.length === 0 ? (
-            <div style={{ padding: '40px 18px', textAlign: 'center', color: 'var(--text-secondary-dark)' }}>
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.35, display: 'block', margin: '0 auto 10px' }}>
+            <div className="notification-popover__empty">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                 <path d="M13.73 21a2 2 0 0 1-3.46 0" />
               </svg>
-              <p style={{ margin: 0, fontSize: '0.85rem' }}>No notifications yet</p>
+              <p className="notification-popover__empty-title">No notifications yet</p>
+              <p className="notification-popover__empty-copy">Approval updates will appear here.</p>
             </div>
           ) : (
-            <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+            <div className="notification-popover__list">
               {items.map((item, index) => {
                 const unread = !readIds.includes(item.id);
                 return (
                   <div
                     key={item.id}
-                    style={{
-                      padding: '12px 14px',
-                      borderBottom: index < items.length - 1 ? '1px solid var(--border-dark)' : 'none',
-                      background: unread ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
-                    }}
+                    className={`notification-popover__item${unread ? ' notification-popover__item--unread' : ''}${index < items.length - 1 ? ' notification-popover__item--bordered' : ''}`}
                   >
-                    <div style={{ fontSize: '0.84rem', fontWeight: unread ? 700 : 600, color: 'var(--text-primary-dark)' }}>
-                      {item.message}
-                    </div>
-                    <div style={{ marginTop: '4px', fontSize: '0.74rem', color: 'var(--text-secondary-dark)' }}>
+                    <div className="notification-popover__message">{item.message}</div>
+                    <div className="notification-popover__time">
                       {new Date(item.createdAt).toLocaleString()}
                     </div>
                   </div>
@@ -180,7 +184,8 @@ export const NotificationBell: React.FC = () => {
               })}
             </div>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

@@ -65,7 +65,7 @@ export const ApprovalActionsPanel: React.FC = () => {
   return (
     <div className="animate-slide-up">
       <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '4px' }}>Actions</h2>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '4px' }}>📝 My Approvals</h2>
         <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem' }}>
           Review approval items assigned to you and submit your decision.
         </p>

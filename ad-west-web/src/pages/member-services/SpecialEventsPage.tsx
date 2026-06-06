@@ -4,6 +4,10 @@ import { useToast } from '../../components/common/Toast'
 import { useConfirm } from '../../components/common/ConfirmDialog'
 import { SwitchToggle } from '../../components/common/SwitchToggle'
 import { DateRangePicker } from '../../components/common/DateTimePicker'
+import { PageHeader } from '../../components/common/PageHeader'
+import { FormSection } from '../../components/common/FormSection'
+import { FormActions } from '../../components/common/FormActions'
+import { EmptyState } from '../../components/common/EmptyState'
 import { useEnumOptions } from '../../hooks/useEnumOptions'
 
 type Mode = 'list' | 'create' | 'edit' | 'registrations'
@@ -130,16 +134,15 @@ export function SpecialEventsPage() {
   if (mode === 'registrations' && viewingEvent) {
     return (
       <div className="animate-slide-up" style={{ width: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-          <button className="btn btn-secondary" onClick={() => setMode('list')}>← Back</button>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800 }}>Registrations — {viewingEvent.title}</h2>
-            <p style={{ margin: '4px 0 0', color: 'var(--text-secondary-dark)', fontSize: '0.88rem' }}>{fmt(viewingEvent.dateTime)}</p>
-          </div>
-        </div>
-        {regLoading && <div style={{ color: 'var(--text-secondary-dark)', padding: '20px' }}>Loading…</div>}
+        <PageHeader
+          icon="🗓️"
+          title={`Registrations — ${viewingEvent.title}`}
+          subtitle={fmt(viewingEvent.dateTime)}
+          actions={<button className="btn btn-secondary" onClick={() => setMode('list')}>← Back</button>}
+        />
+        {regLoading && <div className="loading-state">Loading…</div>}
         {!regLoading && registrations.length === 0 && (
-          <div className="glass-panel" style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary-dark)' }}>No registrations yet.</div>
+          <EmptyState title="No registrations yet" />
         )}
         {!regLoading && registrations.length > 0 && (
           <div className="table-container">
@@ -170,130 +173,135 @@ export function SpecialEventsPage() {
   if (mode === 'create' || mode === 'edit') {
     return (
       <div className="animate-slide-up" style={{ maxWidth: '860px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-          <button className="btn btn-secondary" onClick={() => setMode('list')}>← Back</button>
-          <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800 }}>
-            {mode === 'create' ? 'Create Special Event' : 'Edit Event'}
-          </h2>
-        </div>
+        <PageHeader
+          icon="🗓️"
+          title={mode === 'create' ? 'Create Special Event' : 'Edit Event'}
+          actions={<button className="btn btn-secondary" onClick={() => setMode('list')}>← Back</button>}
+        />
 
-        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Event details */}
-          <div className="glass-panel" style={{ padding: '24px', borderLeft: '3px solid var(--primary)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <p style={{ margin: 0, fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary-dark)' }}>Event Details</p>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Title <span style={{ color: 'var(--error)' }}>*</span></label>
-              <input className="form-input" type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Event title" required />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Description</label>
-              <textarea className="form-input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} style={{ resize: 'vertical' }} placeholder="Describe the event…" />
-            </div>
-            <DateRangePicker
-              startValue={form.dateTime}
-              endValue={form.endDateTime}
-              onStartChange={(v) => setForm({ ...form, dateTime: v })}
-              onEndChange={(v) => setForm({ ...form, endDateTime: v })}
-              startRequired
-            />
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Venue</label>
-              <input className="form-input" type="text" value={form.venue} onChange={(e) => setForm({ ...form, venue: e.target.value })} placeholder="Venue or location" />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Visibility</label>
-                <SwitchToggle
-                  checked={form.isPublic}
-                  onChange={(v) => setForm({ ...form, isPublic: v })}
-                  labelOn="Public event"
-                  labelOff="Private event"
-                />
+        <form onSubmit={handleSave}>
+          <div className="animate-stagger">
+            <FormSection title="Event Details" accent="primary">
+              <div className="form-group">
+                <label className="form-label">Title <span style={{ color: 'var(--error)' }}>*</span></label>
+                <input className="form-input" type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Event title" required />
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Registration</label>
-                <SwitchToggle
-                  checked={form.registrationEnabled}
-                  onChange={(v) => setForm({ ...form, registrationEnabled: v })}
-                  labelOn="Registration open"
-                  labelOff="Registration disabled"
-                />
+              <div className="form-group">
+                <label className="form-label">Description</label>
+                <textarea className="form-input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} style={{ resize: 'vertical' }} placeholder="Describe the event…" />
               </div>
-            </div>
-          </div>
-
-          {/* Sreni selector */}
-          <div className="glass-panel" style={{ padding: '24px' }}>
-            <p style={{ margin: '0 0 12px', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary-dark)' }}>Add to Sreni Calendars</p>
-            {allSrenis.length === 0
-              ? <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary-dark)' }}>No srenis configured.</p>
-              : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '8px' }}>
-                  {allSrenis.map((s) => (
-                    <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer', padding: '8px 12px', border: '1px solid var(--border-dark)', borderRadius: '8px', background: form.sreniIds.includes(s.id) ? 'var(--primary-light)' : 'transparent' }}>
-                      <input type="checkbox" checked={form.sreniIds.includes(s.id)} onChange={() => toggleSreni(s.id)} />
-                      {s.name}
-                    </label>
-                  ))}
+              <DateRangePicker
+                startValue={form.dateTime}
+                endValue={form.endDateTime}
+                onStartChange={(v) => setForm({ ...form, dateTime: v })}
+                onEndChange={(v) => setForm({ ...form, endDateTime: v })}
+                startRequired
+              />
+              <div className="form-group">
+                <label className="form-label">Venue</label>
+                <input className="form-input" type="text" value={form.venue} onChange={(e) => setForm({ ...form, venue: e.target.value })} placeholder="Venue or location" />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="form-group">
+                  <label className="form-label">Visibility</label>
+                  <SwitchToggle
+                    checked={form.isPublic}
+                    onChange={(v) => setForm({ ...form, isPublic: v })}
+                    labelOn="Public event"
+                    labelOff="Private event"
+                  />
                 </div>
-            }
-          </div>
-
-          {/* Form builder */}
-          {form.registrationEnabled && (
-            <div className="glass-panel" style={{ padding: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                <p style={{ margin: 0, fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary-dark)' }}>Registration Form Fields</p>
-                <button type="button" className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 12px' }} onClick={addField}>+ Add Field</button>
+                <div className="form-group">
+                  <label className="form-label">Registration</label>
+                  <SwitchToggle
+                    checked={form.registrationEnabled}
+                    onChange={(v) => setForm({ ...form, registrationEnabled: v })}
+                    labelOn="Registration open"
+                    labelOff="Registration disabled"
+                  />
+                </div>
               </div>
-              {form.formFields.length === 0 && <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary-dark)' }}>No fields yet. Click "Add Field" to build the registration form.</p>}
-              {form.formFields.length > 0 && (
-                <div className="table-container">
-                  <table className="custom-table">
-                    <thead>
-                      <tr>
-                        <th>Type</th>
-                        <th>Label</th>
-                        <th>Placeholder</th>
-                        <th>Required</th>
-                        <th style={{ textAlign: 'right' }}>Remove</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {form.formFields.map((f, i) => (
-                        <tr key={i}>
-                          <td>
-                            <select className="form-input" value={f.fieldType} onChange={(e) => updateField(i, { fieldType: e.target.value as FormFieldType })} style={{ marginBottom: 0, minWidth: '110px' }}>
-                              {fieldTypeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                            </select>
-                          </td>
-                          <td>
-                            <input className="form-input" type="text" value={f.label} onChange={(e) => updateField(i, { label: e.target.value })} placeholder="Label" style={{ marginBottom: 0 }} />
-                          </td>
-                          <td>
-                            {f.fieldType === 'select'
-                              ? <input className="form-input" type="text" value={(f.options ?? []).join(', ')} onChange={(e) => updateField(i, { options: e.target.value.split(',').map((o) => o.trim()).filter(Boolean) })} placeholder="Option 1, Option 2" style={{ marginBottom: 0 }} />
-                              : <input className="form-input" type="text" value={f.placeholder ?? ''} onChange={(e) => updateField(i, { placeholder: e.target.value })} placeholder="Optional" style={{ marginBottom: 0 }} />
-                            }
-                          </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <input type="checkbox" checked={f.isRequired} onChange={(e) => updateField(i, { isRequired: e.target.checked })} />
-                          </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <button type="button" className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '4px 10px', color: 'var(--error)', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeField(i)}>Remove</button>
-                          </td>
+            </FormSection>
+
+            <FormSection title="Add to Sreni Calendars" accent="none">
+              {allSrenis.length === 0
+                ? <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary-dark)' }}>No srenis configured.</p>
+                : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '8px' }}>
+                    {allSrenis.map((s) => (
+                      <div key={s.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', fontSize: '0.85rem', padding: '8px 12px', border: '1px solid var(--border-dark)', borderRadius: '8px', background: form.sreniIds.includes(s.id) ? 'var(--primary-light)' : 'transparent' }}>
+                        <span>{s.name}</span>
+                        <SwitchToggle
+                          variant="inline"
+                          checked={form.sreniIds.includes(s.id)}
+                          onChange={() => toggleSreni(s.id)}
+                          ariaLabel={`Add event to ${s.name} calendar`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+              }
+            </FormSection>
+
+            {form.registrationEnabled && (
+              <FormSection title="Registration Form Fields" accent="none">
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>
+                  <button type="button" className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 12px' }} onClick={addField}>+ Add Field</button>
+                </div>
+                {form.formFields.length === 0 && <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary-dark)' }}>No fields yet. Click "Add Field" to build the registration form.</p>}
+                {form.formFields.length > 0 && (
+                  <div className="table-container">
+                    <table className="custom-table">
+                      <thead>
+                        <tr>
+                          <th>Type</th>
+                          <th>Label</th>
+                          <th>Placeholder</th>
+                          <th>Required</th>
+                          <th style={{ textAlign: 'right' }}>Remove</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
+                      </thead>
+                      <tbody>
+                        {form.formFields.map((f, i) => (
+                          <tr key={i}>
+                            <td>
+                              <select className="form-input" value={f.fieldType} onChange={(e) => updateField(i, { fieldType: e.target.value as FormFieldType })} style={{ marginBottom: 0, minWidth: '110px' }}>
+                                {fieldTypeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                              </select>
+                            </td>
+                            <td>
+                              <input className="form-input" type="text" value={f.label} onChange={(e) => updateField(i, { label: e.target.value })} placeholder="Label" style={{ marginBottom: 0 }} />
+                            </td>
+                            <td>
+                              {f.fieldType === 'select'
+                                ? <input className="form-input" type="text" value={(f.options ?? []).join(', ')} onChange={(e) => updateField(i, { options: e.target.value.split(',').map((o) => o.trim()).filter(Boolean) })} placeholder="Option 1, Option 2" style={{ marginBottom: 0 }} />
+                                : <input className="form-input" type="text" value={f.placeholder ?? ''} onChange={(e) => updateField(i, { placeholder: e.target.value })} placeholder="Optional" style={{ marginBottom: 0 }} />
+                              }
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <SwitchToggle
+                                variant="inline"
+                                checked={f.isRequired}
+                                onChange={(isRequired) => updateField(i, { isRequired })}
+                                ariaLabel={`${f.isRequired ? 'Mark' : 'Unmark'} ${f.label || 'field'} as required`}
+                              />
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <button type="button" className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '4px 10px', color: 'var(--error)', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeField(i)}>Remove</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </FormSection>
+            )}
+          </div>
 
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <FormActions>
             <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : mode === 'create' ? 'Create Event' : 'Save Changes'}</button>
             <button type="button" className="btn btn-secondary" onClick={() => setMode('list')}>Cancel</button>
-          </div>
+          </FormActions>
         </form>
       </div>
     )
@@ -301,30 +309,29 @@ export function SpecialEventsPage() {
 
   return (
     <div className="animate-slide-up" style={{ width: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>Special Events</h2>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.9rem', margin: '6px 0 0' }}>Create events and publish them to Sreni calendars.</p>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
-              <span style={{ fontWeight: 800 }}>{events.length}</span>Total
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)' }}>
-              <span style={{ fontWeight: 800 }}>{upcomingCount}</span>Upcoming
-            </span>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" onClick={load} disabled={loading}>Refresh</button>
-          <button className="btn btn-primary" onClick={openCreate}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Create Event</button>
-        </div>
-      </div>
+      <PageHeader
+        icon="🗓️"
+        title="Special Events"
+        subtitle="Create events and publish them to Sreni calendars."
+        stats={[
+          { label: 'Total', value: events.length, variant: 'info' },
+          { label: 'Upcoming', value: upcomingCount, variant: 'success' },
+        ]}
+        actions={
+          <>
+            <button className="btn btn-secondary" onClick={load} disabled={loading}>Refresh</button>
+            <button className="btn btn-primary" onClick={openCreate}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Create Event</button>
+          </>
+        }
+      />
 
-      {loading && <div style={{ color: 'var(--text-secondary-dark)', padding: '20px' }}>Loading…</div>}
+      {loading && <div className="loading-state">Loading…</div>}
       {!loading && events.length === 0 && (
-        <div className="glass-panel" style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary-dark)' }}>
-          No special events yet. Create the first one!
-        </div>
+        <EmptyState
+          title="No special events yet"
+          copy="Create the first one!"
+          action={<button className="btn btn-primary" onClick={openCreate}>Create Event</button>}
+        />
       )}
       {!loading && events.length > 0 && (
         <div className="table-container">

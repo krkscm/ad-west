@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { PageHeader } from '../components/common/PageHeader'
 import {
   ResponsiveContainer,
   BarChart,
@@ -406,12 +407,11 @@ export function InsightsPage() {
     <div className="animate-slide-up" style={{ display: 'grid', gap: '20px' }}>
 
       {/* Header */}
-      <div>
-        <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>Insights</h2>
-        <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.9rem', margin: '6px 0 0' }}>
-          Contacts, attendance, and reporting insights across Sreni and Sthan units.
-        </p>
-      </div>
+      <PageHeader
+        icon="📈"
+        title="Insights"
+        subtitle="Contacts, attendance, and reporting insights across Sreni and Sthan units."
+      />
 
       <div className="glass-panel" style={{ padding: '16px', display: 'grid', gap: '8px' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'end' }}>

@@ -339,6 +339,7 @@ export interface UserRecord {
   createdBy?: string;
   updatedBy?: string;
   reportingToRoleIds?: string[];
+  gender?: string;
 }
 
 export interface ReportMetricDefinitionRecord {

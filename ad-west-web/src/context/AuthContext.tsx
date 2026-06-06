@@ -12,6 +12,7 @@ interface SessionPayload {
   name?: string
   email?: string
   picture?: string
+  gender?: string
   origin?: 'admin' | 'user'
   sid: string
   exp: number
@@ -87,6 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       name: payload.name ?? payload.code ?? payload.email ?? payload.sub,
       email: payload.email ?? `${payload.code ?? payload.sub}@adwest.local`,
       picture: payload.picture,
+      gender: payload.gender,
       authProvider: payload.authProvider ?? 'password',
       roles: [{ role: 'Super Admin', scopeType: 'global', scopeId: 'global' }],
     }

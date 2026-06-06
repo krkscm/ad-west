@@ -3,6 +3,10 @@ import { backendApi, ReportMetricDefinitionApi, SreniDefinitionApi } from '../..
 import { SreniReportConfigPage } from '../SreniReportConfigPage';
 import { useToast } from '../../components/common/Toast';
 import { SwitchToggle } from '../../components/common/SwitchToggle';
+import { PageHeader } from '../../components/common/PageHeader';
+import { FormSection } from '../../components/common/FormSection';
+import { FormActions } from '../../components/common/FormActions';
+import { EmptyState } from '../../components/common/EmptyState';
 
 type ConfigMode = 'sreni' | 'location';
 
@@ -95,40 +99,36 @@ const LocationReportMetricsPanel: React.FC = () => {
         )}
       </div>
 
-      {/* Form */}
       {showForm && (
-        <div className="glass-panel" style={{ padding: '20px', marginBottom: '20px', borderLeft: '3px solid var(--primary)' }}>
-          <h4 style={{ margin: '0 0 16px', fontSize: '0.95rem', fontWeight: 700 }}>
-            {editingId ? '✏️ Edit Metric' : '+ New Location Metric'}
-          </h4>
+        <FormSection title={editingId ? 'Edit Metric' : 'New Location Metric'} accent="primary">
           <form onSubmit={(e) => void handleSave(e)}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '12px' }}>
-              <div>
-                <label className="form-label">Name *</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+              <div className="form-group">
+                <label className="form-label">Name <span style={{ color: 'var(--error)' }}>*</span></label>
                 <input className="form-input" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
               </div>
-              <div>
+              <div className="form-group">
                 <label className="form-label">Unit <span style={{ color: 'var(--text-secondary-dark)', fontWeight: 400 }}>(optional)</span></label>
                 <input className="form-input" value={form.unit} onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))} placeholder="e.g. count, AED" />
               </div>
-              <div>
+              <div className="form-group">
                 <label className="form-label">Input Type</label>
                 <select className="form-input" value={form.inputType} onChange={(e) => setForm((f) => ({ ...f, inputType: e.target.value as 'number' | 'text' }))}>
                   <option value="number">Number</option>
                   <option value="text">Text</option>
                 </select>
               </div>
-              <div>
+              <div className="form-group">
                 <label className="form-label">Sort Order</label>
                 <input className="form-input" type="number" value={form.sortOrder} onChange={(e) => setForm((f) => ({ ...f, sortOrder: parseInt(e.target.value) || 0 }))} />
               </div>
             </div>
-            <div style={{ marginBottom: '12px' }}>
+            <div className="form-group">
               <label className="form-label">Description <span style={{ color: 'var(--text-secondary-dark)', fontWeight: 400 }}>(optional)</span></label>
               <input className="form-input" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-              <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary-dark)' }}>Required field</span>
+            <div className="form-group">
+              <label className="form-label">Required field</label>
               <SwitchToggle
                 checked={form.isRequired}
                 onChange={(val) => setForm((f) => ({ ...f, isRequired: val }))}
@@ -136,31 +136,27 @@ const LocationReportMetricsPanel: React.FC = () => {
                 labelOff="Optional"
               />
             </div>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            <FormActions>
               <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
               <button type="submit" className="btn btn-primary" disabled={saving}>
                 {saving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Metric'}
               </button>
-            </div>
+            </FormActions>
           </form>
-        </div>
+        </FormSection>
       )}
 
       {/* Metrics list */}
       {isLoading ? (
-        <div className="glass-panel" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary-dark)', fontSize: '0.9rem' }}>Loading…</div>
-      ) : metrics.length === 0 ? (
-        <div className="glass-panel" style={{ padding: '48px 24px', textAlign: 'center' }}>
-          <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>📏</div>
-          <h3 style={{ fontWeight: 700, marginBottom: '8px' }}>No location metrics yet</h3>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', maxWidth: '380px', margin: '0 auto 20px' }}>
-            Add the fields that every sthan must fill in when submitting a monthly report.
-          </p>
-          {!showForm && (
-            <button type="button" className="btn btn-primary" onClick={openCreate}>Add First Metric</button>
-          )}
-        </div>
-      ) : (
+        <div className="loading-state">Loading location metrics…</div>
+      ) : metrics.length === 0 && !showForm ? (
+        <EmptyState
+          icon="📏"
+          title="No location metrics yet"
+          copy="Add the fields that every sthan must fill in when submitting a monthly report."
+          action={<button type="button" className="btn btn-primary" onClick={openCreate}>Add First Metric</button>}
+        />
+      ) : metrics.length > 0 ? (
         <div style={{ display: 'grid', gap: '8px' }}>
           {metrics.map((m) => (
             <div key={m.id} className="glass-panel" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
@@ -180,7 +176,7 @@ const LocationReportMetricsPanel: React.FC = () => {
             </div>
           ))}
         </div>
-      )}
+      ) : null}
 
       <div className="glass-panel" style={{ padding: '12px 16px', marginTop: '20px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
         <span style={{ fontSize: '1rem', flexShrink: 0 }}>ℹ️</span>
@@ -215,12 +211,11 @@ export const ReportConfigSettingsPage: React.FC = () => {
 
   return (
     <div className="animate-slide-up">
-      <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>📊 Report Config</h2>
-        <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginTop: '4px', marginBottom: 0 }}>
-          Define report parameters for Srenies and shared location metrics for all Sthans.
-        </p>
-      </div>
+      <PageHeader
+        icon="📊"
+        title="Report Config"
+        subtitle="Define report parameters for Srenies and shared location metrics for all Sthans."
+      />
 
       {/* Mode toggle */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>

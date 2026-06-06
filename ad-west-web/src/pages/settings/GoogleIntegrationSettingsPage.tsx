@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useToast } from '../../components/common/Toast';
 import { SwitchToggle } from '../../components/common/SwitchToggle';
+import { PageHeader } from '../../components/common/PageHeader';
+import { FormSection } from '../../components/common/FormSection';
+import { FormActions } from '../../components/common/FormActions';
 import { backendApi, GoogleIntegrationConfigApi } from '../../utils/backendApi';
 
 export const GoogleIntegrationSettingsPage: React.FC = () => {
@@ -63,30 +66,21 @@ export const GoogleIntegrationSettingsPage: React.FC = () => {
     }
   };
 
-  const labelStyle: React.CSSProperties = {
-    display: 'block', fontSize: '0.82rem', fontWeight: 600,
-    color: 'var(--text-secondary-dark)', marginBottom: '4px',
-  };
-
   return (
     <div className="animate-slide-up" style={{ width: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>Google Integration</h2>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.9rem', margin: '6px 0 0' }}>
-            Configure Google OAuth and Gmail API credentials stored in the database.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon="🔐"
+        title="Google Integration"
+        subtitle="Configure Google OAuth and Gmail API credentials stored in the database."
+      />
 
       {isLoading ? (
-        <div style={{ color: 'var(--text-secondary-dark)', padding: '20px' }}>Loading configuration…</div>
+        <div className="loading-state">Loading configuration…</div>
       ) : (
         <form onSubmit={handleSave} style={{ maxWidth: '680px' }}>
-          <div className="glass-panel" style={{ padding: '24px', borderLeft: '3px solid var(--primary)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-            <div>
-              <label style={labelStyle}>Google Client ID <span style={{ color: 'var(--error)' }}>*</span></label>
+          <FormSection title="Configuration" accent="primary">
+            <div className="form-group">
+              <label className="form-label">Google Client ID <span style={{ color: 'var(--error)' }}>*</span></label>
               <input
                 className="form-input"
                 type="text"
@@ -97,8 +91,8 @@ export const GoogleIntegrationSettingsPage: React.FC = () => {
               />
             </div>
 
-            <div>
-              <label style={labelStyle}>Google Client Secret</label>
+            <div className="form-group">
+              <label className="form-label">Google Client Secret</label>
               <input
                 className="form-input"
                 type="password"
@@ -106,18 +100,16 @@ export const GoogleIntegrationSettingsPage: React.FC = () => {
                 value={clientSecret}
                 onChange={(e) => setClientSecret(e.target.value)}
               />
-              <div style={{ marginTop: '8px' }}>
-                <SwitchToggle
-                  checked={clearClientSecret}
-                  onChange={setClearClientSecret}
-                  labelOn="Clear stored client secret"
-                  labelOff="Keep stored client secret"
-                />
-              </div>
+              <SwitchToggle
+                checked={clearClientSecret}
+                onChange={setClearClientSecret}
+                labelOn="Clear stored client secret"
+                labelOff="Keep stored client secret"
+              />
             </div>
 
-            <div>
-              <label style={labelStyle}>Redirect URI <span style={{ color: 'var(--error)' }}>*</span></label>
+            <div className="form-group">
+              <label className="form-label">Redirect URI <span style={{ color: 'var(--error)' }}>*</span></label>
               <input
                 className="form-input"
                 type="text"
@@ -128,8 +120,8 @@ export const GoogleIntegrationSettingsPage: React.FC = () => {
               />
             </div>
 
-            <div>
-              <label style={labelStyle}>OAuth Scopes <span style={{ color: 'var(--error)' }}>*</span></label>
+            <div className="form-group">
+              <label className="form-label">OAuth Scopes <span style={{ color: 'var(--error)' }}>*</span></label>
               <textarea
                 className="form-input"
                 rows={3}
@@ -141,8 +133,8 @@ export const GoogleIntegrationSettingsPage: React.FC = () => {
               />
             </div>
 
-            <div>
-              <label style={labelStyle}>Web App Origin <span style={{ color: 'var(--error)' }}>*</span></label>
+            <div className="form-group">
+              <label className="form-label">Web App Origin <span style={{ color: 'var(--error)' }}>*</span></label>
               <input
                 className="form-input"
                 type="text"
@@ -153,8 +145,8 @@ export const GoogleIntegrationSettingsPage: React.FC = () => {
               />
             </div>
 
-            <div>
-              <label style={labelStyle}>Integration Status</label>
+            <div className="form-group">
+              <label className="form-label">Integration Status</label>
               <SwitchToggle
                 checked={enabled}
                 onChange={setEnabled}
@@ -163,15 +155,14 @@ export const GoogleIntegrationSettingsPage: React.FC = () => {
               />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', flexWrap: 'wrap', gap: '10px' }}>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>
-                {config?.updatedAt ? `Last updated: ${new Date(config.updatedAt).toLocaleString()}` : 'Not saved yet'}
-              </span>
+            <FormActions
+              hint={config?.updatedAt ? `Last updated: ${new Date(config.updatedAt).toLocaleString()}` : 'Not saved yet'}
+            >
               <button className="btn btn-primary" type="submit" disabled={isSaving}>
                 {isSaving ? 'Saving…' : 'Save Configuration'}
               </button>
-            </div>
-          </div>
+            </FormActions>
+          </FormSection>
         </form>
       )}
     </div>

@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useToast } from '../../components/common/Toast';
+import { SwitchToggle } from '../../components/common/SwitchToggle';
+import { PageHeader } from '../../components/common/PageHeader';
+import { FormSection } from '../../components/common/FormSection';
+import { FormActions } from '../../components/common/FormActions';
 import {
   AdminUserApi,
   backendApi,
@@ -34,6 +38,7 @@ export const UsersFormPage: React.FC<UsersFormPageProps> = ({ editingUser, onBac
   const [isSaving, setIsSaving] = useState(false);
 
   const [formName, setFormName] = useState('');
+  const [formGender, setFormGender] = useState<'male' | 'female' | ''>('');
   const [formPhone, setFormPhone] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formRoleId, setFormRoleId] = useState('');
@@ -92,6 +97,7 @@ export const UsersFormPage: React.FC<UsersFormPageProps> = ({ editingUser, onBac
 
   useEffect(() => {
     setFormName(editingUser?.name ?? '');
+    setFormGender(editingUser?.gender ?? '');
     setFormPhone(editingUser?.phone ?? '');
     setFormEmail(editingUser?.email ?? '');
     setFormRoleId(editingUser?.roleId ?? '');
@@ -127,6 +133,7 @@ export const UsersFormPage: React.FC<UsersFormPageProps> = ({ editingUser, onBac
           name: cleanName,
           phone: formPhone.trim() || undefined,
           email: formEmail.trim() || undefined,
+          gender: formGender || undefined,
           roleId: formRoleId || undefined,
           sthanId: formSthanId || undefined,
           permissionSetId: formPermissionSetId || undefined,
@@ -143,6 +150,7 @@ export const UsersFormPage: React.FC<UsersFormPageProps> = ({ editingUser, onBac
           password: formPassword.trim(),
           phone: formPhone.trim() || undefined,
           email: formEmail.trim() || undefined,
+          gender: formGender || undefined,
           roleId: formRoleId || undefined,
           sthanId: formSthanId || undefined,
           permissionSetId: formPermissionSetId || undefined,
@@ -164,22 +172,14 @@ export const UsersFormPage: React.FC<UsersFormPageProps> = ({ editingUser, onBac
   return (
     <div className="animate-slide-up">
 
-      {/* Page header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>
-            {editingUser ? 'Edit User' : 'New User'}
-          </h2>
-          {editingUser && (
-            <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginTop: '4px' }}>
-              {editingUser.name}
-            </p>
-          )}
-        </div>
-        <button type="button" className="btn btn-secondary" onClick={onBack}>Back to List</button>
-      </div>
+      <PageHeader
+        icon="👥"
+        title={editingUser ? 'Edit User' : 'New User'}
+        subtitle={editingUser ? editingUser.name : 'Create a user account with role, sthan, and access settings.'}
+        actions={<button type="button" className="btn btn-secondary" onClick={onBack}>Back to List</button>}
+      />
 
-      <form onSubmit={(e) => void handleSave(e)}>
+      <form onSubmit={(e) => void handleSave(e)} className="animate-stagger">
 
         {/* Top row: Profile+Security | Access */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '20px', alignItems: 'start', marginBottom: '20px' }}>
@@ -188,8 +188,7 @@ export const UsersFormPage: React.FC<UsersFormPageProps> = ({ editingUser, onBac
           <div style={{ display: 'grid', gap: '16px' }}>
 
             {/* Profile card */}
-            <div className="glass-panel" style={{ padding: '24px', borderLeft: '3px solid var(--primary)' }}>
-              <CardLabel>Profile</CardLabel>
+            <FormSection title="Profile" accent="primary" flatHover>
 
               <div style={{ marginBottom: '16px' }}>
                 <label className="form-label">Full Name <span style={{ color: 'var(--error)' }}>*</span></label>
@@ -209,11 +208,23 @@ export const UsersFormPage: React.FC<UsersFormPageProps> = ({ editingUser, onBac
                     onChange={(e) => setFormEmail(e.target.value)} />
                 </div>
               </div>
-            </div>
 
-            {/* Security card */}
-            <div className="glass-panel" style={{ padding: '24px', borderLeft: '3px solid #f59e0b' }}>
-              <CardLabel color="#f59e0b">Security</CardLabel>
+              <div style={{ marginTop: '16px' }}>
+                <label className="form-label">Gender</label>
+                <select
+                  className="form-input"
+                  value={formGender}
+                  onChange={(e) => setFormGender(e.target.value as 'male' | 'female' | '')}
+                  style={{ cursor: 'pointer', maxWidth: '240px' }}
+                >
+                  <option value="">Select gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                </select>
+              </div>
+            </FormSection>
+
+            <FormSection title="Security" accent="warning" flatHover>
 
               {editingUser ? (
                 <div>
@@ -279,47 +290,20 @@ export const UsersFormPage: React.FC<UsersFormPageProps> = ({ editingUser, onBac
                   </p>
                 </div>
               )}
-            </div>
+            </FormSection>
 
           </div>
 
-          {/* Right column — Access (compact) */}
-          <div className="glass-panel" style={{ padding: '24px', borderLeft: '3px solid #10b981' }}>
-            <CardLabel color="#10b981">Access</CardLabel>
+          <FormSection title="Access" accent="success" flatHover>
 
-            {/* Super Admin toggle */}
-            <div style={{ marginBottom: '20px' }}>
+            <div className="form-group">
               <label className="form-label">Admin Access</label>
-              <button
-                type="button"
-                onClick={() => setIsSuperAdmin(p => !p)}
-                aria-pressed={isSuperAdmin}
-                style={{
-                  width: '100%', height: '52px', borderRadius: '10px', padding: '0 16px',
-                  border: `1px solid ${isSuperAdmin ? 'rgba(16,185,129,0.35)' : 'var(--border-dark)'}`,
-                  background: isSuperAdmin ? 'rgba(16,185,129,0.08)' : 'transparent',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-                  cursor: 'pointer',
-                }}
-              >
-                <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontSize: '0.875rem', fontWeight: 700, color: isSuperAdmin ? '#10b981' : 'var(--text-secondary-dark)' }}>
-                    {isSuperAdmin ? 'Super Admin' : 'Regular User'}
-                  </div>
-                </div>
-                <span style={{
-                  position: 'relative', width: '40px', height: '22px', borderRadius: '999px', flexShrink: 0,
-                  background: isSuperAdmin ? 'var(--success)' : 'rgba(148,163,184,0.45)',
-                  transition: 'background 0.2s',
-                }}>
-                  <span style={{
-                    position: 'absolute', top: '3px', left: isSuperAdmin ? '19px' : '3px',
-                    width: '16px', height: '16px', borderRadius: '50%',
-                    background: '#fff', boxShadow: '0 1px 3px rgba(15,23,42,0.22)',
-                    transition: 'left 0.2s',
-                  }} />
-                </span>
-              </button>
+              <SwitchToggle
+                checked={isSuperAdmin}
+                onChange={setIsSuperAdmin}
+                labelOn="Super Admin"
+                labelOff="Regular User"
+              />
             </div>
 
             {/* Admin Management */}
@@ -388,29 +372,29 @@ export const UsersFormPage: React.FC<UsersFormPageProps> = ({ editingUser, onBac
                     ) : activeRoles.map((r) => {
                       const checked = formReportingToRoleIds.includes(r.id);
                       return (
-                        <label
+                        <div
                           key={r.id}
                           style={{
-                            display: 'flex', alignItems: 'center', gap: '10px',
-                            padding: '9px 14px', cursor: 'pointer', fontSize: '0.875rem',
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
+                            padding: '9px 14px', fontSize: '0.875rem',
                             background: checked ? 'rgba(99,102,241,0.08)' : 'transparent',
                           }}
                         >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(e) => {
-                              setFormReportingToRoleIds(prev =>
-                                e.target.checked ? [...prev, r.id] : prev.filter(id => id !== r.id)
-                              );
-                            }}
-                            style={{ width: '15px', height: '15px', accentColor: 'var(--primary)', flexShrink: 0 }}
-                          />
                           <span>
                             <span style={{ fontWeight: checked ? 600 : 400 }}>{r.name}</span>
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary-dark)', marginLeft: '6px' }}>{r.level}</span>
                           </span>
-                        </label>
+                          <SwitchToggle
+                            variant="inline"
+                            checked={checked}
+                            onChange={(nextChecked) => {
+                              setFormReportingToRoleIds((prev) =>
+                                nextChecked ? [...prev, r.id] : prev.filter((id) => id !== r.id),
+                              );
+                            }}
+                            ariaLabel={`Toggle reporting role ${r.name}`}
+                          />
+                        </div>
                       );
                     })}
                   </div>,
@@ -441,18 +425,15 @@ export const UsersFormPage: React.FC<UsersFormPageProps> = ({ editingUser, onBac
                 </div>
               )}
             </div>
-          </div>
+          </FormSection>
 
         </div>
 
-        {/* Full-width Organizational card */}
-        <div className="glass-panel" style={{ padding: '24px', borderLeft: '3px solid #8b5cf6', marginBottom: '20px' }}>
-          <CardLabel color="#8b5cf6">Organizational</CardLabel>
+        <FormSection title="Organizational" accent="violet" flatHover>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start' }}>
 
-            {/* Role */}
-            <div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">Role</label>
               <select className="form-input" value={formRoleId} onChange={(e) => setFormRoleId(e.target.value)} style={{ cursor: 'pointer' }}>
                 <option value="">No role assigned</option>
@@ -462,8 +443,7 @@ export const UsersFormPage: React.FC<UsersFormPageProps> = ({ editingUser, onBac
               </select>
             </div>
 
-            {/* Sthan */}
-            <div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">Sthan</label>
               <select className="form-input" value={formSthanId} onChange={(e) => setFormSthanId(e.target.value)} style={{ cursor: 'pointer' }}>
                 <option value="">No sthan assigned</option>
@@ -474,25 +454,16 @@ export const UsersFormPage: React.FC<UsersFormPageProps> = ({ editingUser, onBac
             </div>
 
           </div>
-        </div>
+        </FormSection>
 
-        {/* Action bar */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', paddingTop: '20px', borderTop: '1px solid var(--border-dark)' }}>
+        <FormActions>
           <button type="button" className="btn btn-secondary" onClick={onBack} style={{ minWidth: '100px' }}>Cancel</button>
           <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ minWidth: '140px' }}>
             {isSaving ? 'Saving...' : editingUser ? 'Save Changes' : 'Create User'}
           </button>
-        </div>
+        </FormActions>
       </form>
     </div>
   );
 };
 
-const CardLabel: React.FC<{ children: React.ReactNode; color?: string }> = ({ children, color = 'var(--primary)' }) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-    <div style={{ width: '3px', height: '18px', borderRadius: '2px', background: color, flexShrink: 0 }} />
-    <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary-dark)' }}>
-      {children}
-    </span>
-  </div>
-);

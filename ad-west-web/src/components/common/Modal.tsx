@@ -24,24 +24,9 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
   if (!isOpen) return null;
 
   return ReactDOM.createPortal(
-    <div
-      className="flex-center"
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        backgroundColor: 'rgba(9, 13, 24, 0.82)',
-        backdropFilter: 'blur(6px)',
-        zIndex: 9999,
-        padding: '20px',
-        animation: 'fadeIn 0.25s ease',
-      }}
-      onClick={onClose}
-    >
+    <div className="modal-overlay" onClick={onClose}>
       <div
-        className="modal-panel"
+        className="modal-panel animate-slide-up"
         style={{
           width: '100%',
           maxWidth,
@@ -49,7 +34,6 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
           overflowY: 'auto',
           color: 'var(--text-primary-dark)',
           padding: '28px',
-          animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -65,24 +49,16 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
         >
           <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>{title}</h3>
           <button
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '1.4rem',
-              color: 'var(--text-secondary-dark)',
-              transition: 'var(--transition-fast)',
-              lineHeight: 1,
-              padding: '0 2px',
-            }}
+            type="button"
+            className="btn btn-secondary"
+            style={{ padding: '4px 10px', minHeight: 'unset', fontSize: '1.2rem', lineHeight: 1 }}
             onClick={onClose}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text-primary-dark)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary-dark)')}
+            aria-label="Close"
           >
-            &times;
+            ×
           </button>
         </div>
-        <div>{children}</div>
+        {children}
       </div>
     </div>,
     document.body,

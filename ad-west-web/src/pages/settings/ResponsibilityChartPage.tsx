@@ -304,7 +304,7 @@ export const ResponsibilityChartPage: React.FC = () => {
     <div className="animate-slide-up">
       <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
         <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Responsibility Chart</h2>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>🧭 Responsibility Chart</h2>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

@@ -20,6 +20,7 @@ interface TokenPayload {
   exp: number;
   email?: string;
   name?: string;
+  gender?: string;
   picture?: string;
   memberId?: string;
   mustResetPassword?: boolean;

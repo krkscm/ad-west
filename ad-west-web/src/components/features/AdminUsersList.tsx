@@ -118,7 +118,7 @@ export const AdminUsersList: React.FC<Props> = ({ onAdd, onEdit }) => {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Admin Management</h2>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>👤 Admin Management</h2>
           <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginTop: '4px' }}>
             {total} administrator{total !== 1 ? 's' : ''} · page {page} of {totalPages}
           </p>

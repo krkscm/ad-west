@@ -470,7 +470,7 @@ export class AuthService {
     const normalizedIdentifier = identifier.trim();
 
     const selectClause =
-      'SELECT id, code, name, email, phone, password_hash, active, is_super_admin, must_reset_password FROM adwest.users';
+      'SELECT id, code, name, email, phone, gender, password_hash, active, is_super_admin, must_reset_password FROM adwest.users';
 
     const isEmail = normalizedIdentifier.includes('@');
     const isPhone = /^\+?[0-9]{7,20}$/.test(normalizedIdentifier);
@@ -481,6 +481,7 @@ export class AuthService {
       name: string;
       email: string | null;
       phone: string | null;
+      gender: string | null;
       password_hash: string | null;
       active: boolean;
       is_super_admin: boolean;
@@ -526,6 +527,7 @@ export class AuthService {
         origin: 'user',
         code: user.code,
         name: user.name,
+        gender: user.gender ?? undefined,
         roles: ['SUPER_ADMIN'],
         sid: sessionId,
         email: user.email ?? undefined,

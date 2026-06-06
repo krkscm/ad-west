@@ -62,7 +62,7 @@ export const GmailWorkspacePanel: React.FC = () => {
       {/* Page header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>Email Workspace</h2>
+          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>✉️ Email Workspace</h2>
           <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.9rem', margin: '6px 0 0' }}>
             Compose and send emails, and view the inbox via IMAP.
           </p>

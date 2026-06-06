@@ -3,6 +3,10 @@ import { backendApi, JobPostingApi, JobType } from '../../utils/backendApi'
 import { useToast } from '../../components/common/Toast'
 import { useConfirm } from '../../components/common/ConfirmDialog'
 import { DateField } from '../../components/common/DateFields'
+import { PageHeader } from '../../components/common/PageHeader'
+import { FormSection } from '../../components/common/FormSection'
+import { FormActions } from '../../components/common/FormActions'
+import { EmptyState } from '../../components/common/EmptyState'
 import { useEnumOptions } from '../../hooks/useEnumOptions'
 
 type FormMode = 'list' | 'create' | 'edit'
@@ -118,92 +122,87 @@ export function JobPostingsPage() {
   if (mode !== 'list') {
     return (
       <div className="animate-slide-up" style={{ maxWidth: '920px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-          <button className="btn btn-secondary" onClick={() => setMode('list')}>← Back</button>
-          <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800 }}>
-            {mode === 'create' ? 'New Job Posting' : 'Edit Job Posting'}
-          </h2>
-        </div>
+        <PageHeader
+          icon="💼"
+          title={mode === 'create' ? 'New Job Posting' : 'Edit Job Posting'}
+          actions={<button type="button" className="btn btn-secondary" onClick={() => setMode('list')}>← Back</button>}
+        />
 
-        <div className="glass-panel" style={{ padding: '24px', borderLeft: '3px solid var(--primary)' }}>
-          <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>
-                Title <span style={{ color: 'var(--error)' }}>*</span>
-              </label>
+        <form onSubmit={handleSave}>
+          <FormSection title="Posting Details" accent="primary">
+            <div className="form-group">
+              <label className="form-label">Title <span style={{ color: 'var(--error)' }}>*</span></label>
               <input className="form-input" type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Community Outreach Coordinator" required />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Employment Type</label>
+              <div className="form-group">
+                <label className="form-label">Employment Type</label>
                 <select className="form-input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as JobType })}>
                   {jobTypeOptions.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Location</label>
+              <div className="form-group">
+                <label className="form-label">Location</label>
                 <input className="form-input" type="text" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. Abu Dhabi / Remote" />
               </div>
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>
-                Description <span style={{ color: 'var(--error)' }}>*</span>
-              </label>
+            <div className="form-group">
+              <label className="form-label">Description <span style={{ color: 'var(--error)' }}>*</span></label>
               <textarea className="form-input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={5} placeholder="Role overview, responsibilities…" required style={{ resize: 'vertical' }} />
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Requirements</label>
+            <div className="form-group">
+              <label className="form-label">Requirements</label>
               <textarea className="form-input" value={form.requirements} onChange={(e) => setForm({ ...form, requirements: e.target.value })} rows={3} placeholder="Qualifications, skills needed…" style={{ resize: 'vertical' }} />
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Closing Date (optional)</label>
+            <div className="form-group">
+              <label className="form-label">Closing Date <span style={{ color: 'var(--text-secondary-dark)', fontWeight: 400 }}>(optional)</span></label>
               <DateField value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} />
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: '4px', flexWrap: 'wrap' }}>
-              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : mode === 'create' ? 'Create Posting' : 'Save Changes'}</button>
+            <FormActions>
               <button type="button" className="btn btn-secondary" onClick={() => setMode('list')}>Cancel</button>
-            </div>
-          </form>
-        </div>
+              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : mode === 'create' ? 'Create Posting' : 'Save Changes'}</button>
+            </FormActions>
+          </FormSection>
+        </form>
       </div>
     )
   }
 
   return (
     <div className="animate-slide-up" style={{ width: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>Job Postings</h2>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.9rem', margin: '6px 0 0' }}>Manage positions listed on the public jobs page.</p>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
-              <span style={{ fontWeight: 800 }}>{jobs.length}</span>Total
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)' }}>
-              <span style={{ fontWeight: 800 }}>{activeCount}</span>Active
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(239,68,68,0.1)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.25)' }}>
-              <span style={{ fontWeight: 800 }}>{inactiveCount}</span>Inactive
-            </span>
+      <PageHeader
+        icon="💼"
+        title="Job Postings"
+        subtitle="Manage positions listed on the public jobs page."
+        stats={[
+          { label: 'Total', value: jobs.length, variant: 'info' },
+          { label: 'Active', value: activeCount, variant: 'success' },
+          { label: 'Inactive', value: inactiveCount, variant: 'warning' },
+        ]}
+        actions={
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button type="button" className="btn btn-secondary" onClick={loadJobs} disabled={loading}>Refresh</button>
+            <button type="button" className="btn btn-primary" onClick={openCreate}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New Posting
+            </button>
           </div>
-        </div>
+        }
+      />
 
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" onClick={loadJobs} disabled={loading}>Refresh</button>
-          <button className="btn btn-primary" onClick={openCreate}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Posting</button>
-        </div>
-      </div>
-
-      {loading && <div style={{ color: 'var(--text-secondary-dark)', padding: '20px' }}>Loading…</div>}
+      {loading && <div className="loading-state">Loading job postings…</div>}
       {!loading && jobs.length === 0 && (
-        <div className="glass-panel" style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary-dark)' }}>
-          No job postings yet. Create the first one!
-        </div>
+        <EmptyState
+          icon="💼"
+          title="No job postings yet"
+          copy="Create the first posting to list it on the public jobs page."
+          action={<button type="button" className="btn btn-primary" onClick={openCreate}>New Posting</button>}
+        />
       )}
       {!loading && jobs.length > 0 && (
         <div className="table-container">
@@ -235,13 +234,14 @@ export function JobPostingsPage() {
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                      <button className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 12px' }} onClick={() => handleToggleActive(job)}>
+                      <button type="button" className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 12px' }} onClick={() => handleToggleActive(job)}>
                         {job.isActive ? 'Deactivate' : 'Activate'}
                       </button>
-                      <button className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 12px' }} onClick={() => openEdit(job)}>
+                      <button type="button" className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 12px' }} onClick={() => openEdit(job)}>
                         Edit
                       </button>
                       <button
+                        type="button"
                         className="btn btn-secondary"
                         style={{ fontSize: '0.8rem', padding: '5px 12px', color: 'var(--error)', borderColor: 'rgba(239,68,68,0.3)' }}
                         onClick={() => handleDelete(job.id)}

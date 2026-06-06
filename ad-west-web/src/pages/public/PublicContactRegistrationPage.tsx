@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { backendApi, CaptchaChallengeResponse, PublicSreniOptionApi } from '../../utils/backendApi'
+import { PublicFormSection } from '../../components/common/PublicFormSection'
 import { PublicPageShell } from './PublicPageShell'
 
 const EMAIL_FORMAT_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -20,40 +21,6 @@ const ABU_DHABI_DISTRICTS = [
   'Al Samha', 'Al Shuwaib', 'Ruwais', 'Madinat Zayed', 'Al Mirfa',
   'Ghayathi', 'Liwa',
 ]
-
-const formSectionStyle = {
-  padding: '18px 18px 16px',
-  borderRadius: '14px',
-  border: '1px solid rgba(255, 237, 213, 0.14)',
-  background: 'rgba(255, 248, 235, 0.04)',
-  display: 'flex',
-  flexDirection: 'column' as const,
-  gap: '14px',
-}
-
-const formSectionTitleStyle = {
-  margin: 0,
-  fontSize: '0.88rem',
-  fontWeight: 800,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase' as const,
-  color: 'var(--public-hero-kicker)',
-}
-
-const formSectionTextStyle = {
-  margin: '-4px 0 0',
-  fontSize: '0.8rem',
-  lineHeight: 1.55,
-  color: 'var(--public-text-secondary)',
-}
-
-const fieldLabelStyle = {
-  display: 'block',
-  fontSize: '0.82rem',
-  fontWeight: 600,
-  color: 'var(--public-text-secondary)',
-  marginBottom: '4px',
-} as const
 
 type JoinUsFormState = {
   fullName: string
@@ -242,13 +209,12 @@ export function PublicContactRegistrationPage() {
                   <input id="website" name="website" type="text" autoComplete="off" tabIndex={-1} />
                 </div>
 
-                <section style={formSectionStyle}>
-                  <div>
-                    <h3 style={formSectionTitleStyle}>Membership Details</h3>
-                    <p style={formSectionTextStyle}>Start with the Sreni you want to join and the identity fields we need to reach you.</p>
-                  </div>
-                  <div>
-                    <label style={fieldLabelStyle}>
+                <PublicFormSection
+                  title="Membership Details"
+                  description="Start with the Sreni you want to join and the identity fields we need to reach you."
+                >
+                  <div className="form-group">
+                    <label className="form-label">
                       Interested Sreni <span style={{ color: 'var(--error)' }}>*</span>
                     </label>
                     <select
@@ -267,8 +233,8 @@ export function PublicContactRegistrationPage() {
                     </select>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={fieldLabelStyle}>
+                    <div className="form-group">
+                      <label className="form-label">
                         Full Name <span style={{ color: 'var(--error)' }}>*</span>
                       </label>
                       <input
@@ -280,8 +246,8 @@ export function PublicContactRegistrationPage() {
                         required
                       />
                     </div>
-                    <div>
-                      <label style={fieldLabelStyle}>
+                    <div className="form-group">
+                      <label className="form-label">
                         Phone <span style={{ color: 'var(--error)' }}>*</span>
                       </label>
                       <input
@@ -294,17 +260,14 @@ export function PublicContactRegistrationPage() {
                       />
                     </div>
                   </div>
-                </section>
+                </PublicFormSection>
 
-                <section style={formSectionStyle}>
-                  <div>
-                    <h3 style={formSectionTitleStyle}>Contact Details</h3>
-                    <p style={formSectionTextStyle}>This helps us follow up and understand where you are based.</p>
-                  </div>
-                  <div>
-                    <label style={fieldLabelStyle}>
-                      Email Address
-                    </label>
+                <PublicFormSection
+                  title="Contact Details"
+                  description="This helps us follow up and understand where you are based."
+                >
+                  <div className="form-group">
+                    <label className="form-label">Email Address</label>
                     <input
                       className="form-input"
                       type="email"
@@ -314,8 +277,8 @@ export function PublicContactRegistrationPage() {
                     />
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={fieldLabelStyle}>City</label>
+                    <div className="form-group">
+                      <label className="form-label">City</label>
                       {form.country === 'UAE' ? (
                         <select
                           className="form-input"
@@ -335,8 +298,8 @@ export function PublicContactRegistrationPage() {
                         />
                       )}
                     </div>
-                    <div>
-                      <label style={fieldLabelStyle}>Country</label>
+                    <div className="form-group">
+                      <label className="form-label">Country</label>
                       <select
                         className="form-input"
                         value={form.country}
@@ -348,17 +311,14 @@ export function PublicContactRegistrationPage() {
                       </select>
                     </div>
                   </div>
-                </section>
+                </PublicFormSection>
 
-                <section style={formSectionStyle}>
-                  <div>
-                    <h3 style={formSectionTitleStyle}>Profile Details</h3>
-                    <p style={formSectionTextStyle}>Optional family and work details help us match your record accurately.</p>
-                  </div>
-                  <div>
-                    <label style={fieldLabelStyle}>
-                      Personal Number
-                    </label>
+                <PublicFormSection
+                  title="Profile Details"
+                  description="Optional family and work details help us match your record accurately."
+                >
+                  <div className="form-group">
+                    <label className="form-label">Personal Number</label>
                     <input
                       className="form-input"
                       type="text"
@@ -367,8 +327,8 @@ export function PublicContactRegistrationPage() {
                     />
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={fieldLabelStyle}>Family / Bachelor</label>
+                    <div className="form-group">
+                      <label className="form-label">Family / Bachelor</label>
                       <select
                         className="form-input"
                         value={form.familyOrBachelor}
@@ -379,63 +339,48 @@ export function PublicContactRegistrationPage() {
                         <option value="Bachelor">Bachelor</option>
                       </select>
                     </div>
-                    <div>
-                      <label style={fieldLabelStyle}>
-                        Family
-                      </label>
+                    <div className="form-group">
+                      <label className="form-label">Family</label>
                       <input className="form-input" type="text" value={form.family} onChange={(e) => setForm((prev) => ({ ...prev, family: e.target.value }))} />
                     </div>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={fieldLabelStyle}>
-                        Bachelor
-                      </label>
+                    <div className="form-group">
+                      <label className="form-label">Bachelor</label>
                       <input className="form-input" type="text" value={form.bachelor} onChange={(e) => setForm((prev) => ({ ...prev, bachelor: e.target.value }))} />
                     </div>
-                    <div>
-                      <label style={fieldLabelStyle}>
-                        Wife Name
-                      </label>
+                    <div className="form-group">
+                      <label className="form-label">Wife Name</label>
                       <input className="form-input" type="text" value={form.wifeName} onChange={(e) => setForm((prev) => ({ ...prev, wifeName: e.target.value }))} />
                     </div>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={fieldLabelStyle}>
-                        Company
-                      </label>
+                    <div className="form-group">
+                      <label className="form-label">Company</label>
                       <input className="form-input" type="text" value={form.company} onChange={(e) => setForm((prev) => ({ ...prev, company: e.target.value }))} />
                     </div>
-                    <div>
-                      <label style={fieldLabelStyle}>
-                        Profession
-                      </label>
+                    <div className="form-group">
+                      <label className="form-label">Profession</label>
                       <input className="form-input" type="text" value={form.profession} onChange={(e) => setForm((prev) => ({ ...prev, profession: e.target.value }))} />
                     </div>
                   </div>
-                  <div>
-                    <label style={fieldLabelStyle}>
-                      Land Line
-                    </label>
+                  <div className="form-group">
+                    <label className="form-label">Land Line</label>
                     <input className="form-input" type="text" value={form.landLine} onChange={(e) => setForm((prev) => ({ ...prev, landLine: e.target.value }))} />
                   </div>
-                </section>
+                </PublicFormSection>
 
-                <section style={formSectionStyle}>
-                  <div>
-                    <h3 style={formSectionTitleStyle}>Residence Details</h3>
-                    <p style={formSectionTextStyle}>Add address context so the team can identify the right household or area.</p>
-                  </div>
+                <PublicFormSection
+                  title="Residence Details"
+                  description="Add address context so the team can identify the right household or area."
+                >
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={fieldLabelStyle}>
-                        Address in UAE
-                      </label>
+                    <div className="form-group">
+                      <label className="form-label">Address in UAE</label>
                       <input className="form-input" type="text" value={form.addressInUae} onChange={(e) => setForm((prev) => ({ ...prev, addressInUae: e.target.value }))} />
                     </div>
-                    <div>
-                      <label style={fieldLabelStyle}>District / Area</label>
+                    <div className="form-group">
+                      <label className="form-label">District / Area</label>
                       <select
                         className="form-input"
                         value={form.district}
@@ -446,10 +391,8 @@ export function PublicContactRegistrationPage() {
                       </select>
                     </div>
                   </div>
-                  <div>
-                    <label style={fieldLabelStyle}>
-                      Notes
-                    </label>
+                  <div className="form-group">
+                    <label className="form-label">Notes</label>
                     <textarea
                       className="form-input"
                       value={form.notes}
@@ -459,15 +402,14 @@ export function PublicContactRegistrationPage() {
                       style={{ resize: 'vertical' }}
                     />
                   </div>
-                </section>
+                </PublicFormSection>
 
-                <section style={formSectionStyle}>
-                  <div>
-                    <h3 style={formSectionTitleStyle}>Security Check</h3>
-                    <p style={formSectionTextStyle}>This keeps the public form protected from automated submissions.</p>
-                  </div>
-                  <div>
-                    <label style={{ ...fieldLabelStyle, marginBottom: '6px' }}>
+                <PublicFormSection
+                  title="Security Check"
+                  description="This keeps the public form protected from automated submissions."
+                >
+                  <div className="form-group">
+                    <label className="form-label">
                       Security Check <span style={{ color: 'var(--error)' }}>*</span>
                     </label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
@@ -496,7 +438,7 @@ export function PublicContactRegistrationPage() {
                       required
                     />
                   </div>
-                </section>
+                </PublicFormSection>
 
                 <button
                   type="submit"

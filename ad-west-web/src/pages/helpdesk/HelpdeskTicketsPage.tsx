@@ -2,12 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { backendApi, HelpdeskTicketApi, TicketStatus } from '../../utils/backendApi'
 import { useToast } from '../../components/common/Toast'
 import { useEnumOptions } from '../../hooks/useEnumOptions'
+import { PageHeader } from '../../components/common/PageHeader'
+import { EmptyState } from '../../components/common/EmptyState'
 
-const STATUS_COLORS: Record<TicketStatus, string> = {
-  open: 'var(--error)',
-  in_progress: 'var(--warning)',
-  resolved: 'var(--success)',
-  closed: 'var(--text-secondary-dark)',
+const STATUS_BADGE: Record<TicketStatus, string> = {
+  open: 'badge-error',
+  in_progress: 'badge-warning',
+  resolved: 'badge-success',
+  closed: 'badge-info',
 }
 
 export function HelpdeskTicketsPage() {
@@ -62,32 +64,31 @@ export function HelpdeskTicketsPage() {
 
   return (
     <div className="animate-slide-up" style={{ width: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>Helpdesk Tickets</h2>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.9rem', margin: '6px 0 0' }}>
-            Manage support requests submitted via the public helpdesk page.
-          </p>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
-              <span style={{ fontWeight: 800 }}>{tickets.length}</span>Total
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(239,68,68,0.1)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.25)' }}>
-              <span style={{ fontWeight: 800 }}>{openCount}</span>Open
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)' }}>
-              <span style={{ fontWeight: 800 }}>{resolvedCount}</span>Resolved
-            </span>
-          </div>
-        </div>
+      <PageHeader
+        icon="🎫"
+        title="Helpdesk Tickets"
+        subtitle="Manage support requests submitted via the public helpdesk page."
+        actions={
+          <button className="btn btn-secondary" onClick={loadTickets} disabled={loading}>
+            Refresh
+          </button>
+        }
+      />
 
-        <button className="btn btn-secondary" onClick={loadTickets} disabled={loading}>
-          Refresh
-        </button>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+        <span className="badge badge-info">
+          <strong>{tickets.length}</strong> Total
+        </span>
+        <span className="badge badge-error">
+          <strong>{openCount}</strong> Open
+        </span>
+        <span className="badge badge-success">
+          <strong>{resolvedCount}</strong> Resolved
+        </span>
       </div>
 
-      <div className="glass-panel" style={{ padding: '14px 18px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)' }}>Status</label>
+      <div className="glass-panel list-toolbar" style={{ marginBottom: '16px' }}>
+        <label className="form-label" style={{ marginBottom: 0 }}>Status</label>
         <div style={{ width: '220px', maxWidth: '100%' }}>
           <select
             className="form-input"
@@ -103,11 +104,13 @@ export function HelpdeskTicketsPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: selected ? 'minmax(0,1fr) 360px' : '1fr', gap: '16px', alignItems: 'start' }}>
         <div>
-          {loading && <div style={{ color: 'var(--text-secondary-dark)', padding: '20px' }}>Loading…</div>}
+          {loading && <div className="loading-state">Loading…</div>}
           {!loading && tickets.length === 0 && (
-            <div className="glass-panel" style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary-dark)' }}>
-              No tickets found.
-            </div>
+            <EmptyState
+              icon="🎫"
+              title="No tickets found"
+              copy={filterStatus ? 'Try changing the status filter.' : 'Support requests will appear here once submitted.'}
+            />
           )}
           {!loading && tickets.length > 0 && (
             <div className="table-container">
@@ -128,7 +131,7 @@ export function HelpdeskTicketsPage() {
                       <tr
                         key={ticket.id}
                         onClick={() => openTicket(ticket)}
-                        style={{ cursor: 'pointer', background: isActive ? 'var(--primary-light)' : 'transparent' }}
+                        style={{ cursor: 'pointer', background: isActive ? 'var(--primary-light)' : undefined }}
                       >
                         <td style={{ fontWeight: 600 }}>{ticket.subject}</td>
                         <td>
@@ -139,7 +142,7 @@ export function HelpdeskTicketsPage() {
                         </td>
                         <td>{categoryLabel(ticket.category)}</td>
                         <td>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: STATUS_COLORS[ticket.status], background: `${STATUS_COLORS[ticket.status]}18`, borderRadius: '20px', padding: '2px 8px' }}>
+                          <span className={`badge ${STATUS_BADGE[ticket.status]}`}>
                             {statusLabel(ticket.status)}
                           </span>
                         </td>
@@ -184,14 +187,14 @@ export function HelpdeskTicketsPage() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Status</label>
+              <div className="form-group">
+                <label className="form-label">Status</label>
                 <select className="form-input" value={editStatus} onChange={(e) => setEditStatus(e.target.value as TicketStatus)}>
                   {statusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Internal Notes</label>
+              <div className="form-group">
+                <label className="form-label">Internal Notes</label>
                 <textarea
                   className="form-input"
                   value={editNotes}
