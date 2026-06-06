@@ -1,7 +1,16 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { AssignContactDivisionDto, AssignContactSthanDto, CreateLocationReportMetricDto, CreateReportMetricDefinitionDto, CreateSreniDivisionDto, CreateSreniReportParameterDto, SetContactSreniTagsDto, SubmitSreniMonthlyReportDto, UpdateLocationReportMetricDto, UpdateReportMetricDefinitionDto, UpdateSreniDivisionDto, UpdateSreniReportParameterDto } from '../dto/core-business.dto';
+import { ENUM_TYPES } from '@modules/enum-values/enum-types.constants';
+import { AssignContactDivisionDto, AssignContactSthanDto, CreateHouseholdMemberDto, CreateLocationReportMetricDto, CreateReportMetricDefinitionDto, CreateSreniDivisionDto, CreateSreniReportParameterDto, SetContactSreniTagsDto, SubmitSreniMonthlyReportDto, UpdateHouseholdMemberDto, UpdateLocationReportMetricDto, UpdateReportMetricDefinitionDto, UpdateSreniDivisionDto, UpdateSreniReportParameterDto } from '../dto/core-business.dto';
+import type {
+  HouseholdMemberEnrollmentRecord,
+  HouseholdMemberRecord,
+  SreniParticipantRecord,
+} from '../core-business.types';
 import type { ContactSreniTagRecord, GlobalContactUploadDuplicate, ReportMetricDefinitionRecord, SreniContactRecord, SreniDivisionRecord, SreniMonthlyReportRecord, SreniReportParameterRecord, SrenyRecord } from '../core-business.service';
+import { HouseholdMemberService } from './household-member.service';
+import { HouseholdParticipantResolverService } from './household-participant-resolver.service';
+import { HouseholdEnumConfigService, type HouseholdResolverKey } from './household-enum-config.service';
 
 type SreniContactCellValue = string | number | boolean | null;
 
@@ -60,6 +69,9 @@ export interface SreniAdminRuntimeContext {
   srenies: Map<string, SrenyRecord>;
   sreniDivisions: Map<string, SreniDivisionRecord>;
   sreniContacts: Map<string, SreniContactRecord>;
+  householdMembers: Map<string, HouseholdMemberRecord>;
+  householdEnrollments: Map<string, HouseholdMemberEnrollmentRecord>;
+  enumConfig: HouseholdEnumConfigService;
   reportMetricDefinitions: Map<string, ReportMetricDefinitionRecord>;
   sreniMonthlyReports: Map<string, SreniMonthlyReportRecord>;
   sreniReportParameters: Map<string, SreniReportParameterRecord>;
@@ -71,6 +83,23 @@ export interface SreniAdminRuntimeContext {
 
 export class SreniAdminRuntimeService {
   constructor(private readonly ctx: SreniAdminRuntimeContext) {}
+
+  private householdMemberService: HouseholdMemberService | null = null;
+  private participantResolverService: HouseholdParticipantResolverService | null = null;
+
+  private getHouseholdMembers(): HouseholdMemberService {
+    if (!this.householdMemberService) {
+      this.householdMemberService = new HouseholdMemberService(this.ctx);
+    }
+    return this.householdMemberService;
+  }
+
+  private getParticipantResolver(): HouseholdParticipantResolverService {
+    if (!this.participantResolverService) {
+      this.participantResolverService = new HouseholdParticipantResolverService(this.ctx);
+    }
+    return this.participantResolverService;
+  }
 
   private toMonthKey(dateInput: string, label: string): number {
     const parsed = new Date(dateInput);
@@ -274,10 +303,41 @@ export class SreniAdminRuntimeService {
     sreniId: string,
     page = 1,
     pageSize = 50,
-  ): Promise<{ items: (SreniContactRecord & { sreniName: string; isTagged: boolean })[]; total: number; page: number; pageSize: number; totalPages: number }> {
+  ): Promise<{
+    items: (SreniContactRecord & { sreniName: string; isTagged: boolean })[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    enrollmentScope: string;
+    primaryContactStrategy: string;
+    resolverKey: HouseholdResolverKey;
+    participantTotal: number;
+  }> {
+    const enrollmentScope = await this.getHouseholdMembers().getSreniEnrollmentScope(sreniId);
+    const participantStats = await this.getParticipantResolver().getSreniParticipantStats(sreniId);
+    const primaryContactStrategy = participantStats.strategy;
+    const resolverKey = participantStats.resolverKey;
+    const participantTotal = participantStats.participantCount;
+
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
       const offset = (page - 1) * pageSize;
-      // Include contacts directly in this sreni AND contacts tagged to this sreni via contact_sreni_tags
+      const femaleGenders = resolverKey === 'female_participants'
+        ? await this.ctx.enumConfig.getFemaleGenderMatches()
+        : null;
+      const participantCountSelect = femaleGenders
+        ? `(SELECT COUNT(*)::int
+            FROM adwest.household_members hm
+            WHERE hm.contact_id = c.id AND hm.active = true
+              AND (
+                LOWER(COALESCE(hm.gender, '')) = ANY($4::text[])
+                OR (hm.role = 'spouse' AND hm.source = 'import')
+              )) AS participant_count`
+        : '0 AS participant_count';
+      const listParams: Array<string | number | string[]> = femaleGenders
+        ? [sreniId, pageSize, offset, femaleGenders]
+        : [sreniId, pageSize, offset];
+
       const [countRows, rows] = await Promise.all([
         this.ctx.dataSource.query(
           `SELECT COUNT(DISTINCT c.id)::int AS total
@@ -293,14 +353,31 @@ export class SreniAdminRuntimeService {
                   c.sthan_id, COALESCE(c.active, true) AS active,
                   c.source_file, c.uploaded_by, c.created_at, c.updated_at,
                   COALESCE(s.name, c.sreni_id) AS sreni_name,
-                  (c.sreni_id != $1) AS is_tagged
+                  (c.sreni_id != $1) AS is_tagged,
+                  (SELECT COUNT(*)::int
+                   FROM adwest.household_members hm
+                   INNER JOIN adwest.household_member_sreni_enrollments e
+                     ON e.member_id = hm.id AND e.sreni_id = $1 AND e.active = true
+                   WHERE hm.contact_id = c.id AND hm.role = 'child' AND hm.active = true) AS child_count,
+                  (SELECT STRING_AGG(d.name || ' (' || sub.cnt::text || ')', ', ' ORDER BY d.display_order, d.name)
+                   FROM (
+                     SELECT e.division_id, COUNT(*)::int AS cnt
+                     FROM adwest.household_members hm
+                     INNER JOIN adwest.household_member_sreni_enrollments e
+                       ON e.member_id = hm.id AND e.sreni_id = $1 AND e.active = true
+                     WHERE hm.contact_id = c.id AND hm.role = 'child' AND hm.active = true
+                       AND e.division_id IS NOT NULL
+                     GROUP BY e.division_id
+                   ) sub
+                   INNER JOIN adwest.sreni_divisions d ON d.id = sub.division_id) AS children_division_summary,
+                  ${participantCountSelect}
            FROM adwest.sreni_contacts c
            LEFT JOIN adwest.contact_sreni_tags cst ON cst.contact_id = c.id AND cst.sreni_id = $1
            LEFT JOIN adwest.srenies s ON s.id::text = c.sreni_id
            WHERE c.sreni_id = $1 OR cst.id IS NOT NULL
            ORDER BY (c.sreni_id = $1) DESC, c.row_index ASC
            LIMIT $2 OFFSET $3`,
-          [sreniId, pageSize, offset],
+          listParams,
         ) as Promise<Array<{
           id: string; sreni_id: string; row_index: number;
           data: Record<string, string | number | boolean | null>;
@@ -309,6 +386,8 @@ export class SreniAdminRuntimeService {
           source_file: string | null; uploaded_by: string | null;
           created_at: string | Date; updated_at: string | Date;
           sreni_name: string; is_tagged: boolean;
+          child_count: number; children_division_summary: string | null;
+          participant_count: number;
         }>>,
       ]);
       const total = countRows[0]?.total ?? 0;
@@ -326,12 +405,15 @@ export class SreniAdminRuntimeService {
         active: r.active ?? true,
         sourceFile: r.source_file ?? undefined,
         uploadedBy: r.uploaded_by ?? undefined,
+        childCount: r.child_count ?? 0,
+        childrenDivisionSummary: r.children_division_summary ?? undefined,
+        participantCount: r.participant_count ?? 0,
         createdAt: this.ctx.toIsoTimestamp(r.created_at),
         updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
         sreniName: r.sreni_name,
         isTagged: r.is_tagged ?? false,
       }));
-      return { items, total, page, pageSize, totalPages };
+      return { items, total, page, pageSize, totalPages, enrollmentScope, primaryContactStrategy, resolverKey, participantTotal };
     }
     // In-memory: direct contacts + tagged contacts
     const taggedIds = new Set(
@@ -354,7 +436,17 @@ export class SreniAdminRuntimeService {
     const total = all.length;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     const start = (page - 1) * pageSize;
-    return { items: all.slice(start, start + pageSize), total, page, pageSize, totalPages };
+    return {
+      items: all.slice(start, start + pageSize),
+      total,
+      page,
+      pageSize,
+      totalPages,
+      enrollmentScope,
+      primaryContactStrategy,
+      resolverKey,
+      participantTotal,
+    };
   }
 
   async uploadSreniContacts(
@@ -451,12 +543,22 @@ export class SreniAdminRuntimeService {
         `DELETE FROM adwest.sreni_contacts WHERE sreni_id = $1`,
         [sreniId],
       );
+      const memberSync = this.getHouseholdMembers();
       for (const r of records) {
-        await this.ctx.dataSource.query(
+        const inserted = await this.ctx.dataSource.query(
           `INSERT INTO adwest.sreni_contacts (id, sreni_id, row_index, data, source_file, uploaded_by)
-           VALUES (gen_random_uuid(), $1, $2, $3::jsonb, $4, $5)`,
+           VALUES (gen_random_uuid(), $1, $2, $3::jsonb, $4, $5)
+           RETURNING id`,
           [sreniId, r.rowIndex, JSON.stringify(r.data), r.sourceFile ?? null, r.uploadedBy ?? null],
-        );
+        ) as Array<{ id: string }>;
+        if (inserted[0]?.id) {
+          await memberSync.syncMembersFromContactData(inserted[0].id, r.data);
+        }
+      }
+    } else {
+      const memberSync = this.getHouseholdMembers();
+      for (const r of records) {
+        await memberSync.syncMembersFromContactData(r.id, r.data);
       }
     }
 
@@ -551,18 +653,22 @@ export class SreniAdminRuntimeService {
       }
 
       const now = new Date().toISOString();
+      const memberSync = this.getHouseholdMembers();
       for (const row of toInsert) {
+        const contactId = this.ctx.newId('sc');
         await this.ctx.dataSource.query(
           `INSERT INTO adwest.sreni_contacts (id, sreni_id, row_index, data, active, source_file, uploaded_by, created_at, updated_at)
            VALUES ($1, NULL, $2, $3, true, $4, $5, $6, $6)`,
-          [this.ctx.newId('sc'), row.rowIndex, row.data, originalName, uploadedBy ?? null, now],
+          [contactId, row.rowIndex, row.data, originalName, uploadedBy ?? null, now],
         );
+        await memberSync.syncMembersFromContactData(contactId, row.data);
       }
       return { inserted: toInsert.length, duplicates };
     }
 
     // In-memory fallback — no duplicate detection
     const now = new Date().toISOString();
+    const memberSync = this.getHouseholdMembers();
     for (const row of parsedRows) {
       const id = this.ctx.newId('sc');
       const record: SreniContactRecord = {
@@ -572,6 +678,7 @@ export class SreniAdminRuntimeService {
         createdAt: now, updatedAt: now,
       };
       this.ctx.sreniContacts.set(`global:${id}`, record);
+      await memberSync.syncMembersFromContactData(id, row.data);
     }
     return { inserted: parsedRows.length, duplicates: [] };
   }
@@ -933,6 +1040,8 @@ export class SreniAdminRuntimeService {
   }
 
   async createSreniReportParameter(sreniId: string, submissionType: string, dto: CreateSreniReportParameterDto): Promise<SreniReportParameterRecord> {
+    await this.ctx.enumConfig.validate(ENUM_TYPES.REPORT_SUBMISSION_TYPE, submissionType, 'Submission type');
+    await this.ctx.enumConfig.validate(ENUM_TYPES.REPORT_METRIC_INPUT_TYPE, dto.inputType, 'Input type');
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
       const rows = await this.ctx.dataSource.query(
         `INSERT INTO adwest.sreni_report_parameters (sreni_id, submission_type, name, description, unit, input_type, is_required, sort_order)
@@ -954,6 +1063,9 @@ export class SreniAdminRuntimeService {
   }
 
   async updateSreniReportParameter(parameterId: string, dto: UpdateSreniReportParameterDto): Promise<SreniReportParameterRecord> {
+    if (dto.inputType !== undefined) {
+      await this.ctx.enumConfig.validate(ENUM_TYPES.REPORT_METRIC_INPUT_TYPE, dto.inputType, 'Input type');
+    }
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
       await this.ctx.dataSource.query(
         `UPDATE adwest.sreni_report_parameters
@@ -1085,5 +1197,46 @@ export class SreniAdminRuntimeService {
       return this.listContactSreniTags(contactId);
     }
     return [];
+  }
+
+  async listHouseholdMembers(sreniId: string, contactId: string): Promise<HouseholdMemberRecord[]> {
+    return this.getHouseholdMembers().listMembers(sreniId, contactId);
+  }
+
+  async createHouseholdMember(
+    sreniId: string,
+    contactId: string,
+    dto: CreateHouseholdMemberDto,
+  ): Promise<HouseholdMemberRecord> {
+    return this.getHouseholdMembers().createMember(sreniId, contactId, dto);
+  }
+
+  async updateHouseholdMember(
+    sreniId: string,
+    contactId: string,
+    memberId: string,
+    dto: UpdateHouseholdMemberDto,
+  ): Promise<HouseholdMemberRecord> {
+    return this.getHouseholdMembers().updateMember(sreniId, contactId, memberId, dto);
+  }
+
+  async deleteHouseholdMember(sreniId: string, contactId: string, memberId: string): Promise<void> {
+    return this.getHouseholdMembers().deleteMember(sreniId, contactId, memberId);
+  }
+
+  async getSreniParticipantStats(sreniId: string) {
+    return this.getParticipantResolver().getSreniParticipantStats(sreniId);
+  }
+
+  async listContactParticipants(sreniId: string, contactId: string): Promise<SreniParticipantRecord[]> {
+    return this.getParticipantResolver().listContactParticipants(sreniId, contactId);
+  }
+
+  async listSreniParticipants(
+    sreniId: string,
+    page = 1,
+    pageSize = 100,
+  ): Promise<{ items: SreniParticipantRecord[]; total: number; page: number; pageSize: number; totalPages: number }> {
+    return this.getParticipantResolver().listSreniParticipants(sreniId, page, pageSize);
   }
 }

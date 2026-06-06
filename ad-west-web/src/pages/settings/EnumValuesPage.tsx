@@ -2,22 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useToast } from '../../components/common/Toast'
 import { useConfirm } from '../../components/common/ConfirmDialog'
 import { backendApi, EnumValueApi } from '../../utils/backendApi'
-
-const toUiError = (e: unknown, fallback: string): string => {
-  if (!(e instanceof Error)) return fallback
-  const m = e.message.match(/^API error \(\d+\):\s*(.*)$/i)
-  return m?.[1] ?? e.message ?? fallback
-}
-
-const TYPE_LABELS: Record<string, string> = {
-  admin_role: 'Admin Role',
-  scope_type: 'Scope Type',
-  role_level: 'Role Level',
-  approval_mode: 'Approval Mode',
-}
-
-const formatTypeName = (t: string) =>
-  TYPE_LABELS[t] ?? t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+import { formatEnumTypeName } from '../../constants/enumTypeLabels'
 
 interface FormState {
   value: string
@@ -28,6 +13,92 @@ interface FormState {
 }
 
 const BLANK_FORM: FormState = { value: '', label: '', sortOrder: '0', active: true, parentValue: '' }
+
+const TYPE_PAGE_SIZE = 12
+const VALUE_PAGE_SIZE = 15
+
+const buildPageNums = (page: number, totalPages: number): (number | '…')[] => {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1)
+  if (page <= 4) return [1, 2, 3, 4, 5, '…', totalPages]
+  if (page >= totalPages - 3) return [1, '…', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
+  return [1, '…', page - 1, page, page + 1, '…', totalPages]
+}
+
+function PaginationBar({
+  page,
+  totalPages,
+  totalItems,
+  pageSize,
+  onPageChange,
+}: {
+  page: number
+  totalPages: number
+  totalItems: number
+  pageSize: number
+  onPageChange: (p: number) => void
+}) {
+  if (totalPages <= 1) return null
+  const nums = buildPageNums(page, totalPages)
+  const from = (page - 1) * pageSize + 1
+  const to = Math.min(page * pageSize, totalItems)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px 8px 4px', borderTop: '1px solid var(--border-dark)' }}>
+      <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary-dark)', textAlign: 'center' }}>
+        {from}–{to} of {totalItems}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1}
+          style={{
+            padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--border-dark)', background: 'transparent',
+            fontSize: '0.75rem', cursor: page <= 1 ? 'not-allowed' : 'pointer', opacity: page <= 1 ? 0.4 : 1,
+          }}
+        >
+          ←
+        </button>
+        {nums.map((n, i) => (
+          n === '…' ? (
+            <span key={`e-${i}`} style={{ padding: '4px 2px', color: 'var(--text-secondary-dark)', fontSize: '0.75rem' }}>…</span>
+          ) : (
+            <button
+              key={n}
+              type="button"
+              onClick={() => onPageChange(n)}
+              style={{
+                padding: '4px 8px', borderRadius: '6px', border: '1px solid', minWidth: '28px',
+                borderColor: n === page ? 'var(--primary)' : 'var(--border-dark)',
+                background: n === page ? 'var(--primary)' : 'transparent',
+                color: n === page ? '#fff' : 'var(--text-primary-dark)',
+                fontWeight: n === page ? 700 : 400, fontSize: '0.75rem', cursor: 'pointer',
+              }}
+            >
+              {n}
+            </button>
+          )
+        ))}
+        <button
+          type="button"
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= totalPages}
+          style={{
+            padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--border-dark)', background: 'transparent',
+            fontSize: '0.75rem', cursor: page >= totalPages ? 'not-allowed' : 'pointer', opacity: page >= totalPages ? 0.4 : 1,
+          }}
+        >
+          →
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const toUiError = (e: unknown, fallback: string): string => {
+  if (!(e instanceof Error)) return fallback
+  const m = e.message.match(/^API error \(\d+\):\s*(.*)$/i)
+  return m?.[1] ?? e.message ?? fallback
+}
 
 export const EnumValuesPage: React.FC = () => {
   const { addToast } = useToast()
@@ -44,6 +115,9 @@ export const EnumValuesPage: React.FC = () => {
   const [isAdding, setIsAdding] = useState(false)
   const [newEnumType, setNewEnumType] = useState('')
   const [form, setForm] = useState<FormState>(BLANK_FORM)
+  const [typePage, setTypePage] = useState(1)
+  const [valuePage, setValuePage] = useState(1)
+  const [typeSearch, setTypeSearch] = useState('')
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -67,6 +141,49 @@ export const EnumValuesPage: React.FC = () => {
   const visibleValues = useMemo(() =>
     selectedType ? allValues.filter((v) => v.enumType === selectedType) : [],
   [allValues, selectedType])
+
+  const filteredTypes = useMemo(() => {
+    const q = typeSearch.trim().toLowerCase()
+    if (!q) return types
+    return types.filter((t) =>
+      t.toLowerCase().includes(q) || formatEnumTypeName(t).toLowerCase().includes(q),
+    )
+  }, [types, typeSearch])
+
+  const typeTotalPages = Math.max(1, Math.ceil(filteredTypes.length / TYPE_PAGE_SIZE))
+  const pagedTypes = useMemo(() => {
+    const start = (typePage - 1) * TYPE_PAGE_SIZE
+    return filteredTypes.slice(start, start + TYPE_PAGE_SIZE)
+  }, [filteredTypes, typePage])
+
+  useEffect(() => {
+    if (typePage > typeTotalPages) setTypePage(typeTotalPages)
+  }, [typePage, typeTotalPages])
+
+  useEffect(() => {
+    setTypePage(1)
+  }, [typeSearch])
+
+  useEffect(() => {
+    setValuePage(1)
+    setEditingId(null)
+    setIsAdding(false)
+    setForm(BLANK_FORM)
+  }, [selectedType])
+
+  const sortedVisibleValues = useMemo(() =>
+    visibleValues.slice().sort((a, b) => a.sortOrder - b.sortOrder),
+  [visibleValues])
+
+  const valueTotalPages = Math.max(1, Math.ceil(sortedVisibleValues.length / VALUE_PAGE_SIZE))
+  const pagedVisibleValues = useMemo(() => {
+    const start = (valuePage - 1) * VALUE_PAGE_SIZE
+    return sortedVisibleValues.slice(start, start + VALUE_PAGE_SIZE)
+  }, [sortedVisibleValues, valuePage])
+
+  useEffect(() => {
+    if (valuePage > valueTotalPages) setValuePage(valueTotalPages)
+  }, [valuePage, valueTotalPages])
 
   const openEdit = (item: EnumValueApi) => {
     setEditingId(item.id)
@@ -138,7 +255,7 @@ export const EnumValuesPage: React.FC = () => {
   const handleDelete = async (item: EnumValueApi) => {
     const ok = await confirm({
       title: 'Delete Enum Value',
-      message: `Delete "${item.label}" (${item.value}) from ${formatTypeName(item.enumType)}?`,
+      message: `Delete "${item.label}" (${item.value}) from ${formatEnumTypeName(item.enumType)}?`,
       confirmLabel: 'Delete',
     })
     if (!ok) return
@@ -188,12 +305,23 @@ export const EnumValuesPage: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '20px', alignItems: 'start' }}>
 
           {/* Left — type list */}
-          <div className="glass-panel" style={{ padding: '12px' }}>
+          <div className="glass-panel" style={{ padding: '12px', display: 'flex', flexDirection: 'column' }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary-dark)', padding: '6px 10px 10px' }}>
-              Enum Types
+              Enum Types ({filteredTypes.length})
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              {types.map((t) => {
+            <input
+              className="form-input"
+              value={typeSearch}
+              onChange={(e) => setTypeSearch(e.target.value)}
+              placeholder="Search types…"
+              style={{ margin: '0 4px 10px', padding: '7px 10px', fontSize: '0.8rem' }}
+            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+              {filteredTypes.length === 0 ? (
+                <div style={{ padding: '12px 10px', fontSize: '0.8rem', color: 'var(--text-secondary-dark)', textAlign: 'center' }}>
+                  No types match your search.
+                </div>
+              ) : pagedTypes.map((t) => {
                 const count = allValues.filter((v) => v.enumType === t).length
                 const isActive = selectedType === t
                 return (
@@ -212,7 +340,7 @@ export const EnumValuesPage: React.FC = () => {
                     onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
                   >
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {formatTypeName(t)}
+                      {formatEnumTypeName(t)}
                     </span>
                     <span style={{
                       flexShrink: 0, marginLeft: '6px', padding: '1px 7px', borderRadius: '999px',
@@ -226,6 +354,13 @@ export const EnumValuesPage: React.FC = () => {
                 )
               })}
             </div>
+            <PaginationBar
+              page={typePage}
+              totalPages={typeTotalPages}
+              totalItems={filteredTypes.length}
+              pageSize={TYPE_PAGE_SIZE}
+              onPageChange={setTypePage}
+            />
           </div>
 
           {/* Right — values table */}
@@ -235,11 +370,11 @@ export const EnumValuesPage: React.FC = () => {
             <div style={{ padding: '18px 24px 14px', borderBottom: '1px solid var(--border-dark)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <span style={{ fontSize: '1rem', fontWeight: 700 }}>
-                  {selectedType ? formatTypeName(selectedType) : 'Select a type'}
+                  {selectedType ? formatEnumTypeName(selectedType) : 'Select a type'}
                 </span>
                 {selectedType && (
-                  <span style={{ marginLeft: '8px', fontSize: '0.75rem', color: 'var(--text-secondary-dark)', fontFamily: 'monospace' }}>
-                    {selectedType}
+                  <span style={{ marginLeft: '8px', fontSize: '0.75rem', color: 'var(--text-secondary-dark)' }}>
+                    {visibleValues.length} value{visibleValues.length === 1 ? '' : 's'}
                   </span>
                 )}
               </div>
@@ -366,10 +501,7 @@ export const EnumValuesPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleValues
-                    .slice()
-                    .sort((a, b) => a.sortOrder - b.sortOrder)
-                    .map((item) => (
+                  {pagedVisibleValues.map((item) => (
                       <tr key={item.id} style={{ borderBottom: '1px solid var(--border-dark)' }}
                         onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--btn-secondary-hover)')}
                         onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
@@ -426,6 +558,15 @@ export const EnumValuesPage: React.FC = () => {
                     ))}
                 </tbody>
               </table>
+            )}
+            {visibleValues.length > 0 && (
+              <PaginationBar
+                page={valuePage}
+                totalPages={valueTotalPages}
+                totalItems={sortedVisibleValues.length}
+                pageSize={VALUE_PAGE_SIZE}
+                onPageChange={setValuePage}
+              />
             )}
           </div>
         </div>

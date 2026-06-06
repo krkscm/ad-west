@@ -3,7 +3,7 @@ import { useToast } from '../components/common/Toast';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { Modal } from '../components/common/Modal';
 import { TableLayoutModal } from '../components/common/TableLayoutModal';
-import { backendApi, SreniContactRowApi, SreniDivisionApi, SthanBasicApi } from '../utils/backendApi';
+import { backendApi, HouseholdMemberApi, HouseholdResolverKey, SreniContactRowApi, SreniDivisionApi, SthanBasicApi } from '../utils/backendApi';
 import { useTableLayout } from '../hooks/useTableLayout';
 
 interface Props {
@@ -126,6 +126,329 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, contact, divisions, s
           </button>
         </div>
       </div>
+    </Modal>
+  );
+};
+
+// ── Household Members Modal (BB children + head/spouse view) ─────────────────
+
+interface HouseholdMembersModalProps {
+  isOpen: boolean;
+  sreniId: string;
+  contact: SreniContactRowApi | null;
+  divisions: SreniDivisionApi[];
+  memberEnrollment: boolean;
+  femaleParticipantsMode: boolean;
+  femaleGenderMatches: string[];
+  onClose: () => void;
+  onChanged: () => void;
+}
+
+const HouseholdMembersModal: React.FC<HouseholdMembersModalProps> = ({
+  isOpen,
+  sreniId,
+  contact,
+  divisions,
+  memberEnrollment,
+  femaleParticipantsMode,
+  femaleGenderMatches,
+  onClose,
+  onChanged,
+}) => {
+  const { addToast } = useToast();
+  const confirm = useConfirm();
+  const [members, setMembers] = useState<HouseholdMemberApi[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newDob, setNewDob] = useState('');
+  const [newDivisionId, setNewDivisionId] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDob, setEditDob] = useState('');
+  const [editDivisionId, setEditDivisionId] = useState('');
+
+  const loadMembers = useCallback(() => {
+    if (!contact) return;
+    setLoading(true);
+    backendApi.listHouseholdMembers(sreniId, contact.id)
+      .then(setMembers)
+      .catch((err) => addToast(toUiError(err, 'Failed to load household members.'), 'error'))
+      .finally(() => setLoading(false));
+  }, [sreniId, contact, addToast]);
+
+  useEffect(() => {
+    if (isOpen && contact) {
+      setNewName('');
+      setNewDob('');
+      setNewDivisionId('');
+      setEditingId(null);
+      loadMembers();
+    }
+  }, [isOpen, contact, loadMembers]);
+
+  const contactName = contact?.data['name'] != null ? String(contact.data['name']) : 'Contact';
+  const adults = members.filter((m) => m.role === 'head' || m.role === 'spouse');
+  const children = members.filter((m) => m.role === 'child' && m.active);
+  const isFemaleMember = (m: HouseholdMemberApi) => {
+    const gender = (m.gender ?? '').trim().toLowerCase();
+    if (femaleGenderMatches.includes(gender)) return true;
+    return m.role === 'spouse' && m.source === 'import';
+  };
+  const femaleParticipants = members.filter((m) => m.active && isFemaleMember(m));
+
+  const handleAddChild = async () => {
+    if (!contact) return;
+    const name = newName.trim();
+    if (!name) {
+      addToast('Child name is required.', 'error');
+      return;
+    }
+    if (memberEnrollment && !newDivisionId) {
+      addToast('Division is required for each child.', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      await backendApi.createHouseholdMember(sreniId, contact.id, {
+        name,
+        role: 'child',
+        dateOfBirth: newDob || undefined,
+        divisionId: newDivisionId || undefined,
+      });
+      setNewName('');
+      setNewDob('');
+      setNewDivisionId('');
+      loadMembers();
+      onChanged();
+      addToast('Child added.', 'success');
+    } catch (err) {
+      addToast(toUiError(err, 'Failed to add child.'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddFemaleMember = async () => {
+    if (!contact) return;
+    const name = newName.trim();
+    if (!name) {
+      addToast('Name is required.', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      await backendApi.createHouseholdMember(sreniId, contact.id, {
+        name,
+        role: 'other',
+        gender: 'female',
+      });
+      setNewName('');
+      loadMembers();
+      onChanged();
+      addToast('Female participant added.', 'success');
+    } catch (err) {
+      addToast(toUiError(err, 'Failed to add participant.'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteFemaleMember = async (member: HouseholdMemberApi) => {
+    if (!contact || member.source === 'import') return;
+    const ok = await confirm({
+      title: 'Remove Participant',
+      message: `Remove "${member.name}" from this household?`,
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await backendApi.deleteHouseholdMember(sreniId, contact.id, member.id);
+      loadMembers();
+      onChanged();
+      addToast('Participant removed.', 'success');
+    } catch (err) {
+      addToast(toUiError(err, 'Failed to remove participant.'), 'error');
+    }
+  };
+
+  const handleSaveEdit = async (memberId: string) => {
+    if (!contact) return;
+    const name = editName.trim();
+    if (!name) return;
+    setSaving(true);
+    try {
+      await backendApi.updateHouseholdMember(sreniId, contact.id, memberId, {
+        name,
+        dateOfBirth: editDob || undefined,
+        divisionId: editDivisionId || null,
+      });
+      setEditingId(null);
+      loadMembers();
+      onChanged();
+      addToast('Child updated.', 'success');
+    } catch (err) {
+      addToast(toUiError(err, 'Failed to update child.'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteChild = async (member: HouseholdMemberApi) => {
+    if (!contact) return;
+    const ok = await confirm({
+      title: 'Remove Child',
+      message: `Remove "${member.name}" from this household?`,
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await backendApi.deleteHouseholdMember(sreniId, contact.id, member.id);
+      loadMembers();
+      onChanged();
+      addToast('Child removed.', 'success');
+    } catch (err) {
+      addToast(toUiError(err, 'Failed to remove child.'), 'error');
+    }
+  };
+
+  const roleLabel = (role: HouseholdMemberApi['role']) => {
+    if (role === 'head') return 'Head';
+    if (role === 'spouse') return 'Spouse';
+    return role;
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={`Household — ${contactName}`} maxWidth="520px">
+      {loading ? (
+        <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem' }}>Loading members…</p>
+      ) : (
+        <div style={{ display: 'grid', gap: '18px' }}>
+          {adults.length > 0 && (
+            <div>
+              <h4 style={{ margin: '0 0 10px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary-dark)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                From Excel
+              </h4>
+              <div style={{ display: 'grid', gap: '8px' }}>
+                {adults.map((m) => (
+                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-dark)' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary-dark)', minWidth: '52px' }}>{roleLabel(m.role)}</span>
+                    <span style={{ flex: 1, fontWeight: 600 }}>{m.name}</span>
+                    {m.phone && <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>{m.phone}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {memberEnrollment && (
+          <div>
+            <h4 style={{ margin: '0 0 10px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary-dark)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Children (division per child)
+            </h4>
+            {children.length === 0 ? (
+              <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary-dark)' }}>No children added yet.</p>
+            ) : (
+              <div style={{ display: 'grid', gap: '8px', marginBottom: '12px' }}>
+                {children.map((child) => {
+                  const divisionId = child.enrollments?.[0]?.divisionId ?? '';
+                  const divisionName = child.enrollments?.[0]?.divisionName;
+                  const isEditing = editingId === child.id;
+                  return (
+                    <div key={child.id} style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-dark)', background: 'rgba(255,255,255,0.02)' }}>
+                      {isEditing ? (
+                        <div style={{ display: 'grid', gap: '8px' }}>
+                          <input className="form-input" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Name" disabled={saving} />
+                          <input className="form-input" type="date" value={editDob} onChange={(e) => setEditDob(e.target.value)} disabled={saving} />
+                          {divisions.length > 0 && (
+                            <select className="form-input" value={editDivisionId} onChange={(e) => setEditDivisionId(e.target.value)} disabled={saving}>
+                              <option value="">— Division —</option>
+                              {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </select>
+                          )}
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button type="button" className="btn btn-primary" style={{ fontSize: '0.82rem' }} onClick={() => void handleSaveEdit(child.id)} disabled={saving}>Save</button>
+                            <button type="button" className="btn btn-secondary" style={{ fontSize: '0.82rem' }} onClick={() => setEditingId(null)}>Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                          <span style={{ flex: 1, fontWeight: 600 }}>{child.name}</span>
+                          {child.dateOfBirth && <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>{child.dateOfBirth}</span>}
+                          {divisionName && (
+                            <span style={{ fontSize: '0.72rem', fontWeight: 600, background: 'rgba(99,102,241,0.1)', color: '#818cf8', padding: '2px 8px', borderRadius: '5px' }}>{divisionName}</span>
+                          )}
+                          <button type="button" className="btn btn-secondary" style={{ fontSize: '0.78rem', padding: '4px 8px' }} onClick={() => { setEditingId(child.id); setEditName(child.name); setEditDob(child.dateOfBirth ?? ''); setEditDivisionId(divisionId); }}>Edit</button>
+                          <button type="button" className="btn btn-secondary" style={{ fontSize: '0.78rem', padding: '4px 8px', color: 'var(--error)', borderColor: 'var(--error)' }} onClick={() => void handleDeleteChild(child)}>Remove</button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div style={{ padding: '14px', borderRadius: '8px', border: '1px dashed var(--border-dark)', display: 'grid', gap: '10px' }}>
+              <p style={{ margin: 0, fontSize: '0.8rem', fontWeight: 600 }}>Add child</p>
+              <input className="form-input" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Child name" disabled={saving} />
+              <input className="form-input" type="date" value={newDob} onChange={(e) => setNewDob(e.target.value)} disabled={saving} />
+              {divisions.length > 0 ? (
+                <select className="form-input" value={newDivisionId} onChange={(e) => setNewDivisionId(e.target.value)} disabled={saving}>
+                  <option value="">— Select division —</option>
+                  {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+              ) : (
+                <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--error)' }}>Create divisions first (Manage Divisions).</p>
+              )}
+              <button type="button" className="btn btn-primary" style={{ fontSize: '0.84rem' }} onClick={() => void handleAddChild()} disabled={saving}>
+                {saving ? 'Saving…' : 'Add Child'}
+              </button>
+            </div>
+          </div>
+          )}
+
+          {femaleParticipantsMode && (
+          <div>
+            <h4 style={{ margin: '0 0 10px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary-dark)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Female participants
+            </h4>
+            {femaleParticipants.length === 0 ? (
+              <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary-dark)' }}>No female participants yet. Add manually or include wife name in Excel.</p>
+            ) : (
+              <div style={{ display: 'grid', gap: '8px', marginBottom: '12px' }}>
+                {femaleParticipants.map((member) => (
+                  <div key={member.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-dark)' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary-dark)', minWidth: '52px' }}>{roleLabel(member.role)}</span>
+                    <span style={{ flex: 1, fontWeight: 600 }}>{member.name}</span>
+                    {(member.phone || contact?.data['personalNumber']) && (
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>{member.phone ?? String(contact?.data['personalNumber'] ?? '')}</span>
+                    )}
+                    {member.source === 'manual' && (
+                      <button type="button" className="btn btn-secondary" style={{ fontSize: '0.78rem', padding: '4px 8px', color: 'var(--error)', borderColor: 'var(--error)' }} onClick={() => void handleDeleteFemaleMember(member)}>Remove</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ padding: '14px', borderRadius: '8px', border: '1px dashed var(--border-dark)', display: 'grid', gap: '10px' }}>
+              <p style={{ margin: 0, fontSize: '0.8rem', fontWeight: 600 }}>Add female participant</p>
+              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>For single mothers, widows, or other female members not in the Excel spouse field.</p>
+              <input className="form-input" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Name" disabled={saving} />
+              <button type="button" className="btn btn-primary" style={{ fontSize: '0.84rem' }} onClick={() => void handleAddFemaleMember()} disabled={saving}>
+                {saving ? 'Saving…' : 'Add Participant'}
+              </button>
+            </div>
+          </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 };
@@ -309,7 +632,15 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
   const [showDivisionsModal, setShowDivisionsModal] = useState(false);
   const [sthans, setSthans] = useState<SthanBasicApi[]>([]);
   const [assignTarget, setAssignTarget] = useState<SreniContactRowApi | null>(null);
+  const [householdTarget, setHouseholdTarget] = useState<SreniContactRowApi | null>(null);
+  const [enrollmentScope, setEnrollmentScope] = useState('HOUSEHOLD');
+  const [resolverKey, setResolverKey] = useState<HouseholdResolverKey>('household_head');
+  const [femaleGenderMatches, setFemaleGenderMatches] = useState<string[]>(['f', 'female', 'woman', 'women']);
+  const [participantTotal, setParticipantTotal] = useState(0);
   const [isSavingAssign, setIsSavingAssign] = useState(false);
+
+  const memberEnrollment = enrollmentScope === 'MEMBER' || resolverKey === 'enrolled_children';
+  const femaleParticipantsMode = resolverKey === 'female_participants';
 
   const sreniColDefs = useMemo(
     () => columns.filter((k) => k !== 'name').map((k) => ({ key: k, label: MASTER_CONTACT_COLUMN_LABELS.get(k) ?? k })),
@@ -339,6 +670,9 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
         setRows(res.items);
         setTotal(res.total);
         setTotalPages(res.totalPages);
+        setEnrollmentScope(res.enrollmentScope ?? 'HOUSEHOLD');
+        setResolverKey(res.resolverKey ?? 'household_head');
+        setParticipantTotal(res.participantTotal ?? res.total);
         const colSet = new Set<string>();
         for (const r of res.items) Object.keys(r.data).forEach((k) => colSet.add(k));
         if (colSet.size > 0) {
@@ -351,6 +685,12 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
       .catch((err) => addToast(toUiError(err, 'Failed to load contacts.'), 'error'))
       .finally(() => setIsLoading(false));
   }, [sreniId, pageSize, addToast]);
+
+  useEffect(() => {
+    backendApi.listEnumValues('female_gender_match', true)
+      .then((values) => setFemaleGenderMatches(values.map((v) => v.value.toLowerCase())))
+      .catch(() => {/* non-critical */});
+  }, []);
 
   useEffect(() => {
     setPage(1); setRows([]); setColumns([]); setTotal(0); setTotalPages(1); setSourceFile(null);
@@ -460,11 +800,22 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
       <AssignModal
         isOpen={assignTarget !== null}
         contact={assignTarget}
-        divisions={divisions}
+        divisions={memberEnrollment ? [] : divisions}
         sthans={sthans}
         isSaving={isSavingAssign}
         onClose={() => setAssignTarget(null)}
         onSave={handleSaveAssign}
+      />
+      <HouseholdMembersModal
+        isOpen={householdTarget !== null}
+        sreniId={sreniId}
+        contact={householdTarget}
+        divisions={divisions}
+        memberEnrollment={memberEnrollment}
+        femaleParticipantsMode={femaleParticipantsMode}
+        femaleGenderMatches={femaleGenderMatches}
+        onClose={() => setHouseholdTarget(null)}
+        onChanged={() => load(page)}
       />
 
       {/* Header */}
@@ -473,8 +824,14 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>📋 {sreniName} — Contacts</h2>
           <div style={{ marginTop: '10px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <span className="badge badge-info" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid currentColor', background: 'transparent', fontSize: '0.8rem', fontWeight: 600 }}>
-              <span style={{ fontWeight: 800 }}>{total}</span> contacts
+              <span style={{ fontWeight: 800 }}>{memberEnrollment || femaleParticipantsMode ? participantTotal : total}</span>
+              {memberEnrollment || femaleParticipantsMode ? 'participants' : 'contacts'}
             </span>
+            {(memberEnrollment || femaleParticipantsMode) && (
+              <span className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid var(--border-dark)', background: 'transparent', fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>
+                {total} household{total !== 1 ? 's' : ''}
+              </span>
+            )}
             <span className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid var(--border-dark)', background: 'transparent', fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>
               {divisions.length} division{divisions.length !== 1 ? 's' : ''}
             </span>
@@ -543,12 +900,18 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
                 <tr>
                   <th style={{ width: '48px', textAlign: 'center' }}>#</th>
                   <th style={{ whiteSpace: 'nowrap' }}>Name</th>
-                  <th style={{ whiteSpace: 'nowrap' }}>Division</th>
+                  {memberEnrollment ? (
+                    <th style={{ whiteSpace: 'nowrap' }}>Children</th>
+                  ) : femaleParticipantsMode ? (
+                    <th style={{ whiteSpace: 'nowrap' }}>Participants</th>
+                  ) : (
+                    <th style={{ whiteSpace: 'nowrap' }}>Division</th>
+                  )}
                   <th style={{ whiteSpace: 'nowrap' }}>Sthan</th>
                   {isLoading && columns.length === 0 ? <th>Loading…</th> : visibleSreniCols.map((col) => (
                     <th key={col} style={{ whiteSpace: 'nowrap' }}>{MASTER_CONTACT_COLUMN_LABELS.get(col) ?? col}</th>
                   ))}
-                  <th style={{ width: '80px' }} />
+                  <th style={{ width: '140px' }} />
                 </tr>
               </thead>
               <tbody>
@@ -576,9 +939,28 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
                         )}
                       </td>
                       <td>
-                        {divName
-                          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', fontWeight: 600, background: 'rgba(99,102,241,0.1)', color: '#818cf8', padding: '2px 8px', borderRadius: '5px', border: '1px solid rgba(99,102,241,0.25)' }}>{divName}</span>
-                          : <span style={{ opacity: 0.4, fontSize: '0.84rem' }}>—</span>}
+                        {memberEnrollment ? (
+                          row.childrenDivisionSummary ? (
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }} title={row.childrenDivisionSummary}>
+                              {(row.childCount ?? 0) > 0 ? `${row.childCount} child${row.childCount !== 1 ? 'ren' : ''}` : '—'}
+                              {row.childrenDivisionSummary && (
+                                <span style={{ display: 'block', fontSize: '0.72rem', opacity: 0.85, marginTop: '2px' }}>{row.childrenDivisionSummary}</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span style={{ opacity: 0.4, fontSize: '0.84rem' }}>
+                              {(row.childCount ?? 0) > 0 ? `${row.childCount} child${row.childCount !== 1 ? 'ren' : ''}` : '—'}
+                            </span>
+                          )
+                        ) : femaleParticipantsMode ? (
+                          <span style={{ opacity: (row.participantCount ?? 0) > 0 ? 1 : 0.4, fontSize: '0.84rem' }}>
+                            {(row.participantCount ?? 0) > 0 ? `${row.participantCount} female${row.participantCount !== 1 ? 's' : ''}` : '—'}
+                          </span>
+                        ) : divName ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', fontWeight: 600, background: 'rgba(99,102,241,0.1)', color: '#818cf8', padding: '2px 8px', borderRadius: '5px', border: '1px solid rgba(99,102,241,0.25)' }}>{divName}</span>
+                        ) : (
+                          <span style={{ opacity: 0.4, fontSize: '0.84rem' }}>—</span>
+                        )}
                       </td>
                       <td>
                         {sthanName
@@ -594,14 +976,24 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
                         );
                       })}
                       <td style={{ whiteSpace: 'nowrap' }}>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          style={{ padding: '4px 10px', fontSize: '0.8rem' }}
-                          onClick={() => setAssignTarget(row)}
-                        >
-                          Assign
-                        </button>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ padding: '4px 10px', fontSize: '0.8rem' }}
+                            onClick={() => setHouseholdTarget(row)}
+                          >
+                            Household
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ padding: '4px 10px', fontSize: '0.8rem' }}
+                            onClick={() => setAssignTarget(row)}
+                          >
+                            Assign
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

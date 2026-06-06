@@ -97,9 +97,6 @@ export class ReimbursementController {
     @Body() body: { status: ReimbursementStatus; reviewerNotes?: string },
     @CurrentUser() user: AuthPrincipal,
   ) {
-    if (!['pending_review', 'approved', 'rejected'].includes(body.status)) {
-      throw new BadRequestException('Invalid status for review');
-    }
     const r = await this.svc.updateReimbursementStatus(id, {
       status: body.status,
       reviewerNotes: body.reviewerNotes,

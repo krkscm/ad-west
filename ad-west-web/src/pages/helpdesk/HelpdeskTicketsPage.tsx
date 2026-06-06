@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { backendApi, HelpdeskTicketApi, TicketStatus } from '../../utils/backendApi'
 import { useToast } from '../../components/common/Toast'
-
-const STATUS_LABELS: Record<TicketStatus, string> = {
-  open: 'Open',
-  in_progress: 'In Progress',
-  resolved: 'Resolved',
-  closed: 'Closed',
-}
+import { useEnumOptions } from '../../hooks/useEnumOptions'
 
 const STATUS_COLORS: Record<TicketStatus, string> = {
   open: 'var(--error)',
@@ -18,6 +12,8 @@ const STATUS_COLORS: Record<TicketStatus, string> = {
 
 export function HelpdeskTicketsPage() {
   const { addToast } = useToast()
+  const { options: statusOptions, labelByValue: statusLabel } = useEnumOptions('helpdesk_ticket_status')
+  const { labelByValue: categoryLabel } = useEnumOptions('helpdesk_ticket_category')
   const [tickets, setTickets] = useState<HelpdeskTicketApi[]>([])
   const [loading, setLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState<string>('')
@@ -100,7 +96,7 @@ export function HelpdeskTicketsPage() {
             style={{ marginBottom: 0 }}
           >
             <option value="">All Statuses</option>
-            {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            {statusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
       </div>
@@ -141,10 +137,10 @@ export function HelpdeskTicketsPage() {
                             {ticket.phone}{ticket.email ? ` · ${ticket.email}` : ''}
                           </div>
                         </td>
-                        <td style={{ textTransform: 'capitalize' }}>{ticket.category.replace(/_/g, ' ')}</td>
+                        <td>{categoryLabel(ticket.category)}</td>
                         <td>
                           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: STATUS_COLORS[ticket.status], background: `${STATUS_COLORS[ticket.status]}18`, borderRadius: '20px', padding: '2px 8px' }}>
-                            {STATUS_LABELS[ticket.status]}
+                            {statusLabel(ticket.status)}
                           </span>
                         </td>
                         <td style={{ whiteSpace: 'nowrap', fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>
@@ -172,7 +168,7 @@ export function HelpdeskTicketsPage() {
                   ['Name', selected.name],
                   ['Phone', selected.phone],
                   ['Email', selected.email ?? '—'],
-                  ['Category', selected.category],
+                  ['Category', categoryLabel(selected.category)],
                   ['Submitted', new Date(selected.createdAt).toLocaleString()],
                 ].map(([k, v]) => (
                   <tr key={k} style={{ borderBottom: '1px solid var(--border-dark)' }}>
@@ -191,7 +187,7 @@ export function HelpdeskTicketsPage() {
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Status</label>
                 <select className="form-input" value={editStatus} onChange={(e) => setEditStatus(e.target.value as TicketStatus)}>
-                  {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  {statusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
               <div>

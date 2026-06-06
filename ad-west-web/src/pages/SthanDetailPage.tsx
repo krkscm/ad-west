@@ -2,22 +2,24 @@ import React, { useState } from 'react';
 import { SthanReportsPage } from './SthanReportsPage';
 import { SthanExpensesPage } from './SthanExpensesPage';
 import { SthanContactsPage } from './SthanContactsPage';
+import { SthanCalendarPage } from './SthanCalendarPage';
 
 interface Props {
   locationId: string;
   locationName: string;
 }
 
-type SthanTab = 'reports' | 'expenses' | 'contacts';
+type SthanTab = 'calendar' | 'reports' | 'expenses' | 'contacts';
 
 const TABS: Array<{ key: SthanTab; label: string; icon: string }> = [
+  { key: 'calendar', label: 'Calendar', icon: '📅' },
   { key: 'reports', label: 'Reports', icon: '📊' },
   { key: 'expenses', label: 'Expenses', icon: '💰' },
   { key: 'contacts', label: 'Contacts', icon: '📋' },
 ];
 
 export const SthanDetailPage: React.FC<Props> = ({ locationId, locationName }) => {
-  const [activeTab, setActiveTab] = useState<SthanTab>('reports');
+  const [activeTab, setActiveTab] = useState<SthanTab>('calendar');
 
   return (
     <div className="animate-slide-up">
@@ -27,7 +29,7 @@ export const SthanDetailPage: React.FC<Props> = ({ locationId, locationName }) =
           📍 {locationName}
         </h2>
         <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginTop: '4px', marginBottom: 0 }}>
-          Sthan management — reports, expenses, and contact list.
+          Sthan management — calendar, reports, expenses, and contact list.
         </p>
       </div>
 
@@ -65,6 +67,9 @@ export const SthanDetailPage: React.FC<Props> = ({ locationId, locationName }) =
       </div>
 
       {/* Tab content */}
+      {activeTab === 'calendar' && (
+        <SthanCalendarPage locationId={locationId} locationName={locationName} />
+      )}
       {activeTab === 'reports' && (
         <SthanReportsPage locationId={locationId} locationName={locationName} />
       )}

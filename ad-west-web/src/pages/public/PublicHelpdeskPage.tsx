@@ -1,14 +1,7 @@
 import React, { useState } from 'react'
 import { backendApi, TicketCategory } from '../../utils/backendApi'
 import { PublicPageShell } from './PublicPageShell'
-
-const CATEGORIES: { value: TicketCategory; label: string }[] = [
-  { value: 'general', label: 'General Inquiry' },
-  { value: 'technical', label: 'Technical Issue' },
-  { value: 'financial', label: 'Financial / Membership Fees' },
-  { value: 'membership', label: 'Membership Request' },
-  { value: 'other', label: 'Other' },
-]
+import { useEnumOptions } from '../../hooks/useEnumOptions'
 
 const fieldLabelStyle = {
   display: 'block',
@@ -19,6 +12,7 @@ const fieldLabelStyle = {
 } as const
 
 export function PublicHelpdeskPage() {
+  const { options: categoryOptions } = useEnumOptions('helpdesk_ticket_category')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
@@ -142,7 +136,7 @@ export function PublicHelpdeskPage() {
                     value={category}
                     onChange={(e) => setCategory(e.target.value as TicketCategory)}
                   >
-                    {CATEGORIES.map((c) => (
+                    {categoryOptions.map((c) => (
                       <option key={c.value} value={c.value}>{c.label}</option>
                     ))}
                   </select>

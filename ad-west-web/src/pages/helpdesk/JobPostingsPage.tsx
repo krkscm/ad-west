@@ -3,20 +3,7 @@ import { backendApi, JobPostingApi, JobType } from '../../utils/backendApi'
 import { useToast } from '../../components/common/Toast'
 import { useConfirm } from '../../components/common/ConfirmDialog'
 import { DateField } from '../../components/common/DateFields'
-
-const JOB_TYPES: { value: JobType; label: string }[] = [
-  { value: 'full_time', label: 'Full Time' },
-  { value: 'part_time', label: 'Part Time' },
-  { value: 'volunteer', label: 'Volunteer' },
-  { value: 'contract', label: 'Contract' },
-]
-
-const JOB_TYPE_LABELS: Record<JobType, string> = {
-  full_time: 'Full Time',
-  part_time: 'Part Time',
-  volunteer: 'Volunteer',
-  contract: 'Contract',
-}
+import { useEnumOptions } from '../../hooks/useEnumOptions'
 
 type FormMode = 'list' | 'create' | 'edit'
 
@@ -25,6 +12,7 @@ const BLANK_FORM = { title: '', description: '', requirements: '', location: '',
 export function JobPostingsPage() {
   const { addToast } = useToast()
   const confirm = useConfirm()
+  const { options: jobTypeOptions, labelByValue: jobTypeLabel } = useEnumOptions('job_posting_type')
   const [jobs, setJobs] = useState<JobPostingApi[]>([])
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState<FormMode>('list')
@@ -150,7 +138,7 @@ export function JobPostingsPage() {
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Employment Type</label>
                 <select className="form-input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as JobType })}>
-                  {JOB_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  {jobTypeOptions.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
               <div>
@@ -234,7 +222,7 @@ export function JobPostingsPage() {
               {jobs.map((job) => (
                 <tr key={job.id}>
                   <td style={{ fontWeight: 600 }}>{job.title}</td>
-                  <td>{JOB_TYPE_LABELS[job.type]}</td>
+                  <td>{jobTypeLabel(job.type)}</td>
                   <td>{job.location || '—'}</td>
                   <td>
                     <span className={`badge ${job.isActive ? 'badge-success' : 'badge-error'}`}>

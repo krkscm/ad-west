@@ -25,6 +25,8 @@ export interface SrenyRecord {
   zoneId?: string;
   isServiceSreny: boolean;
   joinUsVisible: boolean;
+  enrollmentScope?: string;
+  primaryContactStrategy?: string;
   code?: string;
   description?: string;
   active: boolean;
@@ -450,6 +452,58 @@ export interface GlobalContactUploadDuplicate {
   existingSreniId: string | null;
 }
 
+export type SreniContactCellValue = string | number | boolean | null;
+
+export type HouseholdMemberRole = 'head' | 'spouse' | 'child' | 'other';
+export type HouseholdMemberSource = 'import' | 'manual';
+export type SreniEnrollmentScope = 'HOUSEHOLD' | 'MEMBER';
+export type PrimaryContactStrategy = 'HOUSEHOLD_HEAD' | 'FEMALE_PARTICIPANTS' | 'ENROLLED_CHILDREN';
+
+export interface SreniParticipantRecord {
+  memberId?: string;
+  contactId: string;
+  sreniId: string;
+  name: string;
+  role: HouseholdMemberRole | 'head';
+  phone?: string;
+  email?: string;
+  gender?: string;
+  dateOfBirth?: string;
+  divisionId?: string;
+  divisionName?: string;
+  householdPhone?: string;
+  householdName?: string;
+  usesHouseholdPhone?: boolean;
+}
+
+export interface HouseholdMemberEnrollmentRecord {
+  id: string;
+  memberId: string;
+  sreniId: string;
+  divisionId?: string;
+  divisionName?: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HouseholdMemberRecord {
+  id: string;
+  contactId: string;
+  role: HouseholdMemberRole;
+  source: HouseholdMemberSource;
+  name: string;
+  phone?: string;
+  email?: string;
+  gender?: string;
+  dateOfBirth?: string;
+  sortOrder: number;
+  active: boolean;
+  enrollments?: HouseholdMemberEnrollmentRecord[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SreniContactRecord {
   id: string;
   sreniId: string | null;
@@ -463,6 +517,9 @@ export interface SreniContactRecord {
   active: boolean;
   sourceFile?: string;
   uploadedBy?: string;
+  childCount?: number;
+  childrenDivisionSummary?: string;
+  participantCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -601,4 +658,24 @@ export interface SthanContactRecord {
   uploadedBy?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SthanCalendarEventRecord {
+  id: string;
+  locationId: string;
+  title: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  color: string;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedBy: string;
+  updatedAt: string;
+  /** local = created on this Sthan calendar; sreni = synced from a Sreni calendar */
+  source: 'local' | 'sreni';
+  sreniId?: string;
+  scope?: 'zone' | 'sthan';
+  readOnly?: boolean;
 }

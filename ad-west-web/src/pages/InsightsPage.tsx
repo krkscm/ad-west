@@ -174,12 +174,12 @@ export function InsightsPage() {
       if (mr.status === 'fulfilled') setMonthlyReports(Array.isArray(mr.value) ? mr.value : (mr.value as any).items ?? [])
 
       const [
-        sreniContacts,
+        sreniContactStats,
         sthanContacts,
         sreniAttendance,
         sthanReports,
       ] = await Promise.all([
-        Promise.allSettled(sreniItems.map((sreni: any) => backendApi.listSreniContacts(sreni.id, 1, 1))),
+        Promise.allSettled(sreniItems.map((sreni: any) => backendApi.getSreniParticipantStats(sreni.id))),
         Promise.allSettled(sthanItems.map((sthan: any) => backendApi.listSthanContacts(sthan.id, 1, 1))),
         Promise.allSettled(sreniItems.map((sreni: any) => backendApi.listSreniAttendanceListing(sreni.id))),
         Promise.allSettled(sthanItems.map((sthan: any) => backendApi.listSthanReports(sthan.id))),
@@ -189,9 +189,9 @@ export function InsightsPage() {
 
       const nextSreniContacts: Record<string, number> = {}
       sreniItems.forEach((sreni: any, index: number) => {
-        const result = sreniContacts[index]
+        const result = sreniContactStats[index]
         nextSreniContacts[sreni.id] = result?.status === 'fulfilled'
-          ? result.value.total ?? result.value.items.length
+          ? result.value.participantCount
           : 0
       })
       setContactCountsBySreni(nextSreniContacts)
@@ -499,8 +499,8 @@ export function InsightsPage() {
 
       {/* Row 1: Contacts */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-        <ChartCard title="Sreni Contacts" subtitle={`${kpis.sreniContactsTotal} total contacts`}>
-          {renderHorizontalBar(contactsBySreni, 'Contacts', 'No Sreni contacts uploaded yet')}
+        <ChartCard title="Sreni Participants" subtitle={`${kpis.sreniContactsTotal} resolved participants (households, children, or ladies)`}>
+          {renderHorizontalBar(contactsBySreni, 'Participants', 'No Sreni participant data yet')}
         </ChartCard>
 
         <ChartCard title="Sthan Contacts" subtitle={`${kpis.sthanContactsTotal} total contacts`}>

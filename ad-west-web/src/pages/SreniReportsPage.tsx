@@ -2,20 +2,16 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { backendApi, SreniReportApi, SreniReportParameterApi } from '../utils/backendApi';
 import { useToast } from '../components/common/Toast';
 import { useAuth } from '../context/auth-context';
+import { useEnumOptions } from '../hooks/useEnumOptions';
 
 interface Props {
   sreniId: string;
   sreniName: string;
 }
 
-type SubmissionType = 'monthly' | 'half_yearly' | 'yearly';
+type SubmissionType = string;
 
-const TYPE_LABELS: Record<SubmissionType, string> = {
-  monthly: 'Monthly',
-  half_yearly: 'Half-Yearly',
-  yearly: 'Yearly',
-};
-const TYPE_ICONS: Record<SubmissionType, string> = {
+const TYPE_ICONS: Record<string, string> = {
   monthly: '📅',
   half_yearly: '📆',
   yearly: '🗓️',
@@ -33,6 +29,7 @@ function periodLabel(type: SubmissionType, year: number, value: number): string 
 export const SreniReportsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
   const { adminUser } = useAuth();
   const { addToast } = useToast();
+  const { options: submissionTypeOptions, labelByValue: submissionTypeLabel } = useEnumOptions('report_submission_type');
 
   const isZoneOrSuper = useMemo(() => {
     const scopes = adminUser?.roles?.map((r) => r.scopeType) ?? [];
@@ -74,9 +71,9 @@ export const SreniReportsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
   const typeReports = useMemo(() => allReports.filter((r) => r.submissionType === activeType), [allReports, activeType]);
 
   const enabledTypes = useMemo<SubmissionType[]>(() => {
-    const seen = new Set(allParams.map((p) => p.submissionType));
-    return (['monthly', 'half_yearly', 'yearly'] as SubmissionType[]).filter((t) => seen.has(t));
-  }, [allParams]);
+    const seen = new Set(allParams.map((p) => p.submissionType as string));
+    return submissionTypeOptions.map((o) => o.value).filter((t) => seen.has(t));
+  }, [allParams, submissionTypeOptions]);
 
   const existingReport = useMemo(
     () => typeReports.find((r) => r.periodYear === formYear && r.periodValue === formValue),
@@ -108,7 +105,7 @@ export const SreniReportsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
     setSubmitting(true);
     try {
       await backendApi.upsertSreniReport(sreniId, {
-        submissionType: activeType,
+        submissionType: activeType as SreniReportApi['submissionType'],
         periodYear: formYear,
         periodValue: formValue,
         entries: formEntries,
@@ -188,7 +185,7 @@ export const SreniReportsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
                   cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
                 }}
               >
-                {TYPE_ICONS[type]} {TYPE_LABELS[type]}
+                {TYPE_ICONS[type] ?? '📋'} {submissionTypeLabel(type)}
                 {count > 0 && (
                   <span style={{ background: isActive ? 'var(--primary)' : 'rgba(148,163,184,0.3)', color: isActive ? '#fff' : 'var(--text-secondary-dark)', borderRadius: '999px', padding: '1px 7px', fontSize: '0.72rem', fontWeight: 700 }}>
                     {count}
@@ -205,7 +202,7 @@ export const SreniReportsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
         <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px', borderLeft: '3px solid var(--primary)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
             <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>
-              {TYPE_ICONS[activeType]} Submit {TYPE_LABELS[activeType]} Report — {periodLabel(activeType, formYear, formValue)}
+              {TYPE_ICONS[activeType] ?? '📋'} Submit {submissionTypeLabel(activeType)} Report — {periodLabel(activeType, formYear, formValue)}
             </h4>
             <button type="button" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.82rem' }} onClick={() => setIsFormOpen(false)}>
               Cancel
@@ -291,7 +288,7 @@ export const SreniReportsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
       ) : typeReports.length === 0 && !isFormOpen ? (
         <div className="glass-panel" style={{ padding: '60px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📊</div>
-          <h3 style={{ fontWeight: 700, marginBottom: '8px' }}>No {TYPE_LABELS[activeType].toLowerCase()} reports yet</h3>
+          <h3 style={{ fontWeight: 700, marginBottom: '8px' }}>No {submissionTypeLabel(activeType).toLowerCase()} reports yet</h3>
           <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', maxWidth: '400px', margin: '0 auto 24px' }}>
             {typeParams.length === 0
               ? 'No parameters configured for this report type. Set them up in Report Config.'

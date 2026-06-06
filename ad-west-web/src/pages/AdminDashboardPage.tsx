@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { MOBILE_LAYOUT_QUERY, useMediaQuery } from '../hooks/useMediaQuery';
 import { useAuth } from '../context/auth-context';
 import { useToast } from '../components/common/Toast';
 import { ThemeToggle } from '../components/common/ThemeToggle';
@@ -279,7 +280,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [isGatewayOpen, setIsGatewayOpen] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isVerySmallDevice, setIsVerySmallDevice] = useState(() => window.innerWidth <= 480);
+  const isMobileLayout = useMediaQuery(MOBILE_LAYOUT_QUERY);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [adminFormEditId, setAdminFormEditId] = useState<string | null>(null);
   const [usersFormEdit, setUsersFormEdit] = useState<UserApi | null>(null);
@@ -293,29 +294,40 @@ export const AdminDashboardPage: React.FC = () => {
   const setActiveTab = useCallback((tab: ActiveTab) => {
     window.location.hash = tab;
     setActiveTabState(tab);
-    if (isVerySmallDevice) {
+    if (isMobileLayout) {
       setIsMobileNavOpen(false);
     }
-  }, [isVerySmallDevice]);
+  }, [isMobileLayout]);
 
   useEffect(() => {
-    const onResize = () => {
-      const verySmall = window.innerWidth <= 480;
-      setIsVerySmallDevice(verySmall);
-      if (!verySmall) {
+    if (!isMobileLayout) {
+      setIsMobileNavOpen(false);
+    }
+  }, [isMobileLayout]);
+
+  useEffect(() => {
+    if (isMobileLayout && isSidebarCollapsed) {
+      setIsSidebarCollapsed(false);
+    }
+  }, [isMobileLayout, isSidebarCollapsed]);
+
+  useEffect(() => {
+    if (!isMobileLayout || !isMobileNavOpen) {
+      return;
+    }
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
         setIsMobileNavOpen(false);
       }
     };
-
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  useEffect(() => {
-    if (isVerySmallDevice && isSidebarCollapsed) {
-      setIsSidebarCollapsed(false);
-    }
-  }, [isVerySmallDevice, isSidebarCollapsed]);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isMobileLayout, isMobileNavOpen]);
 
   const openAdminForm = useCallback((editId: string | null) => {
     setAdminFormEditId(editId);
@@ -901,27 +913,20 @@ export const AdminDashboardPage: React.FC = () => {
   return (
     <div className="admin-theme" style={{ display: 'flex', minHeight: '100vh', width: '100vw' }}>
       <NotificationCarouselModal userType="admin" />
-      {isVerySmallDevice && isMobileNavOpen && (
+      {isMobileLayout && isMobileNavOpen && (
         <button
           type="button"
+          className="admin-nav-backdrop"
           aria-label="Close navigation drawer"
           onClick={() => setIsMobileNavOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 1190,
-            background: 'rgba(2, 6, 23, 0.54)',
-            border: 'none',
-            padding: 0,
-            cursor: 'pointer',
-          }}
         />
       )}
       
       {/* Sidebar navigation */}
       <aside
+        className={`admin-sidebar${isMobileLayout && isMobileNavOpen ? ' admin-sidebar--open' : ''}`}
         style={{
-          width: isVerySmallDevice ? 'min(86vw, 320px)' : sidebarWidth,
+          width: isMobileLayout ? 'min(86vw, 320px)' : sidebarWidth,
           height: '100vh',
           flexShrink: 0,
           borderRight: '1px solid var(--border-dark)',
@@ -930,16 +935,16 @@ export const AdminDashboardPage: React.FC = () => {
           display: 'flex',
           flexDirection: 'column',
           padding: '24px 0',
-          transition: isVerySmallDevice ? 'transform 0.22s ease' : 'width 0.2s ease',
+          transition: isMobileLayout ? 'transform 0.22s ease' : 'width 0.2s ease',
           overflowY: 'auto',
           overflowX: 'hidden',
-          position: isVerySmallDevice ? 'fixed' : 'sticky',
+          position: isMobileLayout ? 'fixed' : 'sticky',
           top: 0,
-          left: isVerySmallDevice ? 0 : undefined,
-          zIndex: isVerySmallDevice ? 1200 : undefined,
-          transform: isVerySmallDevice ? (isMobileNavOpen ? 'translateX(0)' : 'translateX(-104%)') : undefined,
-          pointerEvents: isVerySmallDevice && !isMobileNavOpen ? 'none' : 'auto',
-          boxShadow: isVerySmallDevice && isMobileNavOpen ? '0 24px 56px -20px rgba(2, 6, 23, 0.6)' : undefined,
+          left: isMobileLayout ? 0 : undefined,
+          zIndex: isMobileLayout ? 1200 : undefined,
+          transform: isMobileLayout ? (isMobileNavOpen ? 'translateX(0)' : 'translateX(-104%)') : undefined,
+          pointerEvents: isMobileLayout && !isMobileNavOpen ? 'none' : 'auto',
+          boxShadow: isMobileLayout && isMobileNavOpen ? '0 24px 56px -20px rgba(2, 6, 23, 0.6)' : undefined,
         }}
       >
         {/* Brand */}
@@ -1598,10 +1603,11 @@ export const AdminDashboardPage: React.FC = () => {
       </aside>
 
       {/* Main Content Pane */}
-      <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: isVerySmallDevice ? 'auto' : '100vh', overflow: isVerySmallDevice ? 'visible' : 'hidden' }}>
+      <main className="admin-main" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: isMobileLayout ? 'auto' : '100vh', overflow: isMobileLayout ? 'visible' : 'hidden' }}>
         
         {/* Top Header bar */}
         <header 
+          className="admin-header"
           style={{
             height: '72px',
             minHeight: '72px',
@@ -1616,28 +1622,20 @@ export const AdminDashboardPage: React.FC = () => {
             backdropFilter: 'blur(8px)'
           }}
         >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              minWidth: 0,
-              overflow: 'hidden',
-              whiteSpace: 'nowrap',
-              lineHeight: 1,
-            }}
-          >
+          <div className="admin-header__left">
             <button
               type="button"
+              className="admin-nav-toggle"
               onClick={() => {
-                if (isVerySmallDevice) {
+                if (isMobileLayout) {
                   setIsMobileNavOpen((prev) => !prev);
                   return;
                 }
                 setIsSidebarCollapsed((prev) => !prev);
               }}
-              aria-label={isVerySmallDevice ? (isMobileNavOpen ? 'Close navigation' : 'Open navigation') : isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              title={isVerySmallDevice ? (isMobileNavOpen ? 'Close navigation' : 'Open navigation') : isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-label={isMobileLayout ? (isMobileNavOpen ? 'Close navigation' : 'Open navigation') : isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-expanded={isMobileLayout ? isMobileNavOpen : undefined}
+              title={isMobileLayout ? (isMobileNavOpen ? 'Close navigation' : 'Open navigation') : isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               style={{
                 width: '34px',
                 height: '34px',
@@ -1655,21 +1653,9 @@ export const AdminDashboardPage: React.FC = () => {
                 padding: 0,
               }}
             >
-              ≡
+              {isMobileLayout && isMobileNavOpen ? '✕' : '≡'}
             </button>
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '12px',
-                minWidth: 0,
-                overflow: 'hidden',
-                whiteSpace: 'nowrap',
-                textOverflow: 'ellipsis',
-                fontSize: '0.88rem',
-                lineHeight: 1,
-              }}
-            >
+            <div className="admin-header__breadcrumbs">
               {breadcrumbItems.map((item, index) => {
                 const isLast = index === breadcrumbItems.length - 1;
                 return (
@@ -1712,10 +1698,11 @@ export const AdminDashboardPage: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div className="admin-header__actions">
             <NotificationBell />
             <button
               type="button"
+              className="admin-header__icon-btn"
               onClick={() => setShowResetPassword(true)}
               aria-label="Reset password"
               title="Reset password"
@@ -1733,16 +1720,18 @@ export const AdminDashboardPage: React.FC = () => {
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
             </button>
-            <div style={{ width: '1px', height: '24px', background: 'var(--border-dark)', margin: '0 4px' }} />
+            <div className="admin-header__divider" style={{ width: '1px', height: '24px', background: 'var(--border-dark)', margin: '0 4px' }} />
             <ThemeToggle iconOnly placement="header" />
             {adminUser.picture ? (
               <img
                 src={adminUser.picture}
                 alt={adminUser.name}
+                className="admin-header__avatar"
                 style={{ width: '36px', height: '36px', borderRadius: '999px', border: '1px solid var(--border-dark)' }}
               />
             ) : (
               <div
+                className="admin-header__avatar"
                 style={{
                   width: '36px',
                   height: '36px',
@@ -1758,7 +1747,7 @@ export const AdminDashboardPage: React.FC = () => {
                 👤
               </div>
             )}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+            <div className="admin-header__user-details" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
               <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, lineHeight: 1.2 }}>{adminUser.name}</h4>
               <span style={{ marginTop: '2px', fontSize: '0.75rem', lineHeight: 1.2, color: 'var(--text-secondary-dark)' }}>{adminUser.email}</span>
               <span
@@ -1774,7 +1763,7 @@ export const AdminDashboardPage: React.FC = () => {
         </header>
 
         {/* Body content */}
-        <div key={activeTab} className="tab-content-wrapper" style={{ padding: '32px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        <div key={activeTab} className="tab-content-wrapper admin-content" style={{ padding: '32px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
           
           {/* TAB 1: DASHBOARD VIEW */}
           {activeTab === 'dashboard' && (

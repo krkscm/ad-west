@@ -107,7 +107,7 @@ export class CoreBusinessDbHydrationService {
         'SELECT id, code, name, created_at, updated_at FROM adwest.zones ORDER BY created_at ASC',
       ),
       this.ctx.dataSource.query(
-        'SELECT id, zone_id, name, description, code, active, is_service_sreny, join_us_visible, created_by, updated_by, created_at, updated_at FROM adwest.srenies ORDER BY created_at ASC',
+        'SELECT id, zone_id, name, description, code, active, is_service_sreny, join_us_visible, enrollment_scope, primary_contact_strategy, created_by, updated_by, created_at, updated_at FROM adwest.srenies ORDER BY created_at ASC',
       ),
       Promise.resolve([] as unknown[]),
       Promise.resolve([] as unknown[]),
@@ -219,6 +219,7 @@ export class CoreBusinessDbHydrationService {
     for (const row of srenyRows as Array<{
       id: string; zone_id: string | null; name: string; description: string | null; code: string | null;
       active: boolean; is_service_sreny: boolean; join_us_visible?: boolean | null;
+      enrollment_scope?: string | null; primary_contact_strategy?: string | null;
       created_by: string | null; updated_by: string | null;
       created_at: string | Date; updated_at: string | Date;
     }>) {
@@ -228,6 +229,8 @@ export class CoreBusinessDbHydrationService {
         zoneId: row.zone_id ?? undefined,
         isServiceSreny: row.is_service_sreny,
         joinUsVisible: row.join_us_visible ?? false,
+        enrollmentScope: row.enrollment_scope ?? undefined,
+        primaryContactStrategy: row.primary_contact_strategy ?? undefined,
         code: row.code ?? undefined,
         description: row.description ?? undefined,
         active: row.active,

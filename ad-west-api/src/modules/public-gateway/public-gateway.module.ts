@@ -9,6 +9,7 @@ import {
   PublicSreniContactsController,
 } from './controllers/public-gateway.controller';
 import { HelpdeskTicketEntity } from './entities/helpdesk-ticket.entity';
+import { JobApplicationActivityEntity } from './entities/job-application-activity.entity';
 import { JobApplicationEntity } from './entities/job-application.entity';
 import { JobPostingEntity } from './entities/job-posting.entity';
 import { GatewayAdminAuthGuard } from './guards/gateway-admin-auth.guard';
@@ -17,7 +18,7 @@ import { PublicGatewayService } from './public-gateway.service';
 @Module({})
 export class PublicGatewayModule {
   static register(useDbPersistence: boolean): DynamicModule {
-    const entities = [HelpdeskTicketEntity, JobPostingEntity, JobApplicationEntity];
+    const entities = [HelpdeskTicketEntity, JobPostingEntity, JobApplicationEntity, JobApplicationActivityEntity];
 
     return {
       module: PublicGatewayModule,

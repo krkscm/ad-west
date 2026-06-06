@@ -3,10 +3,7 @@ import { AppNotificationApi, NotificationTarget, backendApi } from '../../utils/
 import { useToast } from '../../components/common/Toast'
 import { useConfirm } from '../../components/common/ConfirmDialog'
 import { DateTimePicker } from '../../components/common/DateTimePicker'
-
-const TARGET_LABELS: Record<NotificationTarget, string> = {
-  all: 'All Users', admin: 'Admins Only', member: 'Members Only',
-}
+import { useEnumOptions } from '../../hooks/useEnumOptions'
 
 type Mode = 'list' | 'create' | 'edit'
 
@@ -20,6 +17,7 @@ function isLive(n: AppNotificationApi) {
 export function NotificationsAdminPage() {
   const { addToast } = useToast()
   const confirm = useConfirm()
+  const { options: targetOptions, labelByValue: targetLabel } = useEnumOptions('notification_target')
   const [items, setItems] = useState<AppNotificationApi[]>([])
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState<Mode>('list')
@@ -138,7 +136,7 @@ export function NotificationsAdminPage() {
             <div>
               <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Target Audience</label>
               <select className="form-input" value={form.target} onChange={(e) => setForm({ ...form, target: e.target.value as NotificationTarget })}>
-                {(Object.entries(TARGET_LABELS) as [NotificationTarget, string][]).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                {targetOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div className="notification-form-actions">
@@ -199,7 +197,7 @@ export function NotificationsAdminPage() {
                       <div style={{ fontWeight: 600 }}>{n.title}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)', marginTop: '2px', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.message}</div>
                     </td>
-                    <td>{TARGET_LABELS[n.target]}</td>
+                    <td>{targetLabel(n.target)}</td>
                     <td style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)', whiteSpace: 'nowrap' }}>
                       {new Date(n.validFrom).toLocaleDateString('en-AE')}
                       <span style={{ margin: '0 4px' }}>→</span>

@@ -4,11 +4,7 @@ import { useToast } from '../../components/common/Toast'
 import { useConfirm } from '../../components/common/ConfirmDialog'
 import { SwitchToggle } from '../../components/common/SwitchToggle'
 import { DateRangePicker } from '../../components/common/DateTimePicker'
-
-const FIELD_TYPE_LABELS: Record<FormFieldType, string> = {
-  text: 'Text', number: 'Number', email: 'Email', phone: 'Phone',
-  date: 'Date', select: 'Dropdown', checkbox: 'Checkbox', textarea: 'Long Text',
-}
+import { useEnumOptions } from '../../hooks/useEnumOptions'
 
 type Mode = 'list' | 'create' | 'edit' | 'registrations'
 
@@ -25,6 +21,7 @@ function fmt(iso: string) {
 export function SpecialEventsPage() {
   const { addToast } = useToast()
   const confirm = useConfirm()
+  const { options: fieldTypeOptions } = useEnumOptions('form_field_type')
   const [events, setEvents] = useState<SpecialEventApi[]>([])
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState<Mode>('list')
@@ -266,7 +263,7 @@ export function SpecialEventsPage() {
                         <tr key={i}>
                           <td>
                             <select className="form-input" value={f.fieldType} onChange={(e) => updateField(i, { fieldType: e.target.value as FormFieldType })} style={{ marginBottom: 0, minWidth: '110px' }}>
-                              {(Object.entries(FIELD_TYPE_LABELS) as [FormFieldType, string][]).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                              {fieldTypeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                             </select>
                           </td>
                           <td>

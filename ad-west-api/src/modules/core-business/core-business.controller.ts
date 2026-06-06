@@ -68,16 +68,20 @@ import {
   UpdateSreniReportParameterDto,
   SubmitSreniReportDto,
   CreateSthanExpenseDto,
+  CreateSthanCalendarEventDto,
   ReviewSthanExpenseDto,
   SubmitSthanReportDto,
+  UpdateSthanCalendarEventDto,
   CreateLocationReportMetricDto,
   UpdateLocationReportMetricDto,
   CreateSreniDivisionDto,
   UpdateSreniDivisionDto,
   AssignContactDivisionDto,
   AssignContactSthanDto,
+  CreateHouseholdMemberDto,
   SetContactActiveDto,
   SetContactSreniTagsDto,
+  UpdateHouseholdMemberDto,
 } from './dto/core-business.dto';
 import { CoreBusinessService } from './core-business.service';
 
@@ -856,6 +860,75 @@ export class CoreBusinessController {
     return this.service.deleteContact(sreniId, contactId);
   }
 
+  @Get('org/sreni-definitions/:sreniId/contacts/:contactId/members')
+  @UseGuards(CoreAdminAuthGuard)
+  listHouseholdMembers(
+    @Param('sreniId') sreniId: string,
+    @Param('contactId') contactId: string,
+  ) {
+    return this.service.listHouseholdMembers(sreniId, contactId);
+  }
+
+  @Post('org/sreni-definitions/:sreniId/contacts/:contactId/members')
+  @UseGuards(CoreAdminAuthGuard)
+  createHouseholdMember(
+    @Param('sreniId') sreniId: string,
+    @Param('contactId') contactId: string,
+    @Body() dto: CreateHouseholdMemberDto,
+  ) {
+    return this.service.createHouseholdMember(sreniId, contactId, dto);
+  }
+
+  @Patch('org/sreni-definitions/:sreniId/contacts/:contactId/members/:memberId')
+  @UseGuards(CoreAdminAuthGuard)
+  updateHouseholdMember(
+    @Param('sreniId') sreniId: string,
+    @Param('contactId') contactId: string,
+    @Param('memberId') memberId: string,
+    @Body() dto: UpdateHouseholdMemberDto,
+  ) {
+    return this.service.updateHouseholdMember(sreniId, contactId, memberId, dto);
+  }
+
+  @Delete('org/sreni-definitions/:sreniId/contacts/:contactId/members/:memberId')
+  @UseGuards(CoreAdminAuthGuard)
+  deleteHouseholdMember(
+    @Param('sreniId') sreniId: string,
+    @Param('contactId') contactId: string,
+    @Param('memberId') memberId: string,
+  ) {
+    return this.service.deleteHouseholdMember(sreniId, contactId, memberId);
+  }
+
+  @Get('org/sreni-definitions/:sreniId/participants/stats')
+  @UseGuards(CoreAdminAuthGuard)
+  getSreniParticipantStats(@Param('sreniId') sreniId: string) {
+    return this.service.getSreniParticipantStats(sreniId);
+  }
+
+  @Get('org/sreni-definitions/:sreniId/participants')
+  @UseGuards(CoreAdminAuthGuard)
+  listSreniParticipants(
+    @Param('sreniId') sreniId: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.service.listSreniParticipants(
+      sreniId,
+      page ? parseInt(page, 10) : 1,
+      pageSize ? parseInt(pageSize, 10) : 100,
+    );
+  }
+
+  @Get('org/sreni-definitions/:sreniId/contacts/:contactId/participants')
+  @UseGuards(CoreAdminAuthGuard)
+  listContactParticipants(
+    @Param('sreniId') sreniId: string,
+    @Param('contactId') contactId: string,
+  ) {
+    return this.service.listContactParticipants(sreniId, contactId);
+  }
+
   @Get('org/contacts/:contactId/sreni-tags')
   @UseGuards(CoreAdminAuthGuard)
   listContactSreniTags(@Param('contactId') contactId: string) {
@@ -1131,6 +1204,45 @@ export class CoreBusinessController {
   @UseGuards(CoreAdminAuthGuard)
   clearSthanContacts(@Param('locationId') locationId: string) {
     return this.service.clearSthanContacts(locationId);
+  }
+
+  // ── Sthan Calendar ────────────────────────────────────────────────────────
+
+  @Get('org/locations/:locationId/calendar-events')
+  @UseGuards(CoreAdminAuthGuard)
+  listSthanCalendarEvents(@Param('locationId') locationId: string) {
+    return this.service.listSthanCalendarEvents(locationId);
+  }
+
+  @Post('org/locations/:locationId/calendar-events')
+  @UseGuards(CoreAdminAuthGuard)
+  createSthanCalendarEvent(
+    @Param('locationId') locationId: string,
+    @Body() dto: CreateSthanCalendarEventDto,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.createSthanCalendarEvent(locationId, dto, actor);
+  }
+
+  @Patch('org/locations/:locationId/calendar-events/:eventId')
+  @UseGuards(CoreAdminAuthGuard)
+  updateSthanCalendarEvent(
+    @Param('locationId') locationId: string,
+    @Param('eventId') eventId: string,
+    @Body() dto: UpdateSthanCalendarEventDto,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.updateSthanCalendarEvent(locationId, eventId, dto, actor);
+  }
+
+  @Delete('org/locations/:locationId/calendar-events/:eventId')
+  @UseGuards(CoreAdminAuthGuard)
+  deleteSthanCalendarEvent(
+    @Param('locationId') locationId: string,
+    @Param('eventId') eventId: string,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.deleteSthanCalendarEvent(locationId, eventId, actor);
   }
 }
 

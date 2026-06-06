@@ -1,11 +1,14 @@
 import { AuthPrincipal } from '@modules/user-management/interfaces/auth-principal.interface';
 import { DataSource } from 'typeorm';
+import { ENUM_TYPES } from '@modules/enum-values/enum-types.constants';
+import { EnumConfigService } from '@modules/enum-values/services/enum-config.service';
 import { SubmitSreniReportDto } from '../dto/core-business.dto';
 import type { SreniReportRecord } from '../core-business.service';
 
 export interface SreniReportsRuntimeContext {
   runtimeMode: 'in-memory' | 'db';
   dataSource?: DataSource;
+  enumConfig: EnumConfigService;
   sreniReports: Map<string, SreniReportRecord>;
   toIsoTimestamp(value: string | Date): string;
   newId(prefix: string): string;
@@ -54,6 +57,7 @@ export class SreniReportsRuntimeService {
     submittedBy?: string,
     principal?: AuthPrincipal,
   ): Promise<SreniReportRecord> {
+    await this.ctx.enumConfig.validate(ENUM_TYPES.REPORT_SUBMISSION_TYPE, dto.submissionType, 'Submission type');
     const now = new Date().toISOString();
 
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {

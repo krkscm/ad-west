@@ -5,15 +5,7 @@ import { useToast } from '../../components/common/Toast'
 import { SwitchToggle } from '../../components/common/SwitchToggle'
 import { useConfirm } from '../../components/common/ConfirmDialog'
 import { FileUploadZone } from '../../components/common/FileUploadZone'
-
-const CATEGORY_LABELS: Record<ReimbursementCategory, string> = {
-  travel: 'Travel',
-  food: 'Food & Meals',
-  accommodation: 'Accommodation',
-  event_supplies: 'Event Supplies',
-  printing: 'Printing',
-  other: 'Other',
-}
+import { useEnumOptions } from '../../hooks/useEnumOptions'
 
 const STATUS_COLORS: Record<ReimbursementStatus, string> = {
   draft:          'var(--text-secondary-dark)',
@@ -21,14 +13,6 @@ const STATUS_COLORS: Record<ReimbursementStatus, string> = {
   pending_review: 'var(--warning)',
   approved:       'var(--success)',
   rejected:       'var(--error)',
-}
-
-const STATUS_LABELS: Record<ReimbursementStatus, string> = {
-  draft:          'Draft',
-  submitted:      'Submitted',
-  pending_review: 'Pending Review',
-  approved:       'Approved',
-  rejected:       'Rejected',
 }
 
 type Mode = 'list' | 'create'
@@ -41,6 +25,11 @@ export function ReimbursementPage() {
   const { adminUser } = useAuth()
   const { addToast } = useToast()
   const confirm = useConfirm()
+  const { options: categoryOptions, labelByValue: categoryLabel } = useEnumOptions('expense_category')
+  const { options: statusOptions, labelByValue: statusLabel } = useEnumOptions('expense_status')
+  const reviewStatusOptions = statusOptions.filter((o) =>
+    ['pending_review', 'approved', 'rejected'].includes(o.value),
+  )
   const isSuperAdmin = adminUser?.roles?.some((r: any) => r.role === 'SUPER_ADMIN') ?? false
 
   const [items, setItems] = useState<ReimbursementApi[]>([])
@@ -148,7 +137,7 @@ export function ReimbursementPage() {
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Category</label>
                 <select className="form-input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as ReimbursementCategory })}>
-                  {(Object.entries(CATEGORY_LABELS) as [ReimbursementCategory, string][]).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  {categoryOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
@@ -232,7 +221,7 @@ export function ReimbursementPage() {
           <div style={{ width: '220px', maxWidth: '100%' }}>
             <select className="form-input" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ marginBottom: 0 }}>
               <option value="">All Statuses</option>
-              {(Object.entries(STATUS_LABELS) as [ReimbursementStatus, string][]).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              {statusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
         </div>
@@ -264,7 +253,7 @@ export function ReimbursementPage() {
                     const isActive = selected?.id === r.id
                     return (
                       <tr key={r.id} onClick={() => { setSelected(r); setReviewStatus('approved'); setReviewNotes(r.reviewerNotes ?? '') }} style={{ cursor: 'pointer', background: isActive ? 'var(--primary-light)' : 'transparent' }}>
-                        <td style={{ fontWeight: 600 }}>{CATEGORY_LABELS[r.category] ?? r.category}</td>
+                        <td style={{ fontWeight: 600 }}>{categoryLabel(r.category)}</td>
                         <td style={{ maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</td>
                         <td style={{ fontWeight: 700 }}>
                           {r.currency} {Number(r.amount).toFixed(2)}
@@ -272,7 +261,7 @@ export function ReimbursementPage() {
                         </td>
                         <td>
                           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: STATUS_COLORS[r.status], background: `${STATUS_COLORS[r.status]}18`, borderRadius: '20px', padding: '2px 8px' }}>
-                            {STATUS_LABELS[r.status]}
+                            {statusLabel(r.status)}
                           </span>
                         </td>
                         <td style={{ whiteSpace: 'nowrap', fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>
@@ -300,14 +289,14 @@ export function ReimbursementPage() {
         {selected && (
           <div className="glass-panel" style={{ padding: '20px', position: 'sticky', top: '16px', borderLeft: '3px solid var(--primary)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>{CATEGORY_LABELS[selected.category]}</h3>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>{categoryLabel(selected.category)}</h3>
               <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-secondary-dark)' }}>✕</button>
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '16px', fontSize: '0.82rem' }}>
               <tbody>
                 {[
                   ['Amount', `${selected.currency} ${Number(selected.amount).toFixed(2)}`],
-                  ['Status', STATUS_LABELS[selected.status]],
+                  ['Status', statusLabel(selected.status)],
                   ['Submitted', new Date(selected.createdAt).toLocaleString()],
                   ...(selected.reviewedAt ? [['Reviewed', new Date(selected.reviewedAt).toLocaleString()]] : []),
                 ].map(([k, v]) => (
@@ -345,9 +334,7 @@ export function ReimbursementPage() {
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Decision</label>
                   <select className="form-input" value={reviewStatus} onChange={(e) => setReviewStatus(e.target.value as ReimbursementStatus)}>
-                    <option value="pending_review">Mark Pending Review</option>
-                    <option value="approved">Approve</option>
-                    <option value="rejected">Reject</option>
+                    {reviewStatusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
                 <div>

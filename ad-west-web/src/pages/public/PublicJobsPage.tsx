@@ -2,15 +2,9 @@ import React, { useEffect, useState } from 'react'
 import { backendApi, JobPostingApi } from '../../utils/backendApi'
 import { FileUploadZone } from '../../components/common/FileUploadZone'
 import { PublicPageShell } from './PublicPageShell'
+import { useEnumOptions } from '../../hooks/useEnumOptions'
 
 type View = 'listings' | 'apply' | 'post'
-
-const JOB_TYPE_LABELS: Record<string, string> = {
-  full_time: 'Full Time',
-  part_time: 'Part Time',
-  volunteer: 'Volunteer',
-  contract: 'Contract',
-}
 
 const MAX_RESUME_SIZE_BYTES = 1024 * 1024
 
@@ -41,7 +35,7 @@ const sectionEyebrowStyle = {
   letterSpacing: '0.06em',
 }
 
-function JobCard({ job, onApply }: { job: JobPostingApi; onApply: (job: JobPostingApi) => void }) {
+function JobCard({ job, onApply, jobTypeLabel }: { job: JobPostingApi; onApply: (job: JobPostingApi) => void; jobTypeLabel: (value: string) => string }) {
   const [expanded, setExpanded] = useState(false)
   const description = stripContactBlock(job.description)
   return (
@@ -51,7 +45,7 @@ function JobCard({ job, onApply }: { job: JobPostingApi; onApply: (job: JobPosti
           <h3 style={{ margin: '0 0 4px', color: 'var(--public-text-primary)', fontSize: '1.05rem', fontWeight: 700 }}>{job.title}</h3>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ background: 'var(--public-accent-soft)', color: 'var(--public-accent)', borderRadius: '20px', padding: '2px 10px', fontSize: '0.78rem', fontWeight: 600 }}>
-              {JOB_TYPE_LABELS[job.type] ?? job.type}
+              {jobTypeLabel(job.type)}
             </span>
             {job.location && (
               <span style={{ color: 'var(--public-text-secondary)', fontSize: '0.82rem' }}>📍 {job.location}</span>
@@ -89,6 +83,7 @@ function JobCard({ job, onApply }: { job: JobPostingApi; onApply: (job: JobPosti
 }
 
 export function PublicJobsPage() {
+  const { options: jobTypeOptions, labelByValue: jobTypeLabel } = useEnumOptions('job_posting_type')
   const [view, setView] = useState<View>('listings')
   const [selectedJob, setSelectedJob] = useState<JobPostingApi | null>(null)
 
@@ -395,7 +390,7 @@ export function PublicJobsPage() {
             {!loading && !loadError && jobs.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {jobs.map((job) => (
-                  <JobCard key={job.id} job={job} onApply={handleApply} />
+                  <JobCard key={job.id} job={job} onApply={handleApply} jobTypeLabel={jobTypeLabel} />
                 ))}
               </div>
             )}
@@ -431,7 +426,7 @@ export function PublicJobsPage() {
                 <>
                   <h2 style={{ margin: '0 0 4px', color: 'var(--public-text-primary)', fontSize: '1.3rem' }}>Apply — {selectedJob.title}</h2>
                   <p style={{ margin: '0 0 24px', color: 'var(--public-text-secondary)', fontSize: '0.88rem' }}>
-                    {JOB_TYPE_LABELS[selectedJob.type] ?? selectedJob.type}
+                    {jobTypeLabel(selectedJob.type)}
                     {selectedJob.location && ` · ${selectedJob.location}`}
                   </p>
 
@@ -572,10 +567,7 @@ export function PublicJobsPage() {
                         <label style={fieldLabelStyle}>Job Type</label>
                         <select className="form-input" value={postJobType} onChange={(e) => setPostJobType(e.target.value)}>
                           <option value="">Select type</option>
-                          <option value="full_time">Full Time</option>
-                          <option value="part_time">Part Time</option>
-                          <option value="volunteer">Volunteer</option>
-                          <option value="contract">Contract</option>
+                          {jobTypeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
                       </div>
                       <div>

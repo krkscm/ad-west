@@ -13,28 +13,6 @@ CREATE TABLE IF NOT EXISTS adwest.integration_google_config (
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO adwest.integration_google_config (
-  id,
-  client_id,
-  client_secret,
-  redirect_uri,
-  oauth_scopes,
-  web_app_origin,
-  enabled,
-  updated_at
-)
-VALUES (
-  'default',
-  '653659463926-tt1k4egcm66j5d2k5r4sc47m8sdjipmg.apps.googleusercontent.com',
-  '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',
-  'http://localhost:3001/api/v1/auth/google/callback',
-  'openid email profile https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly',
-  'http://localhost:3000',
-  TRUE,
-  NOW()
-)
-ON CONFLICT (id) DO NOTHING;
-
 DROP TRIGGER IF EXISTS trg_integration_google_config_updated_at ON adwest.integration_google_config;
 CREATE TRIGGER trg_integration_google_config_updated_at
   BEFORE UPDATE ON adwest.integration_google_config

@@ -52,6 +52,7 @@ export function PublicPageShell({ subtitle, children }: Props) {
 
         {/* Header */}
         <header
+          className="public-page-header"
           style={{
             background: 'var(--public-header-bg)',
             backdropFilter: 'blur(20px)',
@@ -104,7 +105,7 @@ export function PublicPageShell({ subtitle, children }: Props) {
         </header>
 
         {/* Page-specific content */}
-        <main style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '48px 16px' }}>
+        <main className="public-page-main" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '48px 16px' }}>
           {children}
         </main>
 

@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CreateGovernanceAssignmentDto, CreateGovernanceStructureDto, CreateLocationDto, CreateSreniDefinitionDto, CreateSrenyDto, CreateSthanDto, CreateZoneDto, UpdateGovernanceAssignmentDto, UpdateGovernanceStructureDto, UpdateLocationDto, UpdateSreniDefinitionDto, UpdateSrenyDto, UpdateSthanDto, UpdateZoneDto } from '../dto/core-business.dto';
 import type { GovernanceAssignmentRecord, GovernanceStructureRecord, LocationRecord, SrenyRecord, SthanRecord, ZoneRecord } from '../core-business.service';
+import { HOUSEHOLD_ENUM_TYPES, HouseholdEnumConfigService } from './household-enum-config.service';
 
 export interface OrgRuntimeContext {
   zones: Map<string, ZoneRecord>;
@@ -10,6 +11,7 @@ export interface OrgRuntimeContext {
   sthans: Map<string, SthanRecord>;
   governanceStructures: Map<string, GovernanceStructureRecord>;
   governanceAssignments: Map<string, GovernanceAssignmentRecord>;
+  enumConfig: HouseholdEnumConfigService;
   runtimeMode: 'in-memory' | 'db';
   dataSource?: DataSource;
   newId: (prefix: string) => string;
@@ -28,6 +30,51 @@ export interface OrgRuntimeContext {
 
 export class OrgRuntimeService {
   constructor(private readonly ctx: OrgRuntimeContext) {}
+
+  private async resolveSreniHouseholdConfig(dto: {
+    enrollmentScope?: string;
+    primaryContactStrategy?: string;
+  }): Promise<{ enrollmentScope: string; primaryContactStrategy: string }> {
+    const enrollmentScope = dto.enrollmentScope
+      ?? await this.ctx.enumConfig.getDefaultValue(HOUSEHOLD_ENUM_TYPES.ENROLLMENT_SCOPE);
+    const primaryContactStrategy = dto.primaryContactStrategy
+      ?? await this.ctx.enumConfig.getDefaultValue(HOUSEHOLD_ENUM_TYPES.PRIMARY_CONTACT_STRATEGY);
+    if (dto.enrollmentScope) {
+      await this.ctx.enumConfig.validate(HOUSEHOLD_ENUM_TYPES.ENROLLMENT_SCOPE, dto.enrollmentScope, 'Enrollment scope');
+    }
+    if (dto.primaryContactStrategy) {
+      await this.ctx.enumConfig.validate(
+        HOUSEHOLD_ENUM_TYPES.PRIMARY_CONTACT_STRATEGY,
+        dto.primaryContactStrategy,
+        'Primary contact strategy',
+      );
+    }
+    return { enrollmentScope, primaryContactStrategy };
+  }
+
+  private mapSreniDefinitionRow(r: {
+    id: string; name: string; description: string | null; code: string | null; active: boolean;
+    is_service_sreny: boolean; join_us_visible: boolean;
+    enrollment_scope?: string | null; primary_contact_strategy?: string | null;
+    created_by: string | null; updated_by: string | null;
+    created_at: string | Date; updated_at: string | Date;
+  }): SrenyRecord {
+    return {
+      id: r.id,
+      name: r.name,
+      description: r.description ?? undefined,
+      code: r.code ?? undefined,
+      active: r.active,
+      isServiceSreny: r.is_service_sreny,
+      joinUsVisible: r.join_us_visible,
+      enrollmentScope: r.enrollment_scope ?? undefined,
+      primaryContactStrategy: r.primary_contact_strategy ?? undefined,
+      createdBy: r.created_by ?? undefined,
+      updatedBy: r.updated_by ?? undefined,
+      createdAt: this.ctx.toIsoTimestamp(r.created_at),
+      updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+    };
+  }
 
   listZones(): ZoneRecord[] {
     return Array.from(this.ctx.zones.values());
@@ -426,26 +473,29 @@ export class OrgRuntimeService {
         [searchParam],
       ),
       this.ctx.dataSource.query(
-        `SELECT id, name, description, code, active, is_service_sreny, join_us_visible, created_by, updated_by, created_at, updated_at FROM adwest.srenies WHERE zone_id IS NULL AND ($1::text IS NULL OR name ILIKE $1 OR code ILIKE $1 OR description ILIKE $1) ORDER BY name LIMIT $2 OFFSET $3`,
+        `SELECT id, name, description, code, active, is_service_sreny, join_us_visible,
+                enrollment_scope, primary_contact_strategy,
+                created_by, updated_by, created_at, updated_at
+         FROM adwest.srenies
+         WHERE zone_id IS NULL AND ($1::text IS NULL OR name ILIKE $1 OR code ILIKE $1 OR description ILIKE $1)
+         ORDER BY name LIMIT $2 OFFSET $3`,
         [searchParam, pageSize, (page - 1) * pageSize],
       ),
     ]);
     const total = (countRows as Array<{ total: number }>)[0].total;
     const items = (dataRows as Array<{
       id: string; name: string; description: string | null; code: string | null; active: boolean;
-      is_service_sreny: boolean; join_us_visible: boolean; created_by: string | null; updated_by: string | null;
+      is_service_sreny: boolean; join_us_visible: boolean;
+      enrollment_scope: string | null; primary_contact_strategy: string | null;
+      created_by: string | null; updated_by: string | null;
       created_at: string | Date; updated_at: string | Date;
-    }>).map((r) => ({
-      id: r.id, name: r.name, description: r.description ?? undefined, code: r.code ?? undefined,
-      active: r.active, isServiceSreny: r.is_service_sreny,
-      joinUsVisible: r.join_us_visible,
-      createdBy: r.created_by ?? undefined, updatedBy: r.updated_by ?? undefined,
-      createdAt: this.ctx.toIsoTimestamp(r.created_at), updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
-    }));
+    }>).map((r) => this.mapSreniDefinitionRow(r));
     return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) || 1 };
   }
 
   async createSreniDefinition(dto: CreateSreniDefinitionDto, actorEmail?: string): Promise<SrenyRecord> {
+    const householdConfig = await this.resolveSreniHouseholdConfig(dto);
+
     if (this.ctx.runtimeMode !== 'db' || !this.ctx.dataSource) {
       const now = new Date().toISOString();
       const record: SrenyRecord = {
@@ -455,6 +505,8 @@ export class OrgRuntimeService {
         description: dto.description,
         isServiceSreny: false,
         joinUsVisible: dto.joinUsVisible ?? false,
+        enrollmentScope: householdConfig.enrollmentScope,
+        primaryContactStrategy: householdConfig.primaryContactStrategy,
         active: true,
         createdBy: actorEmail,
         updatedBy: actorEmail,
@@ -466,10 +518,22 @@ export class OrgRuntimeService {
     }
 
     const rows = (await this.ctx.dataSource.query(
-      `INSERT INTO adwest.srenies (name, code, description, is_service_sreny, join_us_visible, active, created_by, updated_by)
-       VALUES ($1, $2, $3, false, $4, true, $5, $5)
-       RETURNING id, name, description, code, active, is_service_sreny, join_us_visible, created_by, updated_by, created_at, updated_at`,
-      [dto.name, dto.code ?? null, dto.description ?? null, dto.joinUsVisible ?? false, actorEmail ?? null],
+      `INSERT INTO adwest.srenies (
+         name, code, description, is_service_sreny, join_us_visible, active,
+         enrollment_scope, primary_contact_strategy, created_by, updated_by
+       )
+       VALUES ($1, $2, $3, false, $4, true, $5, $6, $7, $7)
+       RETURNING id, name, description, code, active, is_service_sreny, join_us_visible,
+                 enrollment_scope, primary_contact_strategy, created_by, updated_by, created_at, updated_at`,
+      [
+        dto.name,
+        dto.code ?? null,
+        dto.description ?? null,
+        dto.joinUsVisible ?? false,
+        householdConfig.enrollmentScope,
+        householdConfig.primaryContactStrategy,
+        actorEmail ?? null,
+      ],
     )) as Array<{
       id: string;
       name: string;
@@ -478,25 +542,14 @@ export class OrgRuntimeService {
       active: boolean;
       is_service_sreny: boolean;
       join_us_visible: boolean;
+      enrollment_scope: string | null;
+      primary_contact_strategy: string | null;
       created_by: string | null;
       updated_by: string | null;
       created_at: string | Date;
       updated_at: string | Date;
     }>;
-    const row = rows[0];
-    const record: SrenyRecord = {
-      id: row.id,
-      name: row.name,
-      description: row.description ?? undefined,
-      code: row.code ?? undefined,
-      active: row.active,
-      isServiceSreny: row.is_service_sreny,
-      joinUsVisible: row.join_us_visible,
-      createdBy: row.created_by ?? undefined,
-      updatedBy: row.updated_by ?? undefined,
-      createdAt: this.ctx.toIsoTimestamp(row.created_at),
-      updatedAt: this.ctx.toIsoTimestamp(row.updated_at),
-    };
+    const record = this.mapSreniDefinitionRow(rows[0]);
     this.ctx.srenies.set(record.id, record);
 
     const menuNow = new Date().toISOString();
@@ -548,15 +601,33 @@ export class OrgRuntimeService {
   async updateSreniDefinition(sreniId: string, dto: UpdateSreniDefinitionDto, actorEmail?: string): Promise<SrenyRecord> {
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource && !this.ctx.srenies.has(sreniId)) {
       const rows = await this.ctx.dataSource.query(
-        'SELECT id, name, code, description, active, is_service_sreny, join_us_visible, created_by, updated_by, created_at, updated_at FROM adwest.srenies WHERE id=$1',
+        `SELECT id, name, code, description, active, is_service_sreny, join_us_visible,
+                enrollment_scope, primary_contact_strategy, created_by, updated_by, created_at, updated_at
+         FROM adwest.srenies WHERE id=$1`,
         [sreniId],
-      ) as Array<{ id: string; name: string; code: string | null; description: string | null; active: boolean; is_service_sreny: boolean; join_us_visible: boolean; created_by: string | null; updated_by: string | null; created_at: string | Date; updated_at: string | Date }>;
+      ) as Array<{
+        id: string; name: string; code: string | null; description: string | null; active: boolean;
+        is_service_sreny: boolean; join_us_visible: boolean;
+        enrollment_scope: string | null; primary_contact_strategy: string | null;
+        created_by: string | null; updated_by: string | null;
+        created_at: string | Date; updated_at: string | Date;
+      }>;
       if (!rows.length) throw new NotFoundException('Sreni not found');
-      const r = rows[0];
-      this.ctx.srenies.set(r.id, { id: r.id, name: r.name, code: r.code ?? undefined, description: r.description ?? undefined, active: r.active, isServiceSreny: r.is_service_sreny, joinUsVisible: r.join_us_visible, createdBy: r.created_by ?? undefined, updatedBy: r.updated_by ?? undefined, createdAt: this.ctx.toIsoTimestamp(r.created_at), updatedAt: this.ctx.toIsoTimestamp(r.updated_at) });
+      this.ctx.srenies.set(rows[0].id, this.mapSreniDefinitionRow(rows[0]));
     }
     const current = this.ctx.srenies.get(sreniId);
     if (!current) throw new NotFoundException('Sreni not found');
+
+    if (dto.enrollmentScope) {
+      await this.ctx.enumConfig.validate(HOUSEHOLD_ENUM_TYPES.ENROLLMENT_SCOPE, dto.enrollmentScope, 'Enrollment scope');
+    }
+    if (dto.primaryContactStrategy) {
+      await this.ctx.enumConfig.validate(
+        HOUSEHOLD_ENUM_TYPES.PRIMARY_CONTACT_STRATEGY,
+        dto.primaryContactStrategy,
+        'Primary contact strategy',
+      );
+    }
 
     if (this.ctx.runtimeMode !== 'db' || !this.ctx.dataSource) {
       const updated: SrenyRecord = {
@@ -566,6 +637,8 @@ export class OrgRuntimeService {
         description: dto.description !== undefined ? dto.description : current.description,
         active: dto.active !== undefined ? dto.active : current.active,
         joinUsVisible: dto.joinUsVisible !== undefined ? dto.joinUsVisible : current.joinUsVisible,
+        enrollmentScope: dto.enrollmentScope ?? current.enrollmentScope,
+        primaryContactStrategy: dto.primaryContactStrategy ?? current.primaryContactStrategy,
         updatedBy: actorEmail ?? current.updatedBy,
         updatedAt: new Date().toISOString(),
       };
@@ -578,6 +651,8 @@ export class OrgRuntimeService {
     const nextDescription = dto.description !== undefined ? dto.description : current.description ?? null;
     const nextActive = dto.active !== undefined ? dto.active : current.active;
     const nextJoinUsVisible = dto.joinUsVisible !== undefined ? dto.joinUsVisible : current.joinUsVisible;
+    const nextEnrollmentScope = dto.enrollmentScope ?? current.enrollmentScope ?? null;
+    const nextPrimaryContactStrategy = dto.primaryContactStrategy ?? current.primaryContactStrategy ?? null;
 
     const rows = (await this.ctx.dataSource.query(
       `UPDATE adwest.srenies
@@ -586,26 +661,34 @@ export class OrgRuntimeService {
            description = $4,
            active      = $5,
            join_us_visible = $6,
-           updated_by  = $7,
+           enrollment_scope = $7,
+           primary_contact_strategy = $8,
+           updated_by  = $9,
            updated_at  = now()
        WHERE id = $1
-       RETURNING id, name, description, code, active, is_service_sreny, join_us_visible, created_by, updated_by, created_at, updated_at`,
-      [sreniId, nextName, nextCode, nextDescription, nextActive, nextJoinUsVisible, actorEmail ?? null],
-    )) as unknown as [Array<{ id: string; name: string; description: string | null; code: string | null; active: boolean; is_service_sreny: boolean; join_us_visible: boolean; created_by: string | null; updated_by: string | null; created_at: string | Date; updated_at: string | Date }>, number];
-    const row = rows[0][0];
+       RETURNING id, name, description, code, active, is_service_sreny, join_us_visible,
+                 enrollment_scope, primary_contact_strategy, created_by, updated_by, created_at, updated_at`,
+      [
+        sreniId,
+        nextName,
+        nextCode,
+        nextDescription,
+        nextActive,
+        nextJoinUsVisible,
+        nextEnrollmentScope,
+        nextPrimaryContactStrategy,
+        actorEmail ?? null,
+      ],
+    )) as unknown as [Array<{
+      id: string; name: string; description: string | null; code: string | null; active: boolean;
+      is_service_sreny: boolean; join_us_visible: boolean;
+      enrollment_scope: string | null; primary_contact_strategy: string | null;
+      created_by: string | null; updated_by: string | null;
+      created_at: string | Date; updated_at: string | Date;
+    }>, number];
     const updated: SrenyRecord = {
-      id: row.id,
-      name: row.name,
+      ...this.mapSreniDefinitionRow(rows[0][0]),
       zoneId: current.zoneId,
-      description: row.description ?? undefined,
-      code: row.code ?? undefined,
-      active: row.active,
-      isServiceSreny: row.is_service_sreny,
-      joinUsVisible: row.join_us_visible,
-      createdBy: row.created_by ?? undefined,
-      updatedBy: row.updated_by ?? undefined,
-      createdAt: this.ctx.toIsoTimestamp(row.created_at),
-      updatedAt: this.ctx.toIsoTimestamp(row.updated_at),
     };
     this.ctx.srenies.set(sreniId, updated);
 

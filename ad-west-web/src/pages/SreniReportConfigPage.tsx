@@ -2,21 +2,16 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { backendApi, SreniReportParameterApi } from '../utils/backendApi';
 import { useToast } from '../components/common/Toast';
 import { useConfirm } from '../components/common/ConfirmDialog';
+import { useEnumOptions } from '../hooks/useEnumOptions';
 
 interface Props {
   sreniId: string;
   sreniName: string;
 }
 
-type SubmissionType = 'monthly' | 'half_yearly' | 'yearly';
+type SubmissionType = string;
 
-const TYPE_LABELS: Record<SubmissionType, string> = {
-  monthly: 'Monthly',
-  half_yearly: 'Half-Yearly',
-  yearly: 'Yearly',
-};
-
-const TYPE_ICONS: Record<SubmissionType, string> = {
+const TYPE_ICONS: Record<string, string> = {
   monthly: '📅',
   half_yearly: '📆',
   yearly: '🗓️',
@@ -41,11 +36,11 @@ const toUiError = (err: unknown, fallback: string) => {
   return m?.[1] ?? err.message ?? fallback;
 };
 
-const SUBMISSION_TYPES: SubmissionType[] = ['monthly', 'half_yearly', 'yearly'];
-
 export const SreniReportConfigPage: React.FC<Props> = ({ sreniId, sreniName }) => {
   const { addToast } = useToast();
   const confirm = useConfirm();
+  const { options: submissionTypeOptions, labelByValue: submissionTypeLabel } = useEnumOptions('report_submission_type');
+  const { options: inputTypeOptions, labelByValue: inputTypeLabel } = useEnumOptions('report_metric_input_type');
 
   const [activeType, setActiveType] = useState<SubmissionType>('monthly');
   const [paramsByType, setParamsByType] = useState<Record<SubmissionType, SreniReportParameterApi[]>>({
@@ -147,7 +142,8 @@ export const SreniReportConfigPage: React.FC<Props> = ({ sreniId, sreniName }) =
 
       {/* Submission type tabs */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-        {SUBMISSION_TYPES.map((type) => {
+        {submissionTypeOptions.map((typeOpt) => {
+          const type = typeOpt.value;
           const count = paramsByType[type].filter((p) => p.active).length;
           const isActive = activeType === type;
           return (
@@ -163,7 +159,7 @@ export const SreniReportConfigPage: React.FC<Props> = ({ sreniId, sreniName }) =
                 cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
               }}
             >
-              {TYPE_ICONS[type]} {TYPE_LABELS[type]}
+              {TYPE_ICONS[type] ?? '📋'} {submissionTypeLabel(type)}
               {count > 0 && (
                 <span style={{ background: isActive ? 'var(--primary)' : 'rgba(148,163,184,0.3)', color: isActive ? '#fff' : 'var(--text-secondary-dark)', borderRadius: '999px', padding: '1px 7px', fontSize: '0.72rem', fontWeight: 700 }}>
                   {count}
@@ -178,7 +174,7 @@ export const SreniReportConfigPage: React.FC<Props> = ({ sreniId, sreniName }) =
       <div className="glass-panel" style={{ padding: '24px', borderLeft: '3px solid var(--primary)', marginBottom: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '1rem' }}>{TYPE_ICONS[activeType]} {TYPE_LABELS[activeType]} Reports</div>
+            <div style={{ fontWeight: 700, fontSize: '1rem' }}>{TYPE_ICONS[activeType] ?? '📋'} {submissionTypeLabel(activeType)} Reports</div>
             <div style={{ color: 'var(--text-secondary-dark)', fontSize: '0.82rem', marginTop: '2px' }}>
               {params.filter((p) => p.active).length} active parameter{params.filter((p) => p.active).length !== 1 ? 's' : ''}
             </div>
@@ -215,8 +211,7 @@ export const SreniReportConfigPage: React.FC<Props> = ({ sreniId, sreniName }) =
                 <div>
                   <label className="form-label">Input Type</label>
                   <select className="form-input" value={form.inputType} onChange={(e) => setForm((f) => ({ ...f, inputType: e.target.value as 'number' | 'text' }))} style={{ cursor: 'pointer' }}>
-                    <option value="number">Number</option>
-                    <option value="text">Text</option>
+                    {inputTypeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
                 <div>
@@ -271,7 +266,7 @@ export const SreniReportConfigPage: React.FC<Props> = ({ sreniId, sreniName }) =
             <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>📋</div>
             <div style={{ fontWeight: 700, marginBottom: '6px' }}>No parameters yet</div>
             <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', maxWidth: '360px', margin: '0 auto 16px' }}>
-              Add parameters that will appear in the {TYPE_LABELS[activeType].toLowerCase()} report submission form.
+              Add parameters that will appear in the {submissionTypeLabel(activeType).toLowerCase()} report submission form.
             </p>
             <button type="button" className="btn btn-primary" style={{ fontSize: '0.875rem' }} onClick={openAdd}>Add First Parameter</button>
           </div>
@@ -302,7 +297,7 @@ export const SreniReportConfigPage: React.FC<Props> = ({ sreniId, sreniName }) =
                     </td>
                     <td>
                       <span style={{ background: p.inputType === 'number' ? 'rgba(99,102,241,0.12)' : 'rgba(16,185,129,0.12)', color: p.inputType === 'number' ? '#6366f1' : '#10b981', padding: '3px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600 }}>
-                        {p.inputType === 'number' ? '123 Number' : 'Abc Text'}
+                        {inputTypeLabel(p.inputType)}
                       </span>
                     </td>
                     <td style={{ color: 'var(--text-secondary-dark)', fontSize: '0.85rem' }}>{p.unit || '—'}</td>

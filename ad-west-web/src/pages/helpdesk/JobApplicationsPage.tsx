@@ -1,14 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { backendApi, ApplicationStatus, JobApplicationApi } from '../../utils/backendApi'
+import { backendApi, ApplicationStatus, JobApplicationApi, JobApplicationActivityApi } from '../../utils/backendApi'
 import { useToast } from '../../components/common/Toast'
-
-const STATUS_LABELS: Record<ApplicationStatus, string> = {
-  new: 'New',
-  under_review: 'Under Review',
-  shortlisted: 'Shortlisted',
-  rejected: 'Rejected',
-  accepted: 'Accepted',
-}
+import { useEnumOptions } from '../../hooks/useEnumOptions'
 
 const STATUS_COLORS: Record<ApplicationStatus, string> = {
   new: 'var(--info)',
@@ -18,13 +11,37 @@ const STATUS_COLORS: Record<ApplicationStatus, string> = {
   accepted: 'var(--success)',
 }
 
+function describeActivity(
+  activity: JobApplicationActivityApi,
+  statusLabel: (value: string) => string,
+  activityLabel: (value: string) => string,
+): string {
+  if (activity.action === 'submitted') {
+    return `Application received${activity.toStatus ? ` (${statusLabel(activity.toStatus)})` : ''}`
+  }
+  if (activity.action === 'status_changed') {
+    const from = activity.fromStatus ? statusLabel(activity.fromStatus) : '—'
+    const to = activity.toStatus ? statusLabel(activity.toStatus) : '—'
+    return `${from} → ${to}`
+  }
+  if (activity.action === 'note_updated') {
+    return activity.comment ? activityLabel(activity.action) : 'Notes cleared'
+  }
+  return activity.comment ?? activityLabel(activity.action)
+}
+
 export function JobApplicationsPage() {
   const { addToast } = useToast()
+  const { options: statusOptions, labelByValue: statusLabel } = useEnumOptions('job_application_status')
+  const { labelByValue: activityLabel } = useEnumOptions('job_application_activity')
   const [applications, setApplications] = useState<JobApplicationApi[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<JobApplicationApi | null>(null)
+  const [activities, setActivities] = useState<JobApplicationActivityApi[]>([])
+  const [activitiesLoading, setActivitiesLoading] = useState(false)
   const [editStatus, setEditStatus] = useState<ApplicationStatus>('new')
   const [editNotes, setEditNotes] = useState('')
+  const [followUpNote, setFollowUpNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>('')
 
@@ -40,7 +57,27 @@ export function JobApplicationsPage() {
     }
   }, [addToast])
 
-  useEffect(() => { loadApplications() }, [loadApplications])
+  const loadActivities = useCallback(async (applicationId: string) => {
+    setActivitiesLoading(true)
+    try {
+      const res = await backendApi.listJobApplicationActivities(applicationId)
+      setActivities(res.items)
+    } catch {
+      setActivities([])
+    } finally {
+      setActivitiesLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { void loadApplications() }, [loadApplications])
+
+  useEffect(() => {
+    if (selected) {
+      void loadActivities(selected.id)
+    } else {
+      setActivities([])
+    }
+  }, [selected, loadActivities])
 
   const filtered = filterStatus ? applications.filter((a) => a.status === filterStatus) : applications
 
@@ -48,15 +85,22 @@ export function JobApplicationsPage() {
     setSelected(app)
     setEditStatus(app.status)
     setEditNotes(app.notes ?? '')
+    setFollowUpNote('')
   }
 
   const handleSave = async () => {
     if (!selected) return
     setSaving(true)
     try {
-      const updated = await backendApi.updateJobApplication(selected.id, { status: editStatus, notes: editNotes })
+      const updated = await backendApi.updateJobApplication(selected.id, {
+        status: editStatus,
+        notes: editNotes,
+        followUpNote: followUpNote.trim() || undefined,
+      })
       setApplications((prev) => prev.map((a) => (a.id === updated.id ? updated : a)))
       setSelected(updated)
+      setFollowUpNote('')
+      await loadActivities(updated.id)
       addToast('Application updated', 'success')
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Update failed', 'error')
@@ -85,7 +129,7 @@ export function JobApplicationsPage() {
         <div>
           <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>Job Applications</h2>
           <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.9rem', margin: '6px 0 0' }}>
-            Review and manage applications submitted via the public jobs page.
+            Review applications and track each candidate&apos;s progress through the hiring pipeline.
           </p>
           <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
@@ -100,7 +144,7 @@ export function JobApplicationsPage() {
           </div>
         </div>
 
-        <button className="btn btn-secondary" onClick={loadApplications} disabled={loading}>Refresh</button>
+        <button className="btn btn-secondary" onClick={() => void loadApplications()} disabled={loading}>Refresh</button>
       </div>
 
       <div className="glass-panel" style={{ padding: '14px 18px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -113,12 +157,12 @@ export function JobApplicationsPage() {
             style={{ marginBottom: 0 }}
           >
             <option value="">All Statuses</option>
-            {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            {statusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: selected ? 'minmax(0,1fr) 380px' : '1fr', gap: '16px', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: selected ? 'minmax(0,1fr) 420px' : '1fr', gap: '16px', alignItems: 'start' }}>
         <div>
           {loading && <div style={{ color: 'var(--text-secondary-dark)', padding: '20px' }}>Loading…</div>}
           {!loading && filtered.length === 0 && (
@@ -156,7 +200,7 @@ export function JobApplicationsPage() {
                         <td style={{ fontWeight: 600 }}>{app.jobTitle}</td>
                         <td>
                           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: STATUS_COLORS[app.status], background: `${STATUS_COLORS[app.status]}18`, borderRadius: '20px', padding: '2px 8px' }}>
-                            {STATUS_LABELS[app.status]}
+                            {statusLabel(app.status)}
                           </span>
                         </td>
                         <td style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>
@@ -175,7 +219,7 @@ export function JobApplicationsPage() {
         </div>
 
         {selected && (
-          <div className="glass-panel" style={{ padding: '20px', position: 'sticky', top: '16px', borderLeft: '3px solid var(--primary)' }}>
+          <div className="glass-panel" style={{ padding: '20px', position: 'sticky', top: '16px', borderLeft: '3px solid var(--primary)', maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
               <div>
                 <h3 style={{ margin: '0 0 2px', fontSize: '1rem', color: 'var(--text-primary-dark)', fontWeight: 700 }}>{selected.name}</h3>
@@ -190,10 +234,11 @@ export function JobApplicationsPage() {
                   ['Phone', selected.phone],
                   ['Email', selected.email ?? '—'],
                   ['Applied', new Date(selected.createdAt).toLocaleString()],
-                  ...(selected.reviewedAt ? [['Reviewed', new Date(selected.reviewedAt).toLocaleString()]] : []),
+                  ['Current status', statusLabel(selected.status)],
+                  ...(selected.reviewedAt ? [['Last reviewed', new Date(selected.reviewedAt).toLocaleString()]] : []),
                 ].map(([k, v]) => (
                   <tr key={k} style={{ borderBottom: '1px solid var(--border-dark)' }}>
-                    <td style={{ padding: '6px 0', color: 'var(--text-secondary-dark)', width: '90px', fontWeight: 600 }}>{k}</td>
+                    <td style={{ padding: '6px 0', color: 'var(--text-secondary-dark)', width: '110px', fontWeight: 600 }}>{k}</td>
                     <td style={{ padding: '6px 0', color: 'var(--text-primary-dark)' }}>{v}</td>
                   </tr>
                 ))}
@@ -205,9 +250,6 @@ export function JobApplicationsPage() {
                 <button className="btn btn-secondary" onClick={() => void handleOpenResume(selected)}>
                   Open Resume{selected.resumeFileName ? `: ${selected.resumeFileName}` : ''}
                 </button>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>
-                  Stored URL: {selected.resumeUrl}
-                </div>
                 {selected.resumeMimeType && selected.resumeSizeBytes !== undefined && (
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>
                     {selected.resumeMimeType} · {Math.max(1, Math.round(selected.resumeSizeBytes / 1024))} KB
@@ -217,17 +259,63 @@ export function JobApplicationsPage() {
             )}
 
             {selected.coverLetter && (
-              <div style={{ background: 'var(--panel-soft-bg)', borderRadius: '8px', padding: '12px', marginBottom: '16px', fontSize: '0.84rem', color: 'var(--text-primary-dark)', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: '200px', overflowY: 'auto' }}>
+              <div style={{ background: 'var(--panel-soft-bg)', borderRadius: '8px', padding: '12px', marginBottom: '16px', fontSize: '0.84rem', color: 'var(--text-primary-dark)', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: '160px', overflowY: 'auto' }}>
                 <p style={{ margin: '0 0 6px', fontWeight: 600, fontSize: '0.78rem', color: 'var(--text-secondary-dark)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Cover Letter</p>
                 {selected.coverLetter}
               </div>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {/* Activity timeline */}
+            <div style={{ marginBottom: '18px' }}>
+              <p style={{ margin: '0 0 10px', fontWeight: 700, fontSize: '0.78rem', color: 'var(--text-secondary-dark)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Application Timeline
+              </p>
+              {activitiesLoading ? (
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>Loading timeline…</div>
+              ) : activities.length === 0 ? (
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)', padding: '12px', background: 'var(--panel-soft-bg)', borderRadius: '8px' }}>
+                  No activity recorded yet.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0', position: 'relative', paddingLeft: '14px', borderLeft: '2px solid var(--border-dark)' }}>
+                  {activities.map((activity, idx) => (
+                    <div key={activity.id} style={{ position: 'relative', paddingBottom: idx < activities.length - 1 ? '14px' : 0 }}>
+                      <div style={{
+                        position: 'absolute', left: '-21px', top: '4px', width: '10px', height: '10px',
+                        borderRadius: '50%', background: activity.action === 'status_changed' ? 'var(--primary)' : 'var(--border-dark)',
+                        border: '2px solid var(--glass-bg)',
+                      }} />
+                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary-dark)' }}>
+                        {activityLabel(activity.action)}
+                      </div>
+                      <div style={{ fontSize: '0.82rem', color: 'var(--text-primary-dark)', marginTop: '2px' }}>
+                        {describeActivity(activity, statusLabel, activityLabel)}
+                      </div>
+                      {activity.comment && activity.action !== 'note_updated' && (
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)', marginTop: '4px', whiteSpace: 'pre-wrap' }}>
+                          {activity.comment}
+                        </div>
+                      )}
+                      {activity.comment && activity.action === 'note_updated' && (
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)', marginTop: '4px', whiteSpace: 'pre-wrap', fontStyle: 'italic' }}>
+                          &ldquo;{activity.comment.length > 120 ? `${activity.comment.slice(0, 120)}…` : activity.comment}&rdquo;
+                        </div>
+                      )}
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary-dark)', marginTop: '4px' }}>
+                        {new Date(activity.createdAt).toLocaleString()}
+                        {activity.actorLabel ? ` · ${activity.actorLabel}` : ''}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid var(--border-dark)', paddingTop: '16px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Decision</label>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Update Status</label>
                 <select className="form-input" value={editStatus} onChange={(e) => setEditStatus(e.target.value as ApplicationStatus)}>
-                  {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  {statusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
               <div>
@@ -237,12 +325,23 @@ export function JobApplicationsPage() {
                   value={editNotes}
                   onChange={(e) => setEditNotes(e.target.value)}
                   rows={3}
-                  placeholder="Notes for internal review…"
+                  placeholder="Summary notes for the team…"
                   style={{ resize: 'vertical' }}
                 />
               </div>
-              <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-                {saving ? 'Saving…' : 'Save Decision'}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary-dark)', marginBottom: '4px' }}>Add Follow-up to Timeline</label>
+                <textarea
+                  className="form-input"
+                  value={followUpNote}
+                  onChange={(e) => setFollowUpNote(e.target.value)}
+                  rows={2}
+                  placeholder="e.g. Called candidate, scheduled interview for next week…"
+                  style={{ resize: 'vertical' }}
+                />
+              </div>
+              <button className="btn btn-primary" onClick={() => void handleSave()} disabled={saving}>
+                {saving ? 'Saving…' : 'Save & Record Update'}
               </button>
             </div>
           </div>

@@ -1,38 +1,22 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { backendApi, SthanExpenseApi, SthanExpenseCategory, SthanExpenseStatus } from '../utils/backendApi';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { backendApi, SthanExpenseApi, SthanExpenseCategory } from '../utils/backendApi';
 import { useAuth } from '../context/auth-context';
 import { useToast } from '../components/common/Toast';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { SwitchToggle } from '../components/common/SwitchToggle';
+import { useEnumOptions } from '../hooks/useEnumOptions';
 
 interface Props {
   locationId: string;
   locationName: string;
 }
 
-const CATEGORY_LABELS: Record<SthanExpenseCategory, string> = {
-  travel: 'Travel',
-  food: 'Food & Meals',
-  accommodation: 'Accommodation',
-  event_supplies: 'Event Supplies',
-  printing: 'Printing',
-  other: 'Other',
-};
-
-const STATUS_COLORS: Record<SthanExpenseStatus, string> = {
+const STATUS_COLORS: Record<string, string> = {
   draft: 'var(--text-secondary-dark)',
   submitted: 'var(--warning)',
   pending_review: 'var(--warning)',
   approved: 'var(--success)',
   rejected: 'var(--error)',
-};
-
-const STATUS_LABELS: Record<SthanExpenseStatus, string> = {
-  draft: 'Draft',
-  submitted: 'Submitted',
-  pending_review: 'Pending Review',
-  approved: 'Approved',
-  rejected: 'Rejected',
 };
 
 const BLANK = { category: 'other' as SthanExpenseCategory, description: '', amount: '', currency: 'AED', asDraft: false };
@@ -57,6 +41,14 @@ export const SthanExpensesPage: React.FC<Props> = ({ locationId, locationName })
   const [reviewStatus, setReviewStatus] = useState<'approved' | 'rejected' | 'pending_review'>('approved');
   const [reviewNotes, setReviewNotes] = useState('');
   const [reviewing, setReviewing] = useState(false);
+
+  const { options: categoryOptions, labelByValue: categoryLabel } = useEnumOptions('expense_category');
+  const { options: statusOptions, labelByValue: statusLabel } = useEnumOptions('expense_status');
+
+  const statusFilters = useMemo(
+    () => [{ label: 'All', value: '' }, ...statusOptions.map((o) => ({ label: o.label, value: o.value }))],
+    [statusOptions],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -125,14 +117,6 @@ export const SthanExpensesPage: React.FC<Props> = ({ locationId, locationName })
     }
   };
 
-  const statusFilters: Array<{ label: string; value: string }> = [
-    { label: 'All', value: '' },
-    { label: 'Submitted', value: 'submitted' },
-    { label: 'Pending Review', value: 'pending_review' },
-    { label: 'Approved', value: 'approved' },
-    { label: 'Rejected', value: 'rejected' },
-  ];
-
   return (
     <div className="animate-slide-up">
       {/* Header */}
@@ -167,8 +151,8 @@ export const SthanExpensesPage: React.FC<Props> = ({ locationId, locationName })
               <div>
                 <label className="form-label">Category</label>
                 <select className="form-input" value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as SthanExpenseCategory }))}>
-                  {(Object.keys(CATEGORY_LABELS) as SthanExpenseCategory[]).map((c) => (
-                    <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
+                  {categoryOptions.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
                   ))}
                 </select>
               </div>
@@ -219,7 +203,7 @@ export const SthanExpensesPage: React.FC<Props> = ({ locationId, locationName })
               <button key={s} type="button" onClick={() => setReviewStatus(s)}
                 className={`btn ${reviewStatus === s ? 'btn-primary' : 'btn-secondary'}`}
                 style={{ padding: '6px 14px', fontSize: '0.84rem' }}>
-                {STATUS_LABELS[s]}
+                {statusLabel(s)}
               </button>
             ))}
           </div>
@@ -271,13 +255,13 @@ export const SthanExpensesPage: React.FC<Props> = ({ locationId, locationName })
             <tbody>
               {items.map((item) => (
                 <tr key={item.id}>
-                  <td style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{CATEGORY_LABELS[item.category]}</td>
+                  <td style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{categoryLabel(item.category)}</td>
                   <td style={{ fontSize: '0.85rem', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</td>
                   <td style={{ fontSize: '0.85rem', fontWeight: 600, whiteSpace: 'nowrap' }}>{item.currency} {Number(item.amount).toFixed(2)}</td>
                   {isSuperAdmin && <td style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>{item.submittedBy ?? '—'}</td>}
                   <td>
                     <span style={{ fontSize: '0.8rem', fontWeight: 600, color: STATUS_COLORS[item.status] }}>
-                      {STATUS_LABELS[item.status]}
+                      {statusLabel(item.status)}
                     </span>
                     {item.reviewerNotes && (
                       <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: 'var(--text-secondary-dark)' }}>{item.reviewerNotes}</p>

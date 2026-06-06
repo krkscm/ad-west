@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { EnumValueEntity } from '../entities/enum-value.entity';
 import { CreateEnumValueDto, ListEnumValuesQueryDto, UpdateEnumValueDto } from '../dto/enum-value.dto';
 import { CryptoService } from '@modules/user-management/services/crypto.service';
+import { PLATFORM_ENUM_SEEDS, SUPPORTED_ENUM_TYPES } from '../enum-types.constants';
+import { EnumConfigService } from './enum-config.service';
 
 export interface EnumValue {
   id: string;
@@ -17,29 +19,14 @@ export interface EnumValue {
   updatedAt: string;
 }
 
-const SEED_VALUES: Omit<EnumValue, 'id' | 'createdAt' | 'updatedAt'>[] = [
-  // Admin roles
-  { enumType: 'admin_role', value: 'SUPER_ADMIN',  label: 'Super Admin',  sortOrder: 10, active: true, parentValue: null },
-  { enumType: 'admin_role', value: 'ZONE_ADMIN',   label: 'Zone Admin',   sortOrder: 20, active: true, parentValue: null },
-  { enumType: 'admin_role', value: 'SRENY_ADMIN',  label: 'Sreny Admin',  sortOrder: 30, active: true, parentValue: null },
-  // Scope types
-  { enumType: 'scope_type', value: 'global', label: 'Global', sortOrder: 10, active: true, parentValue: null },
-  { enumType: 'scope_type', value: 'zone',   label: 'Zone',   sortOrder: 20, active: true, parentValue: null },
-  { enumType: 'scope_type', value: 'sreny',  label: 'Sreny',  sortOrder: 30, active: true, parentValue: null },
-  // Role levels
-  { enumType: 'role_level', value: 'ZONE',  label: 'Zone',  sortOrder: 10, active: true, parentValue: null },
-  { enumType: 'role_level', value: 'STHAN', label: 'Sthan', sortOrder: 20, active: true, parentValue: 'ZONE' },
-  // Approval modes
-  { enumType: 'approval_mode', value: 'sequential', label: 'Sequential', sortOrder: 10, active: true, parentValue: null },
-  { enumType: 'approval_mode', value: 'parallel',   label: 'Parallel',   sortOrder: 20, active: true, parentValue: null },
-];
-
-const SUPPORTED_ENUM_TYPES = new Set<string>([
-  'admin_role',
-  'scope_type',
-  'role_level',
-  'approval_mode',
-]);
+const SEED_VALUES: Omit<EnumValue, 'id' | 'createdAt' | 'updatedAt'>[] = PLATFORM_ENUM_SEEDS.map((seed) => ({
+  enumType: seed.enumType,
+  value: seed.value,
+  label: seed.label,
+  sortOrder: seed.sortOrder,
+  active: seed.active,
+  parentValue: seed.parentValue,
+}));
 
 @Injectable()
 export class EnumValuesService {
@@ -146,6 +133,7 @@ export class EnumValuesService {
     } else {
       this.mem.set(item.id, item);
     }
+    EnumConfigService.invalidateAllCaches();
     return item;
   }
 
@@ -172,6 +160,7 @@ export class EnumValuesService {
     } else {
       this.mem.set(id, updated);
     }
+    EnumConfigService.invalidateAllCaches();
     return updated;
   }
 
@@ -182,6 +171,7 @@ export class EnumValuesService {
     } else {
       this.mem.delete(id);
     }
+    EnumConfigService.invalidateAllCaches();
     return { success: true };
   }
 

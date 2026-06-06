@@ -81,6 +81,14 @@ export class CreateSreniDefinitionDto {
   @IsOptional()
   @IsBoolean()
   joinUsVisible?: boolean;
+
+  @IsOptional()
+  @IsString()
+  enrollmentScope?: string;
+
+  @IsOptional()
+  @IsString()
+  primaryContactStrategy?: string;
 }
 
 export class UpdateSreniDefinitionDto {
@@ -104,6 +112,14 @@ export class UpdateSreniDefinitionDto {
   @IsOptional()
   @IsBoolean()
   joinUsVisible?: boolean;
+
+  @IsOptional()
+  @IsString()
+  enrollmentScope?: string;
+
+  @IsOptional()
+  @IsString()
+  primaryContactStrategy?: string;
 }
 
 export class CreateAnalyticsStudioLayoutDto {
@@ -1147,6 +1163,60 @@ export class ReviewSthanExpenseDto {
   reviewerNotes?: string;
 }
 
+export class CreateSthanCalendarEventDto {
+  @IsString()
+  @IsNotEmpty()
+  title!: string;
+
+  @IsDateString()
+  date!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  startTime!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  endTime!: string;
+
+  @IsOptional()
+  @IsString()
+  color?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class UpdateSthanCalendarEventDto {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  title?: string;
+
+  @IsOptional()
+  @IsDateString()
+  date?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  startTime?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  endTime?: string;
+
+  @IsOptional()
+  @IsString()
+  color?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
 // ── Sreni Divisions ───────────────────────────────────────────────────────────
 
 export class CreateSreniDivisionDto {
@@ -1199,4 +1269,49 @@ export class ContactSreniTagItemDto {
 export class SetContactSreniTagsDto {
   @IsArray()
   tags!: ContactSreniTagItemDto[];
+}
+
+export class CreateHouseholdMemberDto {
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @IsOptional()
+  @IsIn(['child', 'other'])
+  role?: 'child' | 'other';
+
+  @IsOptional()
+  @IsString()
+  gender?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dateOfBirth?: string;
+
+  @IsOptional()
+  @IsString()
+  divisionId?: string;
+}
+
+export class UpdateHouseholdMemberDto {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  gender?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dateOfBirth?: string;
+
+  @IsOptional()
+  @IsString()
+  divisionId?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
 }

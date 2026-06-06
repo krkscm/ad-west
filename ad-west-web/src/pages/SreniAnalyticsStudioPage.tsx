@@ -28,6 +28,7 @@ import type {
   CalendarEventApi,
   SreniAttendanceListingItemApi,
   SreniContactRowApi,
+  SreniParticipantApi,
 } from '../utils/backendApi';
 import { useToast } from '../components/common/Toast';
 import { useConfirm } from '../components/common/ConfirmDialog';
@@ -42,7 +43,7 @@ interface Props {
 }
 
 type StudioTab = 'details' | 'pivot' | 'graph';
-type DatasetKey = 'all' | 'contacts' | 'events' | 'attendance';
+type DatasetKey = 'all' | 'contacts' | 'participants' | 'events' | 'attendance';
 type SortDirection = 'asc' | 'desc';
 type Aggregation = 'sum' | 'avg' | 'min' | 'max' | 'count';
 type GraphType = 'line' | 'bar' | 'area' | 'composed' | 'pie' | 'radar';
@@ -86,7 +87,8 @@ const selectorChipStyle = (active: boolean): React.CSSProperties => ({
 
 const DATASET_OPTIONS: Array<{ key: DatasetKey; label: string }> = [
   { key: 'all', label: 'All Domains' },
-  { key: 'contacts', label: 'Contacts' },
+  { key: 'contacts', label: 'Households' },
+  { key: 'participants', label: 'Participants' },
   { key: 'events', label: 'Events' },
   { key: 'attendance', label: 'Attendance' },
 ];
@@ -130,7 +132,7 @@ const parseNumberSafe = (value: ScalarValue): number | null => {
 };
 
 const isDatasetKey = (value: unknown): value is DatasetKey =>
-  value === 'all' || value === 'contacts' || value === 'events' || value === 'attendance';
+  value === 'all' || value === 'contacts' || value === 'participants' || value === 'events' || value === 'attendance';
 
 const isSortDirection = (value: unknown): value is SortDirection => value === 'asc' || value === 'desc';
 
@@ -190,6 +192,17 @@ const durationMinutes = (startTime: string | null | undefined, endTime: string |
   return diff >= 0 ? diff : diff + 24 * 60;
 };
 
+const loadAllParticipants = async (sreniId: string): Promise<SreniParticipantApi[]> => {
+  const pageSize = 500;
+  const first = await backendApi.listSreniParticipants(sreniId, 1, pageSize);
+  const pages: SreniParticipantApi[][] = [first.items];
+  for (let p = 2; p <= first.totalPages; p++) {
+    const next = await backendApi.listSreniParticipants(sreniId, p, pageSize);
+    pages.push(next.items);
+  }
+  return pages.flat();
+};
+
 const loadAllContacts = async (sreniId: string): Promise<SreniContactRowApi[]> => {
   const pageSize = 200;
   const first = await backendApi.listSreniContacts(sreniId, 1, pageSize);
@@ -226,6 +239,7 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
   const [deletingLayoutId, setDeletingLayoutId] = useState<string | null>(null);
 
   const [contacts, setContacts] = useState<SreniContactRowApi[]>([]);
+  const [participants, setParticipants] = useState<SreniParticipantApi[]>([]);
   const [events, setEvents] = useState<CalendarEventApi[]>([]);
   const [attendance, setAttendance] = useState<SreniAttendanceListingItemApi[]>([]);
 
@@ -304,8 +318,9 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
 
     const run = async () => {
       setLoading(true);
-      const [contactsResult, eventsResult, attendanceResult] = await Promise.allSettled([
+      const [contactsResult, participantsResult, eventsResult, attendanceResult] = await Promise.allSettled([
         loadAllContacts(sreniId),
+        loadAllParticipants(sreniId),
         backendApi.listSreniCalendarEvents(sreniId),
         backendApi.listSreniAttendanceListing(sreniId),
       ]);
@@ -317,6 +332,13 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
       } else {
         setContacts([]);
         addToast('Could not load contacts for analytics.', 'warning');
+      }
+
+      if (participantsResult.status === 'fulfilled') {
+        setParticipants(participantsResult.value);
+      } else {
+        setParticipants([]);
+        addToast('Could not load participants for analytics.', 'warning');
       }
 
       if (eventsResult.status === 'fulfilled') {
@@ -363,6 +385,25 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
       return base;
     });
   }, [contacts]);
+
+  const participantRecords = useMemo<StudioRecord[]>(() => {
+    return participants.map((row) => ({
+      id: `participant:${row.memberId ?? row.contactId}:${row.name}`,
+      domain: 'participants',
+      period_bucket: String(new Date().getFullYear()),
+      recorded_at: new Date().toISOString(),
+      participant_name: row.name,
+      participant_role: row.role,
+      participant_phone: row.phone ?? '',
+      household_name: row.householdName ?? '',
+      household_phone: row.householdPhone ?? '',
+      uses_household_phone: row.usesHouseholdPhone ? 1 : 0,
+      division_name: row.divisionName ?? '',
+      gender: row.gender ?? '',
+      date_of_birth: row.dateOfBirth ?? '',
+      contact_id: row.contactId,
+    }));
+  }, [participants]);
 
   const eventRecords = useMemo<StudioRecord[]>(() => {
     return events.map((event) => ({
@@ -461,11 +502,12 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
   const datasetMap = useMemo(() => {
     return {
       contacts: contactRecords,
+      participants: participantRecords,
       events: eventRecords,
       attendance: attendanceRecords,
-      all: [...contactRecords, ...eventRecords, ...attendanceRecords],
+      all: [...contactRecords, ...participantRecords, ...eventRecords, ...attendanceRecords],
     } as Record<DatasetKey, StudioRecord[]>;
-  }, [contactRecords, eventRecords, attendanceRecords]);
+  }, [contactRecords, participantRecords, eventRecords, attendanceRecords]);
 
   const activeRecords = datasetMap[dataset];
 

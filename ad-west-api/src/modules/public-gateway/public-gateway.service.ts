@@ -1,11 +1,15 @@
 import { BadRequestException, ConflictException, Injectable, Optional, ServiceUnavailableException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { EnumConfigService } from '@modules/enum-values/services/enum-config.service';
+import { ENUM_TYPES } from '@modules/enum-values/enum-types.constants';
+import { DataSource } from 'typeorm';
 import { randomBytes, randomUUID } from 'crypto';
 import { mkdir, writeFile } from 'fs/promises';
 import JSZip from 'jszip';
 import { extname, join } from 'path';
 import { In, Repository } from 'typeorm';
 import { HelpdeskTicketEntity } from './entities/helpdesk-ticket.entity';
+import { JobApplicationActivityEntity } from './entities/job-application-activity.entity';
 import { JobApplicationEntity } from './entities/job-application.entity';
 import { JobPostingEntity } from './entities/job-posting.entity';
 
@@ -63,6 +67,20 @@ export interface JobApplication {
   updatedAt: string;
 }
 
+export type JobApplicationActivityAction = 'submitted' | 'status_changed' | 'note_updated' | 'follow_up';
+
+export interface JobApplicationActivity {
+  id: string;
+  applicationId: string;
+  action: JobApplicationActivityAction;
+  fromStatus?: string;
+  toStatus?: string;
+  comment?: string;
+  actorId?: string;
+  actorLabel?: string;
+  createdAt: string;
+}
+
 export interface PublicSreniOption {
   id: string;
   name: string;
@@ -100,7 +118,9 @@ export class PublicGatewayService {
   private readonly tickets = new Map<string, HelpdeskTicket>();
   private readonly jobPostings = new Map<string, JobPosting>();
   private readonly jobApplications = new Map<string, JobApplication>();
+  private readonly jobApplicationActivities = new Map<string, JobApplicationActivity[]>();
   private readonly memoryResumeStorage = new Map<string, ResumeDownloadDescriptor>();
+  private readonly enumConfig: EnumConfigService;
 
   constructor(
     @Optional() @InjectRepository(HelpdeskTicketEntity)
@@ -109,10 +129,104 @@ export class PublicGatewayService {
     private readonly jobPostingRepo?: Repository<JobPostingEntity>,
     @Optional() @InjectRepository(JobApplicationEntity)
     private readonly jobApplicationRepo?: Repository<JobApplicationEntity>,
-  ) {}
+    @Optional() @InjectRepository(JobApplicationActivityEntity)
+    private readonly jobApplicationActivityRepo?: Repository<JobApplicationActivityEntity>,
+    @Optional() @InjectDataSource() private readonly dataSource?: DataSource,
+  ) {
+    this.enumConfig = new EnumConfigService(this.useDb() ? 'db' : 'in-memory', this.dataSource);
+  }
 
   private useDb(): boolean {
     return !!this.ticketRepo && !!this.jobPostingRepo && !!this.jobApplicationRepo;
+  }
+
+  private canPersistActivities(): boolean {
+    return this.useDb() && !!this.jobApplicationActivityRepo;
+  }
+
+  private toJobApplicationActivity(entity: JobApplicationActivityEntity): JobApplicationActivity {
+    return {
+      id: entity.id,
+      applicationId: entity.applicationId,
+      action: entity.action as JobApplicationActivityAction,
+      fromStatus: entity.fromStatus ?? undefined,
+      toStatus: entity.toStatus ?? undefined,
+      comment: entity.comment ?? undefined,
+      actorId: entity.actorId ?? undefined,
+      actorLabel: entity.actorLabel ?? undefined,
+      createdAt: entity.createdAt.toISOString(),
+    };
+  }
+
+  private async recordApplicationActivity(
+    applicationId: string,
+    payload: {
+      action: JobApplicationActivityAction;
+      fromStatus?: string;
+      toStatus?: string;
+      comment?: string;
+      actorId?: string;
+      actorLabel?: string;
+      createdAt?: Date;
+    },
+  ): Promise<JobApplicationActivity> {
+    await this.enumConfig.validate(ENUM_TYPES.JOB_APPLICATION_ACTIVITY, payload.action, 'Activity action');
+
+    const now = payload.createdAt ?? new Date();
+    const activity: JobApplicationActivity = {
+      id: randomUUID(),
+      applicationId,
+      action: payload.action,
+      fromStatus: payload.fromStatus,
+      toStatus: payload.toStatus,
+      comment: payload.comment?.trim() || undefined,
+      actorId: payload.actorId,
+      actorLabel: payload.actorLabel,
+      createdAt: now.toISOString(),
+    };
+
+    if (this.canPersistActivities()) {
+      const entity = this.jobApplicationActivityRepo!.create({
+        id: activity.id,
+        applicationId,
+        action: payload.action,
+        fromStatus: payload.fromStatus ?? null,
+        toStatus: payload.toStatus ?? null,
+        comment: payload.comment?.trim() || null,
+        actorId: payload.actorId ?? null,
+        actorLabel: payload.actorLabel ?? null,
+        createdAt: now,
+      });
+      return this.toJobApplicationActivity(await this.jobApplicationActivityRepo!.save(entity));
+    }
+
+    const bucket = this.jobApplicationActivities.get(applicationId) ?? [];
+    bucket.push(activity);
+    this.jobApplicationActivities.set(applicationId, bucket);
+    return activity;
+  }
+
+  async listApplicationActivities(applicationId: string): Promise<JobApplicationActivity[]> {
+    if (this.canPersistActivities()) {
+      const application = await this.jobApplicationRepo!.findOne({ where: { id: applicationId } });
+      if (!application) return [];
+      const rows = await this.jobApplicationActivityRepo!.find({
+        where: { applicationId },
+        order: { createdAt: 'ASC' },
+      });
+      return rows.map((row) => this.toJobApplicationActivity(row));
+    }
+
+    if (this.useDb()) {
+      const application = await this.jobApplicationRepo!.findOne({ where: { id: applicationId } });
+      if (!application) return [];
+    } else if (!this.jobApplications.has(applicationId)) {
+      return [];
+    }
+
+    return (this.jobApplicationActivities.get(applicationId) ?? [])
+      .slice()
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
   private newId(): string {
@@ -429,6 +543,9 @@ export class PublicGatewayService {
     subject: string;
     description: string;
   }): Promise<HelpdeskTicket> {
+    const category = data.category ?? 'general';
+    await this.enumConfig.validate(ENUM_TYPES.HELPDESK_TICKET_CATEGORY, category, 'Category');
+    await this.enumConfig.validate(ENUM_TYPES.HELPDESK_TICKET_STATUS, 'open', 'Status');
     const now = new Date();
 
     if (this.useDb()) {
@@ -436,7 +553,7 @@ export class PublicGatewayService {
         name: data.name.trim(),
         phone: data.phone.trim(),
         email: data.email?.trim() || null,
-        category: data.category ?? 'general',
+        category,
         subject: data.subject.trim(),
         description: data.description.trim(),
         status: 'open',
@@ -452,7 +569,7 @@ export class PublicGatewayService {
       name: data.name.trim(),
       phone: data.phone.trim(),
       email: data.email?.trim() || undefined,
-      category: data.category ?? 'general',
+      category,
       subject: data.subject.trim(),
       description: data.description.trim(),
       status: 'open',
@@ -501,6 +618,9 @@ export class PublicGatewayService {
     id: string,
     data: { status?: TicketStatus; assignedTo?: string; notes?: string },
   ): Promise<HelpdeskTicket | undefined> {
+    if (data.status !== undefined) {
+      await this.enumConfig.validate(ENUM_TYPES.HELPDESK_TICKET_STATUS, data.status, 'Status');
+    }
     if (this.useDb()) {
       const ticket = await this.ticketRepo!.findOne({ where: { id } });
       if (!ticket) return undefined;
@@ -578,6 +698,8 @@ export class PublicGatewayService {
     },
     createdBy: string,
   ): Promise<JobPosting> {
+    const type = data.type ?? 'full_time';
+    await this.enumConfig.validate(ENUM_TYPES.JOB_POSTING_TYPE, type, 'Job type');
     const now = new Date();
 
     if (this.useDb()) {
@@ -586,7 +708,7 @@ export class PublicGatewayService {
         description: data.description.trim(),
         requirements: data.requirements?.trim() || null,
         location: data.location?.trim() || null,
-        type: data.type ?? 'full_time',
+        type,
         isActive: true,
         expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
         createdBy,
@@ -603,7 +725,7 @@ export class PublicGatewayService {
       description: data.description.trim(),
       requirements: data.requirements?.trim() || undefined,
       location: data.location?.trim() || undefined,
-      type: data.type ?? 'full_time',
+      type,
       isActive: true,
       expiresAt: data.expiresAt || undefined,
       createdBy,
@@ -626,6 +748,9 @@ export class PublicGatewayService {
       expiresAt?: string;
     },
   ): Promise<JobPosting | undefined> {
+    if (data.type !== undefined) {
+      await this.enumConfig.validate(ENUM_TYPES.JOB_POSTING_TYPE, data.type, 'Job type');
+    }
     if (this.useDb()) {
       const posting = await this.jobPostingRepo!.findOne({ where: { id } });
       if (!posting) return undefined;
@@ -740,7 +865,14 @@ export class PublicGatewayService {
         updatedAt: now,
       });
 
-      return this.toJobApplication(await this.jobApplicationRepo!.save(entity), job.title);
+      const saved = await this.jobApplicationRepo!.save(entity);
+      await this.recordApplicationActivity(applicationId, {
+        action: 'submitted',
+        toStatus: 'new',
+        actorLabel: data.name.trim(),
+        createdAt: now,
+      });
+      return this.toJobApplication(saved, job.title);
     }
 
     const job = this.jobPostings.get(jobId);
@@ -775,6 +907,12 @@ export class PublicGatewayService {
     }
 
     this.jobApplications.set(application.id, application);
+    await this.recordApplicationActivity(applicationId, {
+      action: 'submitted',
+      toStatus: 'new',
+      actorLabel: data.name.trim(),
+      createdAt: new Date(now),
+    });
     return application;
   }
 
@@ -825,17 +963,29 @@ export class PublicGatewayService {
 
   async updateApplication(
     id: string,
-    data: { status?: ApplicationStatus; notes?: string },
-    reviewedBy?: string,
+    data: { status?: ApplicationStatus; notes?: string; followUpNote?: string },
+    actor?: { userId?: string; email?: string },
   ): Promise<JobApplication | undefined> {
+    if (data.status !== undefined) {
+      await this.enumConfig.validate(ENUM_TYPES.JOB_APPLICATION_STATUS, data.status, 'Application status');
+    }
+    const actorLabel = actor?.email?.trim() || actor?.userId || 'Admin';
+
     if (this.useDb()) {
       const application = await this.jobApplicationRepo!.findOne({ where: { id } });
       if (!application) return undefined;
 
-      application.status = data.status ?? application.status;
-      application.notes = data.notes ?? application.notes ?? null;
-      application.reviewedBy = reviewedBy ?? application.reviewedBy ?? null;
-      application.reviewedAt = reviewedBy ? new Date() : application.reviewedAt;
+      const previousStatus = application.status;
+      const previousNotes = application.notes ?? '';
+      const nextStatus = data.status ?? application.status;
+      const nextNotes = data.notes !== undefined ? (data.notes ?? '') : previousNotes;
+
+      application.status = nextStatus;
+      application.notes = nextNotes || null;
+      if (actor?.userId) {
+        application.reviewedBy = actor.userId;
+        application.reviewedAt = new Date();
+      }
       application.updatedAt = new Date();
 
       const [saved, job] = await Promise.all([
@@ -843,19 +993,81 @@ export class PublicGatewayService {
         this.jobPostingRepo!.findOne({ where: { id: application.jobId } }),
       ]);
 
+      if (nextStatus !== previousStatus) {
+        await this.recordApplicationActivity(id, {
+          action: 'status_changed',
+          fromStatus: previousStatus,
+          toStatus: nextStatus,
+          actorId: actor?.userId,
+          actorLabel,
+        });
+      }
+      if (data.notes !== undefined && nextNotes !== previousNotes) {
+        await this.recordApplicationActivity(id, {
+          action: 'note_updated',
+          comment: nextNotes || undefined,
+          actorId: actor?.userId,
+          actorLabel,
+        });
+      }
+      const followUp = data.followUpNote?.trim();
+      if (followUp) {
+        await this.recordApplicationActivity(id, {
+          action: 'follow_up',
+          comment: followUp,
+          actorId: actor?.userId,
+          actorLabel,
+        });
+      }
+
       return this.toJobApplication(saved, job?.title ?? 'Unknown Job');
     }
 
     const application = this.jobApplications.get(id);
     if (!application) return undefined;
+
+    const previousStatus = application.status;
+    const previousNotes = application.notes ?? '';
+    const nextStatus = data.status ?? application.status;
+    const nextNotes = data.notes !== undefined ? (data.notes ?? '') : previousNotes;
+
     const updated: JobApplication = {
       ...application,
-      ...data,
-      reviewedBy: reviewedBy ?? application.reviewedBy,
-      reviewedAt: reviewedBy ? new Date().toISOString() : application.reviewedAt,
+      status: nextStatus,
+      notes: nextNotes || undefined,
+      reviewedBy: actor?.userId ?? application.reviewedBy,
+      reviewedAt: actor?.userId ? new Date().toISOString() : application.reviewedAt,
       updatedAt: new Date().toISOString(),
     };
     this.jobApplications.set(id, updated);
+
+    if (nextStatus !== previousStatus) {
+      await this.recordApplicationActivity(id, {
+        action: 'status_changed',
+        fromStatus: previousStatus,
+        toStatus: nextStatus,
+        actorId: actor?.userId,
+        actorLabel,
+      });
+    }
+    if (data.notes !== undefined && nextNotes !== previousNotes) {
+      await this.recordApplicationActivity(id, {
+        action: 'note_updated',
+        comment: nextNotes || undefined,
+        actorId: actor?.userId,
+        actorLabel,
+      });
+    }
+    const followUp = data.followUpNote?.trim();
+    if (followUp) {
+      await this.recordApplicationActivity(id, {
+        action: 'follow_up',
+        comment: followUp,
+        actorId: actor?.userId,
+        actorLabel,
+      });
+    }
+
     return updated;
   }
 

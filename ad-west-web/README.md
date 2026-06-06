@@ -121,7 +121,7 @@ If your backend runs on a different port, set `VITE_API_PROXY_TARGET` before sta
 - On authenticated pages, it is placed in the page header as an icon-only action.
 - In Sreni contact assignment, the Division selector is rendered only when at least one division exists; if none are defined, the Division field is hidden instead of showing an empty dropdown.
 - The admin workspace now includes a persistent authenticated footer aligned to the main content pane, so it does not overlap the left sidebar.
-- On very small devices (`<=480px`), admin navigation now behaves like an app drawer (menu button opens a slide-in sidebar with backdrop) while desktop/tablet sidebar behavior remains unchanged.
+- On mobile and tablet widths (`<=768px`), admin navigation uses an app drawer (tap **≡** in the header to open the slide-in sidebar with backdrop). Desktop sidebar collapse behavior is unchanged above 768px.
 
 For test credentials, see [ad-west-api/README.md](../ad-west-api/README.md) under Authentication Seeds (Non-Production).
 

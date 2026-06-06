@@ -158,11 +158,15 @@ export interface SreniDefinitionApi {
   description?: string
   active: boolean
   joinUsVisible: boolean
+  enrollmentScope?: string
+  primaryContactStrategy?: string
   createdBy?: string
   updatedBy?: string
   createdAt: string
   updatedAt: string
 }
+
+export type HouseholdResolverKey = 'household_head' | 'female_participants' | 'enrolled_children'
 
 export interface SthanBasicApi {
   id: string
@@ -192,8 +196,70 @@ export interface SreniContactRowApi {
   active: boolean
   /** True when this contact belongs to another Sreni but is tagged to the current one */
   isTagged?: boolean
+  childCount?: number
+  childrenDivisionSummary?: string
+  participantCount?: number
   sourceFile?: string
   uploadedBy?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SreniContactsListApi extends PaginatedResponse<SreniContactRowApi> {
+  enrollmentScope?: string
+  primaryContactStrategy?: string
+  resolverKey?: HouseholdResolverKey
+  participantTotal?: number
+}
+
+export interface SreniParticipantStatsApi {
+  strategy: string
+  resolverKey?: HouseholdResolverKey
+  householdCount: number
+  participantCount: number
+}
+
+export interface SreniParticipantApi {
+  memberId?: string
+  contactId: string
+  sreniId: string
+  name: string
+  role: 'head' | 'spouse' | 'child' | 'other'
+  phone?: string
+  email?: string
+  gender?: string
+  dateOfBirth?: string
+  divisionId?: string
+  divisionName?: string
+  householdPhone?: string
+  householdName?: string
+  usesHouseholdPhone?: boolean
+}
+
+export interface HouseholdMemberEnrollmentApi {
+  id: string
+  memberId: string
+  sreniId: string
+  divisionId?: string
+  divisionName?: string
+  active: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface HouseholdMemberApi {
+  id: string
+  contactId: string
+  role: 'head' | 'spouse' | 'child' | 'other'
+  source: 'import' | 'manual'
+  name: string
+  phone?: string
+  email?: string
+  gender?: string
+  dateOfBirth?: string
+  sortOrder: number
+  active: boolean
+  enrollments?: HouseholdMemberEnrollmentApi[]
   createdAt: string
   updatedAt: string
 }
@@ -747,6 +813,18 @@ export interface JobApplicationApi {
   updatedAt: string
 }
 
+export interface JobApplicationActivityApi {
+  id: string
+  applicationId: string
+  action: string
+  fromStatus?: string
+  toStatus?: string
+  comment?: string
+  actorId?: string
+  actorLabel?: string
+  createdAt: string
+}
+
 export interface PublicSreniOptionApi {
   id: string
   name: string
@@ -786,6 +864,25 @@ export interface SthanReportApi {
   submittedAt?: string
   createdAt: string
   updatedAt: string
+}
+
+export interface SthanCalendarEventApi {
+  id: string
+  locationId: string
+  title: string
+  date: string
+  startTime: string
+  endTime: string
+  color: string
+  notes?: string
+  createdBy: string
+  createdAt: string
+  updatedBy: string
+  updatedAt: string
+  source?: 'local' | 'sreni'
+  sreniId?: string
+  scope?: 'zone' | 'sthan'
+  readOnly?: boolean
 }
 
 export type SthanExpenseCategory = 'travel' | 'food' | 'accommodation' | 'event_supplies' | 'printing' | 'other'
@@ -1002,10 +1099,25 @@ export const backendApi = {
     return api.get<PaginatedResponse<SreniDefinitionApi>>(`/org/sreni-definitions?${qs.toString()}`)
   },
 
-  createSreniDefinition: (payload: { name: string; code?: string; description?: string; joinUsVisible?: boolean }) =>
+  createSreniDefinition: (payload: {
+    name: string
+    code?: string
+    description?: string
+    joinUsVisible?: boolean
+    enrollmentScope?: string
+    primaryContactStrategy?: string
+  }) =>
     api.post<SreniDefinitionApi>('/org/sreni-definitions', payload),
 
-  updateSreniDefinition: (id: string, payload: { name?: string; code?: string; description?: string; active?: boolean; joinUsVisible?: boolean }) =>
+  updateSreniDefinition: (id: string, payload: {
+    name?: string
+    code?: string
+    description?: string
+    active?: boolean
+    joinUsVisible?: boolean
+    enrollmentScope?: string
+    primaryContactStrategy?: string
+  }) =>
     api.patch<SreniDefinitionApi>(`/org/sreni-definitions/${id}`, payload),
 
   deleteSreniDefinition: (id: string) => api.delete<void>(`/org/sreni-definitions/${id}`),
@@ -1343,7 +1455,7 @@ export const backendApi = {
 
   // Sreni Contact List
   listSreniContacts: (sreniId: string, page = 1, pageSize = 50) =>
-    api.get<PaginatedResponse<SreniContactRowApi>>(
+    api.get<SreniContactsListApi>(
       `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts?page=${page}&pageSize=${pageSize}`,
     ),
 
@@ -1382,6 +1494,52 @@ export const backendApi = {
   deleteContact: (sreniId: string, contactId: string) =>
     api.delete<{ deleted: boolean }>(
       `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}`,
+    ),
+
+  listHouseholdMembers: (sreniId: string, contactId: string) =>
+    api.get<HouseholdMemberApi[]>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}/members`,
+    ),
+
+  createHouseholdMember: (
+    sreniId: string,
+    contactId: string,
+    payload: { name: string; role?: 'child' | 'other'; gender?: string; dateOfBirth?: string; divisionId?: string },
+  ) =>
+    api.post<HouseholdMemberApi>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}/members`,
+      payload,
+    ),
+
+  updateHouseholdMember: (
+    sreniId: string,
+    contactId: string,
+    memberId: string,
+    payload: { name?: string; gender?: string; dateOfBirth?: string; divisionId?: string | null; active?: boolean },
+  ) =>
+    api.patch<HouseholdMemberApi>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}/members/${encodeURIComponent(memberId)}`,
+      payload,
+    ),
+
+  deleteHouseholdMember: (sreniId: string, contactId: string, memberId: string) =>
+    api.delete<void>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}/members/${encodeURIComponent(memberId)}`,
+    ),
+
+  getSreniParticipantStats: (sreniId: string) =>
+    api.get<SreniParticipantStatsApi>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/participants/stats`,
+    ),
+
+  listSreniParticipants: (sreniId: string, page = 1, pageSize = 500) =>
+    api.get<PaginatedResponse<SreniParticipantApi>>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/participants?page=${page}&pageSize=${pageSize}`,
+    ),
+
+  listContactParticipants: (sreniId: string, contactId: string) =>
+    api.get<SreniParticipantApi[]>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}/participants`,
     ),
 
   listSthans: (srenyId?: string) =>
@@ -1587,8 +1745,10 @@ export const backendApi = {
     api.get<{ items: JobApplicationApi[] }>(`/gateway/jobs/${jobId}/applications`),
   downloadJobApplicationResume: (id: string) =>
     api.getBlob(`/gateway/jobs/applications/${id}/resume`),
-  updateJobApplication: (id: string, payload: { status?: ApplicationStatus; notes?: string }) =>
+  updateJobApplication: (id: string, payload: { status?: ApplicationStatus; notes?: string; followUpNote?: string }) =>
     api.patch<JobApplicationApi>(`/gateway/jobs/applications/${id}`, payload),
+  listJobApplicationActivities: (id: string) =>
+    api.get<{ items: JobApplicationActivityApi[] }>(`/gateway/jobs/applications/${id}/activities`),
 
   // ─── Public Gateway — Public endpoints (no auth) ─────────────────────────
   publicListActiveJobs: () =>
@@ -1722,6 +1882,33 @@ export const backendApi = {
   },
   clearSthanContacts: (locationId: string) =>
     api.delete<{ deleted: number }>(`/org/locations/${encodeURIComponent(locationId)}/contacts`),
+
+  // ─── Sthan — Calendar ──────────────────────────────────────────────────────
+  listSthanCalendarEvents: (locationId: string) =>
+    api.get<SthanCalendarEventApi[]>(`/org/locations/${encodeURIComponent(locationId)}/calendar-events`),
+  createSthanCalendarEvent: (locationId: string, payload: {
+    title: string
+    date: string
+    startTime: string
+    endTime: string
+    color?: string
+    notes?: string
+  }) => api.post<SthanCalendarEventApi>(`/org/locations/${encodeURIComponent(locationId)}/calendar-events`, payload),
+  updateSthanCalendarEvent: (locationId: string, eventId: string, payload: {
+    title?: string
+    date?: string
+    startTime?: string
+    endTime?: string
+    color?: string
+    notes?: string
+  }) => api.patch<SthanCalendarEventApi>(
+    `/org/locations/${encodeURIComponent(locationId)}/calendar-events/${encodeURIComponent(eventId)}`,
+    payload,
+  ),
+  deleteSthanCalendarEvent: (locationId: string, eventId: string) =>
+    api.delete<{ success: boolean; deletedBy: string }>(
+      `/org/locations/${encodeURIComponent(locationId)}/calendar-events/${encodeURIComponent(eventId)}`,
+    ),
 
   // ─── Table Layouts ────────────────────────────────────────────────────────
   listTableLayouts: (tableKey: string) =>

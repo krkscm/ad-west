@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useToast } from '../../components/common/Toast';
 import { useConfirm } from '../../components/common/ConfirmDialog';
-import { backendApi, SreniDefinitionApi } from '../../utils/backendApi';
+import { backendApi, EnumValueApi, SreniDefinitionApi } from '../../utils/backendApi';
 
 const toUiError = (error: unknown, fallback: string): string => {
   if (!(error instanceof Error)) return fallback;
@@ -34,9 +34,20 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [joinUsVisible, setJoinUsVisible] = useState(false);
+  const [enrollmentScope, setEnrollmentScope] = useState('');
+  const [primaryContactStrategy, setPrimaryContactStrategy] = useState('');
+  const [enrollmentScopeOptions, setEnrollmentScopeOptions] = useState<EnumValueApi[]>([]);
+  const [strategyOptions, setStrategyOptions] = useState<EnumValueApi[]>([]);
 
   const resetForm = () => {
-    setEditingId(null); setCode(''); setName(''); setDescription(''); setJoinUsVisible(false); setFormOpen(false);
+    setEditingId(null);
+    setCode('');
+    setName('');
+    setDescription('');
+    setJoinUsVisible(false);
+    setEnrollmentScope(enrollmentScopeOptions[0]?.value ?? '');
+    setPrimaryContactStrategy(strategyOptions[0]?.value ?? '');
+    setFormOpen(false);
   };
 
   const load = (p: number, ps: number, q: string) => {
@@ -48,6 +59,20 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
   };
 
   useEffect(() => { load(page, pageSize, search); }, [page, pageSize]);
+
+  useEffect(() => {
+    Promise.all([
+      backendApi.listEnumValues('enrollment_scope', true),
+      backendApi.listEnumValues('primary_contact_strategy', true),
+    ])
+      .then(([scopes, strategies]) => {
+        setEnrollmentScopeOptions(scopes);
+        setStrategyOptions(strategies);
+        if (!enrollmentScope && scopes[0]) setEnrollmentScope(scopes[0].value);
+        if (!primaryContactStrategy && strategies[0]) setPrimaryContactStrategy(strategies[0].value);
+      })
+      .catch(() => {/* non-critical */});
+  }, []);
 
   const handleSearchChange = (q: string) => {
     setSearch(q);
@@ -102,10 +127,24 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
     setIsSaving(true);
     try {
       if (editingId) {
-        await backendApi.updateSreniDefinition(editingId, { name: cleanName, code: cleanCode, description: cleanDescription, joinUsVisible });
+        await backendApi.updateSreniDefinition(editingId, {
+          name: cleanName,
+          code: cleanCode,
+          description: cleanDescription,
+          joinUsVisible,
+          enrollmentScope: enrollmentScope || undefined,
+          primaryContactStrategy: primaryContactStrategy || undefined,
+        });
         addToast('Sreni updated successfully.', 'success');
       } else {
-        await backendApi.createSreniDefinition({ name: cleanName, code: cleanCode, description: cleanDescription, joinUsVisible });
+        await backendApi.createSreniDefinition({
+          name: cleanName,
+          code: cleanCode,
+          description: cleanDescription,
+          joinUsVisible,
+          enrollmentScope: enrollmentScope || undefined,
+          primaryContactStrategy: primaryContactStrategy || undefined,
+        });
         addToast('Sreni created successfully.', 'success');
       }
       resetForm();
@@ -124,9 +163,14 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
     setName(sreni.name);
     setDescription(sreni.description ?? '');
     setJoinUsVisible(sreni.joinUsVisible);
+    setEnrollmentScope(sreni.enrollmentScope ?? enrollmentScopeOptions[0]?.value ?? '');
+    setPrimaryContactStrategy(sreni.primaryContactStrategy ?? strategyOptions[0]?.value ?? '');
     setFormOpen(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const labelForEnum = (options: EnumValueApi[], value?: string) =>
+    options.find((o) => o.value === value)?.label ?? value ?? '—';
 
   const pageNums = (() => {
     if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -188,6 +232,24 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
               <div>
                 <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-secondary-dark)', marginBottom: '6px' }}>Name <span style={{ color: 'var(--error)' }}>*</span></label>
                 <input className="form-input" placeholder="Sreni name" value={name} onChange={(e) => setName(e.target.value)} required style={{ fontSize: '0.875rem' }} />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div>
+                <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-secondary-dark)', marginBottom: '6px' }}>Enrollment Scope</label>
+                <select className="form-input" value={enrollmentScope} onChange={(e) => setEnrollmentScope(e.target.value)} style={{ fontSize: '0.875rem' }}>
+                  {enrollmentScopeOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-secondary-dark)', marginBottom: '6px' }}>Participant Strategy</label>
+                <select className="form-input" value={primaryContactStrategy} onChange={(e) => setPrimaryContactStrategy(e.target.value)} style={{ fontSize: '0.875rem' }}>
+                  {strategyOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
               </div>
             </div>
             <div style={{ marginBottom: '20px' }}>
@@ -268,7 +330,7 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
         <table className="custom-table">
           <thead>
             <tr>
-              {['Code', 'Name', 'Description', 'Join Us', 'Status', 'Created By', 'Actions'].map((col) => (
+              {['Code', 'Name', 'Description', 'Enrollment', 'Strategy', 'Join Us', 'Status', 'Created By', 'Actions'].map((col) => (
                 <th key={col} style={{ textAlign: 'left' }}>
                   {col}
                 </th>
@@ -278,7 +340,7 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
           <tbody>
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
-                <tr key={i}>{Array.from({ length: 7 }).map((__, j) => (
+                <tr key={i}>{Array.from({ length: 9 }).map((__, j) => (
                   <td key={j} style={{ padding: '14px 20px' }}>
                     <div style={{ height: '14px', borderRadius: '6px', background: 'var(--border-dark)', width: j === 1 ? '60%' : j === 2 ? '80%' : '40%', animation: 'pulse 1.4s ease-in-out infinite' }} />
                   </td>
@@ -286,7 +348,7 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
               ))
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary-dark)' }}>
+                <td colSpan={9} style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary-dark)' }}>
                   {search ? 'No srenies match your search.' : 'No srenies defined yet. Click "New Sreni" to add one.'}
                 </td>
               </tr>
@@ -303,6 +365,12 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
                   <td style={{ padding: '14px 20px', fontWeight: 600 }}>{sreni.name}</td>
                   <td style={{ padding: '14px 20px', color: 'var(--text-secondary-dark)', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={sreni.description}>
                     {sreni.description ?? <span style={{ opacity: 0.45 }}>—</span>}
+                  </td>
+                  <td style={{ padding: '14px 20px', fontSize: '0.8rem', color: 'var(--text-secondary-dark)', whiteSpace: 'nowrap' }}>
+                    {labelForEnum(enrollmentScopeOptions, sreni.enrollmentScope)}
+                  </td>
+                  <td style={{ padding: '14px 20px', fontSize: '0.8rem', color: 'var(--text-secondary-dark)', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={labelForEnum(strategyOptions, sreni.primaryContactStrategy)}>
+                    {labelForEnum(strategyOptions, sreni.primaryContactStrategy)}
                   </td>
                   <td style={{ padding: '14px 20px', whiteSpace: 'nowrap' }}>
                     <span style={{

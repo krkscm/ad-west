@@ -10,6 +10,10 @@ import { EventSreniLinkEntity } from './entities/event-sreni-link.entity';
 import { EventFormFieldEntity } from './entities/event-form-field.entity';
 import { EventRegistrationEntity } from './entities/event-registration.entity';
 import { NotificationEntity } from './entities/notification.entity';
+import { EnumConfigService } from '@modules/enum-values/services/enum-config.service';
+import { ENUM_TYPES } from '@modules/enum-values/enum-types.constants';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 
 export type ReimbursementCategory = 'travel' | 'food' | 'accommodation' | 'event_supplies' | 'printing' | 'other';
 export type ReimbursementStatus = 'draft' | 'submitted' | 'pending_review' | 'approved' | 'rejected';
@@ -88,6 +92,7 @@ export class MemberServicesService {
   private readonly memEvents = new Map<string, SpecialEvent>();
   private readonly memRegistrations = new Map<string, EventRegistration>();
   private readonly memNotifications = new Map<string, AppNotification>();
+  private readonly enumConfig: EnumConfigService;
 
   constructor(
     @Optional() @InjectRepository(ReimbursementRequestEntity)
@@ -102,7 +107,10 @@ export class MemberServicesService {
     private readonly registrationRepo?: Repository<EventRegistrationEntity>,
     @Optional() @InjectRepository(NotificationEntity)
     private readonly notificationRepo?: Repository<NotificationEntity>,
-  ) {}
+    @Optional() @InjectDataSource() private readonly dataSource?: DataSource,
+  ) {
+    this.enumConfig = new EnumConfigService(this.useDb() ? 'db' : 'in-memory', this.dataSource);
+  }
 
   private useDb(): boolean {
     return !!this.reimbursementRepo && !!this.eventRepo && !!this.notificationRepo;
@@ -210,8 +218,10 @@ export class MemberServicesService {
     asDraft?: boolean;
     receiptFile?: Express.Multer.File;
   }): Promise<ReimbursementRequest> {
-    const now = new Date();
+    await this.enumConfig.validate(ENUM_TYPES.EXPENSE_CATEGORY, data.category, 'Category');
     const status: ReimbursementStatus = data.asDraft ? 'draft' : 'submitted';
+    await this.enumConfig.validate(ENUM_TYPES.EXPENSE_STATUS, status, 'Status');
+    const now = new Date();
     const id = randomUUID();
     const receipt = data.receiptFile ? await this.persistReceiptFile(id, data.receiptFile) : undefined;
 
@@ -257,6 +267,7 @@ export class MemberServicesService {
     id: string,
     data: { status: ReimbursementStatus; reviewerNotes?: string; reviewedBy?: string },
   ): Promise<ReimbursementRequest | undefined> {
+    await this.enumConfig.validate(ENUM_TYPES.EXPENSE_STATUS, data.status, 'Status');
     if (this.useDb()) {
       const entity = await this.reimbursementRepo!.findOne({ where: { id } });
       if (!entity) return undefined;
@@ -394,6 +405,9 @@ export class MemberServicesService {
     formFields?: Array<{ fieldType: FormFieldType; label: string; placeholder?: string; options?: string[]; isRequired?: boolean; sortOrder?: number }>;
     createdBy?: string;
   }): Promise<SpecialEvent> {
+    for (const f of data.formFields ?? []) {
+      await this.enumConfig.validate(ENUM_TYPES.FORM_FIELD_TYPE, f.fieldType, 'Form field type');
+    }
     const now = new Date();
 
     if (this.useDb()) {
@@ -475,6 +489,9 @@ export class MemberServicesService {
     sreniIds?: string[];
     formFields?: Array<{ fieldType: FormFieldType; label: string; placeholder?: string; options?: string[]; isRequired?: boolean; sortOrder?: number }>;
   }): Promise<SpecialEvent | undefined> {
+    for (const f of data.formFields ?? []) {
+      await this.enumConfig.validate(ENUM_TYPES.FORM_FIELD_TYPE, f.fieldType, 'Form field type');
+    }
     if (this.useDb()) {
       const entity = await this.eventRepo!.findOne({ where: { id } });
       if (!entity) return undefined;
@@ -634,6 +651,8 @@ export class MemberServicesService {
     target?: NotificationTarget;
     createdBy?: string;
   }): Promise<AppNotification> {
+    const target = data.target ?? 'all';
+    await this.enumConfig.validate(ENUM_TYPES.NOTIFICATION_TARGET, target, 'Notification target');
     const now = new Date();
     if (this.useDb()) {
       const entity = this.notificationRepo!.create({
@@ -641,7 +660,7 @@ export class MemberServicesService {
         message: data.message.trim(),
         validFrom: data.validFrom ? new Date(data.validFrom) : now,
         validTo: new Date(data.validTo),
-        target: data.target ?? 'all',
+        target,
         isActive: true,
         createdBy: data.createdBy ?? null,
         createdAt: now,
@@ -656,7 +675,7 @@ export class MemberServicesService {
       message: data.message.trim(),
       validFrom: data.validFrom ?? ts,
       validTo: data.validTo,
-      target: data.target ?? 'all',
+      target,
       isActive: true,
       createdBy: data.createdBy,
       createdAt: ts,
@@ -674,6 +693,9 @@ export class MemberServicesService {
     target?: NotificationTarget;
     isActive?: boolean;
   }): Promise<AppNotification | undefined> {
+    if (data.target !== undefined) {
+      await this.enumConfig.validate(ENUM_TYPES.NOTIFICATION_TARGET, data.target, 'Notification target');
+    }
     if (this.useDb()) {
       const entity = await this.notificationRepo!.findOne({ where: { id } });
       if (!entity) return undefined;

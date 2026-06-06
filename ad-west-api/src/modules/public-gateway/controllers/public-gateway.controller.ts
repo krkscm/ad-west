@@ -296,6 +296,11 @@ export class AdminJobsController {
     return { items: await this.service.listAllApplications(fromDate, toDate) };
   }
 
+  @Get('applications/:id/activities')
+  async listApplicationActivities(@Param('id') id: string) {
+    return { items: await this.service.listApplicationActivities(id) };
+  }
+
   @Get('applications/:id/resume')
   async downloadApplicationResume(@Param('id') id: string, @Res() res: Response) {
     const file = await this.service.getApplicationResumeDownload(id);
@@ -316,10 +321,10 @@ export class AdminJobsController {
   @Patch('applications/:id')
   async updateApplication(
     @Param('id') id: string,
-    @Body() body: { status?: ApplicationStatus; notes?: string },
+    @Body() body: { status?: ApplicationStatus; notes?: string; followUpNote?: string },
     @CurrentUser() user: AuthPrincipal,
   ) {
-    const updated = await this.service.updateApplication(id, body, user.userId);
+    const updated = await this.service.updateApplication(id, body, { userId: user.userId, email: user.email });
     if (!updated) throw new NotFoundException('Application not found');
     return updated;
   }

@@ -62,7 +62,9 @@ import {
   UpdateSreniReportParameterDto,
   SubmitSreniReportDto,
   CreateSthanExpenseDto,
+  CreateSthanCalendarEventDto,
   ReviewSthanExpenseDto,
+  UpdateSthanCalendarEventDto,
   SubmitSthanReportDto,
   CreateLocationReportMetricDto,
   UpdateLocationReportMetricDto,
@@ -70,7 +72,9 @@ import {
   UpdateSreniDivisionDto,
   AssignContactDivisionDto,
   AssignContactSthanDto,
+  CreateHouseholdMemberDto,
   SetContactSreniTagsDto,
+  UpdateHouseholdMemberDto,
 } from './dto/core-business.dto';
 import { ApprovalRuntimeService } from './services/approval-runtime.service';
 import { AttendanceRuntimeService, type AttendanceRuntimeContext } from './services/attendance-runtime.service';
@@ -88,6 +92,8 @@ import { ProgramRuntimeService, type ProgramRuntimeContext } from './services/pr
 import { ResponsibilityChartRuntimeService } from './services/responsibility-chart-runtime.service';
 import { OrgRuntimeService, type OrgRuntimeContext } from './services/org-runtime.service';
 import { SreniAdminRuntimeService } from './services/sreni-admin-runtime.service';
+import { ENUM_TYPES } from '@modules/enum-values/enum-types.constants';
+import { HouseholdEnumConfigService, type HouseholdResolverKey } from './services/household-enum-config.service';
 import { SreniReportsRuntimeService } from './services/sreni-reports-runtime.service';
 import { SthanRuntimeService } from './services/sthan-runtime.service';
 import { UserAdminRuntimeService } from './services/user-admin-runtime.service';
@@ -104,6 +110,8 @@ import type {
   CalendarEventRecord,
   ContactSreniTagRecord,
   GlobalContactUploadDuplicate,
+  HouseholdMemberEnrollmentRecord,
+  HouseholdMemberRecord,
   CoreBusinessPersistenceReadinessRecord,
   DocumentFolderRecord,
   DocumentRecord,
@@ -124,12 +132,14 @@ import type {
   RegistrationRecord,
   SreniContactRecord,
   SreniDivisionRecord,
+  SreniParticipantRecord,
   SreniMonthlyReportRecord,
   SreniReportParameterRecord,
   SreniReportRecord,
   SrenyRecord,
   SthanRecord,
   SthanReportRecord,
+  SthanCalendarEventRecord,
   SthanExpenseRecord,
   SthanContactRecord,
   TicketActivityRecord,
@@ -170,8 +180,13 @@ export type {
   RegistrationRecord,
   ContactSreniTagRecord,
   GlobalContactUploadDuplicate,
+  HouseholdMemberEnrollmentRecord,
+  HouseholdMemberRecord,
+  PrimaryContactStrategy,
   SreniContactRecord,
   SreniDivisionRecord,
+  SreniEnrollmentScope,
+  SreniParticipantRecord,
   SreniMonthlyReportRecord,
   SreniReportParameterRecord,
   SreniReportRecord,
@@ -221,6 +236,8 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   private readonly sreniDivisions = new Map<string, SreniDivisionRecord>();
   /** Keyed by `${sreniId}:${rowId}` for flat iteration; grouped by sreniId for queries */
   private readonly sreniContacts = new Map<string, SreniContactRecord>();
+  private readonly householdMembers = new Map<string, HouseholdMemberRecord>();
+  private readonly householdEnrollments = new Map<string, HouseholdMemberEnrollmentRecord>();
   private readonly approvalWorkflows = new Map<string, ApprovalWorkflowRecord>();
   private readonly approvalItems = new Map<string, ApprovalItemRecord>();
   private readonly approvalNotifications = new Map<string, ApprovalNotificationRecord>();
@@ -239,6 +256,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   private programRuntimeService: ProgramRuntimeService | null = null;
   private orgRuntimeService: OrgRuntimeService | null = null;
   private sreniAdminRuntimeService: SreniAdminRuntimeService | null = null;
+  private householdEnumConfigService: HouseholdEnumConfigService | null = null;
   private sreniReportsRuntimeService: SreniReportsRuntimeService | null = null;
   private responsibilityChartRuntimeService: ResponsibilityChartRuntimeService | null = null;
   private userAdminRuntimeService: UserAdminRuntimeService | null = null;
@@ -627,15 +645,17 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getDocumentReportRuntime().listDocuments(srenyId, search);
   }
 
-  createDocument(dto: CreateDocumentDto, principal: AuthPrincipal): DocumentRecord {
+  async createDocument(dto: CreateDocumentDto, principal: AuthPrincipal): Promise<DocumentRecord> {
+    await this.getHouseholdEnumConfig().validate(ENUM_TYPES.DOCUMENT_ACCESS_LEVEL, dto.accessLevel, 'Access level');
     return this.getDocumentReportRuntime().createDocument(dto, principal);
   }
 
-  createDocumentVersion(
+  async createDocumentVersion(
     documentId: string,
     dto: CreateDocumentDto,
     principal: AuthPrincipal,
-  ): DocumentRecord {
+  ): Promise<DocumentRecord> {
+    await this.getHouseholdEnumConfig().validate(ENUM_TYPES.DOCUMENT_ACCESS_LEVEL, dto.accessLevel, 'Access level');
     return this.getDocumentReportRuntime().createDocumentVersion(documentId, dto, principal);
   }
 
@@ -660,7 +680,10 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getDocumentReportRuntime().listReportTemplates(srenyId);
   }
 
-  createReportTemplate(dto: CreateReportTemplateDto): ReportTemplateRecord {
+  async createReportTemplate(dto: CreateReportTemplateDto): Promise<ReportTemplateRecord> {
+    for (const field of dto.fields) {
+      await this.getHouseholdEnumConfig().validate(ENUM_TYPES.REPORT_TEMPLATE_FIELD_TYPE, field.type, 'Field type');
+    }
     return this.getDocumentReportRuntime().createReportTemplate(dto);
   }
 
@@ -679,11 +702,12 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getDocumentReportRuntime().listMyReportSubmissions(principal);
   }
 
-  reviewReportSubmission(
+  async reviewReportSubmission(
     submissionId: string,
     dto: ReviewReportSubmissionDto,
     principal: AuthPrincipal,
-  ): ReportSubmissionRecord {
+  ): Promise<ReportSubmissionRecord> {
+    await this.getHouseholdEnumConfig().validate(ENUM_TYPES.REPORT_SUBMISSION_STATUS, dto.decision, 'Review decision');
     return this.getDocumentReportRuntime().reviewReportSubmission(submissionId, dto, principal);
   }
 
@@ -919,6 +943,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
       sthans: this.sthans,
       governanceStructures: this.governanceStructures,
       governanceAssignments: this.governanceAssignments,
+      enumConfig: this.getHouseholdEnumConfig(),
       runtimeMode: this.runtimeMode,
       dataSource: this.dataSource,
       newId: (prefix) => this.newId(prefix),
@@ -1394,12 +1419,22 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.coreBusinessAccessUtilsService;
   }
 
+  private getHouseholdEnumConfig(): HouseholdEnumConfigService {
+    if (!this.householdEnumConfigService) {
+      this.householdEnumConfigService = new HouseholdEnumConfigService(this.runtimeMode, this.dataSource);
+    }
+    return this.householdEnumConfigService;
+  }
+
   private getSreniAdminRuntime(): SreniAdminRuntimeService {
     if (!this.sreniAdminRuntimeService) {
       this.sreniAdminRuntimeService = new SreniAdminRuntimeService({
         srenies: this.srenies,
         sreniDivisions: this.sreniDivisions,
         sreniContacts: this.sreniContacts,
+        householdMembers: this.householdMembers,
+        householdEnrollments: this.householdEnrollments,
+        enumConfig: this.getHouseholdEnumConfig(),
         reportMetricDefinitions: this.reportMetricDefinitions,
         sreniMonthlyReports: this.sreniMonthlyReports,
         sreniReportParameters: this.sreniReportParameters,
@@ -1490,7 +1525,17 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     sreniId: string,
     page = 1,
     pageSize = 50,
-  ): Promise<{ items: SreniContactRecord[]; total: number; page: number; pageSize: number; totalPages: number }> {
+  ): Promise<{
+    items: SreniContactRecord[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    enrollmentScope: string;
+    primaryContactStrategy: string;
+    resolverKey: HouseholdResolverKey;
+    participantTotal: number;
+  }> {
     return this.getSreniAdminRuntime().listSreniContacts(sreniId, page, pageSize);
   }
 
@@ -1536,6 +1581,47 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
 
   async setContactSreniTags(contactId: string, dto: SetContactSreniTagsDto): Promise<ContactSreniTagRecord[]> {
     return this.getSreniAdminRuntime().setContactSreniTags(contactId, dto);
+  }
+
+  async listHouseholdMembers(sreniId: string, contactId: string): Promise<HouseholdMemberRecord[]> {
+    return this.getSreniAdminRuntime().listHouseholdMembers(sreniId, contactId);
+  }
+
+  async createHouseholdMember(
+    sreniId: string,
+    contactId: string,
+    dto: CreateHouseholdMemberDto,
+  ): Promise<HouseholdMemberRecord> {
+    return this.getSreniAdminRuntime().createHouseholdMember(sreniId, contactId, dto);
+  }
+
+  async updateHouseholdMember(
+    sreniId: string,
+    contactId: string,
+    memberId: string,
+    dto: UpdateHouseholdMemberDto,
+  ): Promise<HouseholdMemberRecord> {
+    return this.getSreniAdminRuntime().updateHouseholdMember(sreniId, contactId, memberId, dto);
+  }
+
+  async deleteHouseholdMember(sreniId: string, contactId: string, memberId: string): Promise<void> {
+    return this.getSreniAdminRuntime().deleteHouseholdMember(sreniId, contactId, memberId);
+  }
+
+  async getSreniParticipantStats(sreniId: string) {
+    return this.getSreniAdminRuntime().getSreniParticipantStats(sreniId);
+  }
+
+  async listContactParticipants(sreniId: string, contactId: string): Promise<SreniParticipantRecord[]> {
+    return this.getSreniAdminRuntime().listContactParticipants(sreniId, contactId);
+  }
+
+  async listSreniParticipants(
+    sreniId: string,
+    page = 1,
+    pageSize = 100,
+  ): Promise<{ items: SreniParticipantRecord[]; total: number; page: number; pageSize: number; totalPages: number }> {
+    return this.getSreniAdminRuntime().listSreniParticipants(sreniId, page, pageSize);
   }
 
   // ── Report Metric Definitions ───────────────────────────────────────────────
@@ -1620,6 +1706,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
       this.sreniReportsRuntimeService = new SreniReportsRuntimeService({
         runtimeMode: this.runtimeMode,
         dataSource: this.dataSource ?? undefined,
+        enumConfig: this.getHouseholdEnumConfig(),
         sreniReports: this.sreniReports,
         toIsoTimestamp: (value) => this.getCoreBusinessDomainUtilsService().toIsoTimestamp(value),
         newId: (prefix) => this.newId(prefix),
@@ -1638,8 +1725,11 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
       this.sthanRuntimeService = new SthanRuntimeService({
         runtimeMode: this.runtimeMode,
         dataSource: this.dataSource ?? undefined,
+        enumConfig: this.getHouseholdEnumConfig(),
         toIsoTimestamp: (value) => this.getCoreBusinessDomainUtilsService().toIsoTimestamp(value),
         newId: (prefix) => this.newId(prefix),
+        createReportingApprovalRequest: (payload, principal) => this.createReportingApprovalRequest(payload, principal),
+        logWarning: (message) => this.logger.warn(message),
       });
     }
     return this.sthanRuntimeService;
@@ -1682,5 +1772,34 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
 
   async clearSthanContacts(locationId: string): Promise<{ deleted: number }> {
     return this.getSthanRuntime().clearSthanContacts(locationId);
+  }
+
+  async listSthanCalendarEvents(locationId: string): Promise<SthanCalendarEventRecord[]> {
+    return this.getSthanRuntime().listSthanCalendarEvents(locationId);
+  }
+
+  async createSthanCalendarEvent(
+    locationId: string,
+    dto: CreateSthanCalendarEventDto,
+    principal: AuthPrincipal,
+  ): Promise<SthanCalendarEventRecord> {
+    return this.getSthanRuntime().createSthanCalendarEvent(locationId, dto, principal);
+  }
+
+  async updateSthanCalendarEvent(
+    locationId: string,
+    eventId: string,
+    dto: UpdateSthanCalendarEventDto,
+    principal: AuthPrincipal,
+  ): Promise<SthanCalendarEventRecord> {
+    return this.getSthanRuntime().updateSthanCalendarEvent(locationId, eventId, dto, principal);
+  }
+
+  async deleteSthanCalendarEvent(
+    locationId: string,
+    eventId: string,
+    principal: AuthPrincipal,
+  ): Promise<{ success: boolean; deletedBy: string }> {
+    return this.getSthanRuntime().deleteSthanCalendarEvent(locationId, eventId, principal);
   }
 }

@@ -16,9 +16,8 @@ This folder contains executable PostgreSQL scripts for ADWest.
 6. 011_auth_store.sql (recommended for persistent API auth)
 7. 012_auth_security_hardening.sql (required for password+captcha login hardening)
 8. 013_auth_remove_otp_mfa_legacy.sql (recommended cleanup for password+captcha-only deployments)
-9. 014_core_business_frm_008_017_035_persistence.sql (FRM-008/017/035 DB persistence support)
-10. 015_document_job_approval_modules.sql (FR-DOC/FR-JOB/FR-APR DB persistence support)
-11. 016_core_business_runtime_state_store.sql (Core Business runtime snapshot persistence for DB mode)
+9. 015_document_job_approval_modules.sql (FR-DOC/FR-JOB/FR-APR DB persistence support)
+10. 016_core_business_runtime_state_store.sql (Core Business runtime snapshot persistence for DB mode)
 12. 017_approval_workflow_runtime_metadata.sql (FR-APR workflow mode/escalation/audit metadata persistence)
 13. 018_role_definitions.sql (Settings Roles Definition CRUD persistence)
 14. 019_unified_locations.sql
@@ -41,8 +40,8 @@ This folder contains executable PostgreSQL scripts for ADWest.
 31. 036_remove_deprecated_helpdesk_profile_edit_request_runtime.sql (Decommissions deprecated helpdesk/tickets and profile/edit-request persistence)
 32. 037_remove_deprecated_jobs_resumes_and_enum_values.sql (Decommissions deprecated jobs/resumes persistence and removes deprecated enum values)
 33. 038_auth_login_performance_indexes.sql (Adds targeted login indexes for users code/phone/lower(email) lookups)
-34. 039_public_gateway.sql (Prepares future DB persistence for public helpdesk tickets, public job postings, and public job applications)
-35. 040_member_services.sql (Adds reimbursements, special events, and notifications persistence)
+34. 039_public_gateway.sql (Public helpdesk, jobs — text columns; validated via enum_values)
+35. 040_member_services.sql (Reimbursements, events, notifications — text columns)
 36. 041_google_integration_config.sql (Adds DB-backed Google OAuth/Gmail configuration and settings menu key)
 37. 042_drop_audit_fks.sql (Drops selected member-services audit FK constraints for mixed persistence/runtime compatibility)
 38. 043_report_metric_target.sql (Adds target column for report metric definitions)
@@ -54,10 +53,36 @@ This folder contains executable PostgreSQL scripts for ADWest.
 44. 049_sthan_contacts.sql (Adds standalone Sthan contacts persistence table with row index + JSONB payload)
 45. 050_governance_ai_chatbot_menu.sql (Adds AI Chatbot governance menu key for grant-driven access control)
 46. 051_sreni_join_us_visibility.sql (Adds explicit Join Us visibility flag on Sreni definitions for public intake filtering)
-47. 055_analytics_studio_layouts.sql (Adds DB-backed saved Analytics Studio layouts per user and per Sreni)
-48. 058_general_services_menu_merge.sql (Merges Governance + Member Services hierarchy into a single General Services parent for admin menu grants)
-49. 063_enum_values_parent_value.sql (Adds parent_value support for hierarchical enum domains such as role_level)
-50. 064_contact_location_hierarchy_tags.sql (Adds explicit zone/sthan/division location tags on contacts for parent-child hierarchy assignment)
+47. 052_smtp_integration_config.sql
+48. 053_smtp_imap_fields.sql
+49. 054_admin_password_reset_tokens.sql
+50. 055_sreni_divisions.sql
+51. 055_analytics_studio_layouts.sql
+52. 056_sreni_contact_sthan.sql
+53. 057_user_table_layouts.sql
+54. 058_general_services_menu_merge.sql
+55. 059_contact_sreni_tags.sql
+56. 059_remove_ai_chatbot_menu.sql
+57. 060_sreni_contact_active.sql
+58. 061_sreni_contacts_nullable_sreni.sql
+59. 062_location_parent_id.sql
+60. 063_enum_values_parent_value.sql (Adds parent_value support for hierarchical enum domains such as role_level)
+61. 064_contact_location_hierarchy_tags.sql (Adds explicit zone/sthan/division location tags on contacts for parent-child hierarchy assignment)
+62. 065_household_members_and_enrollments.sql (Optional — household members + enrollments)
+63. 066_household_participant_strategy.sql (Optional — requires 065; ladies/BB participant strategy)
+64. 068_platform_config_enums.sql (Seeds platform-wide enum_values; drops CHECK constraints where tables exist)
+65. 069_postgres_enum_to_varchar.sql (**Upgrade only** — legacy PG ENUM → text if prod ran old 039/040)
+
+## Supabase production (shortcut)
+
+See **[supabase/MIGRATE.md](./supabase/MIGRATE.md)**. For prod already on ~062, run pending scripts via:
+
+```powershell
+$env:DATABASE_URL = "<supabase-connection-string>"
+.\ad-docs\database-script\supabase\run-prod-pending.ps1
+```
+
+**Removed:** `067_household_config_enums.sql` (redundant with 068). **Removed from docs:** `014` (never existed).
 
 ## Enum Visibility Note
 - API now serves only supported active enum domains to the UI, even if legacy rows still exist in `adwest.enum_values`.
@@ -89,7 +114,6 @@ psql "$env:DATABASE_URL" -f "ad-docs/database-script/010_seed_minimal.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/011_auth_store.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/012_auth_security_hardening.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/013_auth_remove_otp_mfa_legacy.sql"
-psql "$env:DATABASE_URL" -f "ad-docs/database-script/014_core_business_frm_008_017_035_persistence.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/015_document_job_approval_modules.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/016_core_business_runtime_state_store.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/017_approval_workflow_runtime_metadata.sql"
@@ -127,9 +151,27 @@ psql "$env:DATABASE_URL" -f "ad-docs/database-script/048_fix_sthan_table_types.s
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/049_sthan_contacts.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/050_governance_ai_chatbot_menu.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/051_sreni_join_us_visibility.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/052_smtp_integration_config.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/053_smtp_imap_fields.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/054_admin_password_reset_tokens.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/055_sreni_divisions.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/055_analytics_studio_layouts.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/056_sreni_contact_sthan.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/057_user_table_layouts.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/058_general_services_menu_merge.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/059_contact_sreni_tags.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/059_remove_ai_chatbot_menu.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/060_sreni_contact_active.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/061_sreni_contacts_nullable_sreni.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/062_location_parent_id.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/063_enum_values_parent_value.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/064_contact_location_hierarchy_tags.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/065_household_members_and_enrollments.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/066_household_participant_strategy.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/068_platform_config_enums.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/069_postgres_enum_to_varchar.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/070_sthan_calendar_events.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/071_job_application_activities.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/072_job_application_activity_enum.sql"
 ```
 

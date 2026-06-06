@@ -1,11 +1,17 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { AuthPrincipal } from '@modules/user-management/interfaces/auth-principal.interface';
+import { EnumConfigService } from '@modules/enum-values/services/enum-config.service';
+import { ENUM_TYPES } from '@modules/enum-values/enum-types.constants';
 import {
+  CreateSthanCalendarEventDto,
   CreateSthanExpenseDto,
   ReviewSthanExpenseDto,
   SubmitSthanReportDto,
+  UpdateSthanCalendarEventDto,
 } from '../dto/core-business.dto';
 import type {
+  SthanCalendarEventRecord,
   SthanContactRecord,
   SthanExpenseCategory,
   SthanExpenseRecord,
@@ -16,8 +22,14 @@ import type {
 export interface SthanRuntimeContext {
   runtimeMode: 'in-memory' | 'db';
   dataSource?: DataSource;
+  enumConfig: EnumConfigService;
   toIsoTimestamp(value: string | Date): string;
   newId(prefix: string): string;
+  createReportingApprovalRequest?(
+    payload: { targetId: string; targetType: 'report_submission' | 'calendar_event'; summary: string },
+    principal: AuthPrincipal,
+  ): void;
+  logWarning?(message: string): void;
 }
 
 export class SthanRuntimeService {
@@ -138,7 +150,9 @@ export class SthanRuntimeService {
   }
 
   async createSthanExpense(locationId: string, dto: CreateSthanExpenseDto, submittedBy?: string): Promise<SthanExpenseRecord> {
+    await this.ctx.enumConfig.validate(ENUM_TYPES.EXPENSE_CATEGORY, dto.category, 'Category');
     const status = dto.asDraft ? 'draft' : 'submitted';
+    await this.ctx.enumConfig.validate(ENUM_TYPES.EXPENSE_STATUS, status, 'Status');
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
       const rows = await this.ctx.dataSource.query(
         `INSERT INTO adwest.sthan_expenses (location_id, submitted_by, category, description, amount, currency, status)
@@ -155,6 +169,7 @@ export class SthanRuntimeService {
   }
 
   async reviewSthanExpense(locationId: string, expenseId: string, dto: ReviewSthanExpenseDto, reviewedBy?: string): Promise<SthanExpenseRecord> {
+    await this.ctx.enumConfig.validate(ENUM_TYPES.EXPENSE_STATUS, dto.status, 'Status');
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
       const rows = await this.ctx.dataSource.query(
         `UPDATE adwest.sthan_expenses
@@ -307,6 +322,221 @@ export class SthanRuntimeService {
     }
     return { deleted: 0 };
   }
+
+  // ── Calendar ────────────────────────────────────────────────────────────────
+
+  private async assertSthanLocation(locationId: string): Promise<void> {
+    if (!(this.ctx.runtimeMode === 'db' && this.ctx.dataSource)) {
+      throw new BadRequestException('Sthan calendar requires database mode');
+    }
+    const rows = await this.ctx.dataSource.query(
+      `SELECT id::text, level FROM adwest.locations WHERE id = $1::uuid AND active = true LIMIT 1`,
+      [locationId],
+    ) as Array<{ id: string; level: string }>;
+    if (!rows[0]) {
+      throw new NotFoundException('Location not found');
+    }
+    if (rows[0].level !== 'sthan') {
+      throw new BadRequestException('Calendar events can only be created for Sthan locations');
+    }
+  }
+
+  private mapCalendarRow(r: SthanCalendarDbRow): SthanCalendarEventRecord {
+    return {
+      id: r.id,
+      locationId: r.location_id,
+      title: r.title,
+      date: typeof r.event_date === 'string' ? r.event_date.slice(0, 10) : new Date(r.event_date).toISOString().slice(0, 10),
+      startTime: typeof r.start_time === 'string' ? r.start_time.slice(0, 5) : String(r.start_time).slice(0, 5),
+      endTime: typeof r.end_time === 'string' ? r.end_time.slice(0, 5) : String(r.end_time).slice(0, 5),
+      color: r.color,
+      notes: r.notes ?? undefined,
+      createdBy: r.created_by,
+      createdAt: this.ctx.toIsoTimestamp(r.created_at),
+      updatedBy: r.updated_by,
+      updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+      source: 'local',
+    };
+  }
+
+  private mapSreniCalendarRow(r: SreniCalendarDbRow, locationId: string): SthanCalendarEventRecord {
+    return {
+      id: r.id,
+      locationId,
+      title: r.title,
+      date: typeof r.event_date === 'string' ? r.event_date.slice(0, 10) : new Date(r.event_date).toISOString().slice(0, 10),
+      startTime: typeof r.start_time === 'string' ? r.start_time.slice(0, 5) : String(r.start_time).slice(0, 5),
+      endTime: typeof r.end_time === 'string' ? r.end_time.slice(0, 5) : String(r.end_time).slice(0, 5),
+      color: r.color,
+      notes: r.notes ?? undefined,
+      createdBy: r.created_by,
+      createdAt: this.ctx.toIsoTimestamp(r.created_at),
+      updatedBy: r.updated_by,
+      updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+      source: 'sreni',
+      sreniId: r.sreni_id,
+      scope: r.scope as 'zone' | 'sthan',
+      readOnly: true,
+    };
+  }
+
+  private async listLinkedSreniCalendarEvents(locationId: string): Promise<SthanCalendarEventRecord[]> {
+    if (!(this.ctx.runtimeMode === 'db' && this.ctx.dataSource)) return [];
+    try {
+      const rows = await this.ctx.dataSource.query(
+        `SELECT id::text, sreni_id, title, event_date, start_time, end_time, color, notes, scope,
+                created_by, updated_by, created_at, updated_at
+         FROM adwest.sreni_calendar_events e
+         WHERE scope = 'zone'
+            OR (
+              scope = 'sthan'
+              AND (
+                jsonb_array_length(sthan_ids) = 0
+                OR sthan_ids @> jsonb_build_array($1::text)
+              )
+            )
+         ORDER BY event_date ASC, start_time ASC, title ASC`,
+        [locationId],
+      ) as SreniCalendarDbRow[];
+      return rows.map((r) => this.mapSreniCalendarRow(r, locationId));
+    } catch {
+      return [];
+    }
+  }
+
+  private sortCalendarEvents(events: SthanCalendarEventRecord[]): SthanCalendarEventRecord[] {
+    return events.slice().sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      if (a.startTime !== b.startTime) return a.startTime.localeCompare(b.startTime);
+      return a.title.localeCompare(b.title);
+    });
+  }
+
+  async listSthanCalendarEvents(locationId: string): Promise<SthanCalendarEventRecord[]> {
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      try {
+        await this.assertSthanLocation(locationId);
+        const [localRows, linkedRows] = await Promise.all([
+          this.ctx.dataSource.query(
+            `SELECT id::text, location_id::text, title, event_date, start_time, end_time, color, notes,
+                    created_by, updated_by, created_at, updated_at
+             FROM adwest.sthan_calendar_events
+             WHERE location_id = $1::uuid
+             ORDER BY event_date ASC, start_time ASC, title ASC`,
+            [locationId],
+          ) as Promise<SthanCalendarDbRow[]>,
+          this.listLinkedSreniCalendarEvents(locationId),
+        ]);
+        const local = localRows.map((r) => this.mapCalendarRow(r));
+        return this.sortCalendarEvents([...local, ...linkedRows]);
+      } catch (error) {
+        if (error instanceof NotFoundException || error instanceof BadRequestException) throw error;
+        return [];
+      }
+    }
+    return [];
+  }
+
+  async createSthanCalendarEvent(
+    locationId: string,
+    dto: CreateSthanCalendarEventDto,
+    principal: AuthPrincipal,
+  ): Promise<SthanCalendarEventRecord> {
+    await this.assertSthanLocation(locationId);
+    const actor = principal.email ?? principal.userId;
+    const rows = await this.ctx.dataSource!.query(
+      `INSERT INTO adwest.sthan_calendar_events
+         (location_id, title, event_date, start_time, end_time, color, notes, created_by, updated_by)
+       VALUES ($1::uuid, $2, $3::date, $4::time, $5::time, $6, $7, $8, $8)
+       RETURNING id::text, location_id::text, title, event_date, start_time, end_time, color, notes,
+                 created_by, updated_by, created_at, updated_at`,
+      [
+        locationId,
+        dto.title.trim(),
+        dto.date.slice(0, 10),
+        dto.startTime,
+        dto.endTime,
+        dto.color ?? '#6366f1',
+        dto.notes?.trim() || null,
+        actor,
+      ],
+    ) as SthanCalendarDbRow[];
+    const event = this.mapCalendarRow(rows[0]);
+    this.ctx.createReportingApprovalRequest?.(
+      {
+        targetId: event.id,
+        targetType: 'calendar_event',
+        summary: `Sthan calendar event "${event.title}" on ${event.date}`,
+      },
+      principal,
+    );
+    return event;
+  }
+
+  async updateSthanCalendarEvent(
+    locationId: string,
+    eventId: string,
+    dto: UpdateSthanCalendarEventDto,
+    principal: AuthPrincipal,
+  ): Promise<SthanCalendarEventRecord> {
+    await this.assertSthanLocation(locationId);
+    const actor = principal.email ?? principal.userId;
+    const rows = await this.ctx.dataSource!.query(
+      `UPDATE adwest.sthan_calendar_events
+       SET title = COALESCE($3, title),
+           event_date = COALESCE($4::date, event_date),
+           start_time = COALESCE($5::time, start_time),
+           end_time = COALESCE($6::time, end_time),
+           color = COALESCE($7, color),
+           notes = CASE WHEN $8::boolean THEN $9 ELSE notes END,
+           updated_by = $10,
+           updated_at = now()
+       WHERE id = $1::uuid AND location_id = $2::uuid
+       RETURNING id::text, location_id::text, title, event_date, start_time, end_time, color, notes,
+                 created_by, updated_by, created_at, updated_at`,
+      [
+        eventId,
+        locationId,
+        dto.title?.trim() ?? null,
+        dto.date?.slice(0, 10) ?? null,
+        dto.startTime ?? null,
+        dto.endTime ?? null,
+        dto.color ?? null,
+        dto.notes !== undefined,
+        dto.notes?.trim() || null,
+        actor,
+      ],
+    ) as SthanCalendarDbRow[];
+    if (!rows[0]) {
+      throw new NotFoundException('Calendar event not found');
+    }
+    const event = this.mapCalendarRow(rows[0]);
+    this.ctx.createReportingApprovalRequest?.(
+      {
+        targetId: event.id,
+        targetType: 'calendar_event',
+        summary: `Sthan calendar event update "${event.title}" on ${event.date}`,
+      },
+      principal,
+    );
+    return event;
+  }
+
+  async deleteSthanCalendarEvent(
+    locationId: string,
+    eventId: string,
+    principal: AuthPrincipal,
+  ): Promise<{ success: boolean; deletedBy: string }> {
+    await this.assertSthanLocation(locationId);
+    const result = await this.ctx.dataSource!.query(
+      `DELETE FROM adwest.sthan_calendar_events WHERE id = $1::uuid AND location_id = $2::uuid RETURNING id`,
+      [eventId, locationId],
+    ) as Array<{ id: string }>;
+    if (!result[0]) {
+      throw new NotFoundException('Calendar event not found');
+    }
+    return { success: true, deletedBy: principal.email ?? principal.userId };
+  }
 }
 
 interface SthanExpenseDbRow {
@@ -323,6 +553,37 @@ interface SthanExpenseDbRow {
   reviewer_notes: string | null;
   reviewed_by: string | null;
   reviewed_at: string | Date | null;
+  created_at: string | Date;
+  updated_at: string | Date;
+}
+
+interface SthanCalendarDbRow {
+  id: string;
+  location_id: string;
+  title: string;
+  event_date: string | Date;
+  start_time: string;
+  end_time: string;
+  color: string;
+  notes: string | null;
+  created_by: string;
+  updated_by: string;
+  created_at: string | Date;
+  updated_at: string | Date;
+}
+
+interface SreniCalendarDbRow {
+  id: string;
+  sreni_id: string;
+  title: string;
+  event_date: string | Date;
+  start_time: string;
+  end_time: string;
+  color: string;
+  notes: string | null;
+  scope: string;
+  created_by: string;
+  updated_by: string;
   created_at: string | Date;
   updated_at: string | Date;
 }
