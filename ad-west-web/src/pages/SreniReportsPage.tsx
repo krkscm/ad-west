@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { backendApi, SreniReportApi, SreniReportParameterApi } from '../utils/backendApi';
 import { useToast } from '../components/common/Toast';
+import { ExportMenu, formatExportSections, RowExportButton } from '../components/common/ExportMenu';
 import { useAuth } from '../context/auth-context';
 import { useEnumOptions } from '../hooks/useEnumOptions';
+import { exportSreniReports } from '../utils/reportExport';
+import type { ExportFormat } from '../utils/tableExport';
 
 interface Props {
   sreniId: string;
@@ -129,6 +132,45 @@ export const SreniReportsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
     return [{ value: 1, label: 'Full Year' }];
   }, [activeType]);
 
+  const reportExportSections = formatExportSections([
+    {
+      title: periodLabel(activeType, formYear, formValue),
+      disabled: !typeReports.some((report) => report.periodYear === formYear && report.periodValue === formValue),
+      onExport: (format) => exportSreniReports(
+        typeReports.filter((report) => report.periodYear === formYear && report.periodValue === formValue),
+        typeParams,
+        {
+          entityName: sreniName,
+          submissionType: activeType,
+          submissionTypeLabel: submissionTypeLabel(activeType),
+          scope: 'single',
+          periodLabel: periodLabel(activeType, formYear, formValue),
+        },
+        format,
+      ),
+    },
+    {
+      title: `All ${submissionTypeLabel(activeType)} Reports`,
+      disabled: typeReports.length === 0,
+      onExport: (format) => exportSreniReports(typeReports, typeParams, {
+        entityName: sreniName,
+        submissionType: activeType,
+        submissionTypeLabel: submissionTypeLabel(activeType),
+        scope: 'all',
+      }, format),
+    },
+  ]);
+
+  const exportSingleReport = (report: SreniReportApi, format: ExportFormat) => {
+    exportSreniReports([report], typeParams, {
+      entityName: sreniName,
+      submissionType: activeType,
+      submissionTypeLabel: submissionTypeLabel(activeType),
+      scope: 'single',
+      periodLabel: periodLabel(activeType, report.periodYear, report.periodValue),
+    }, format);
+  };
+
   return (
     <div className="animate-slide-up">
       {/* Header */}
@@ -151,18 +193,24 @@ export const SreniReportsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
           </div>
         </div>
         {!isFormOpen && typeParams.length > 0 && (
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{ fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-            onClick={() => { const def = typeReports.find((r) => r.periodYear === formYear && r.periodValue === formValue); openForm(formYear, formValue, def); }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="16 16 12 12 8 16" /><line x1="12" y1="12" x2="12" y2="21" />
-              <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
-            </svg>
-            Submit Report
-          </button>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <ExportMenu
+              disabled={isLoading}
+              sections={reportExportSections}
+            />
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+              onClick={() => { const def = typeReports.find((r) => r.periodYear === formYear && r.periodValue === formValue); openForm(formYear, formValue, def); }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="16 16 12 12 8 16" /><line x1="12" y1="12" x2="12" y2="21" />
+                <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
+              </svg>
+              Submit Report
+            </button>
+          </div>
         )}
       </div>
 
@@ -328,7 +376,11 @@ export const SreniReportsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
                     <td key={p.id} style={{ fontSize: '0.85rem' }}>{report.entries[p.id] ?? '—'}</td>
                   ))}
                   <td>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                      <RowExportButton
+                        title={`Export ${periodLabel(activeType, report.periodYear, report.periodValue)}`}
+                        onExport={(format) => exportSingleReport(report, format)}
+                      />
                       <button type="button" className="btn btn-secondary" style={{ padding: '6px 14px', fontSize: '0.82rem', whiteSpace: 'nowrap' }} onClick={() => openForm(report.periodYear, report.periodValue, report)}>
                         ✏️ Edit
                       </button>

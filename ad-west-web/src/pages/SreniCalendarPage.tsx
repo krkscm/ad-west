@@ -2,8 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal } from '../components/common/Modal';
 import { useToast } from '../components/common/Toast';
 import { DateField, TimeField } from '../components/common/DateFields';
+import { ExportMenu, formatExportSections } from '../components/common/ExportMenu';
 import { useAuth } from '../context/auth-context';
 import { backendApi, CalendarEventApi, LocationDefinitionApi } from '../utils/backendApi';
+import {
+  exportSreniCalendar,
+  filterSreniEventsForMonth,
+} from '../utils/calendarExport';
 
 interface Props {
   sreniId: string;
@@ -187,6 +192,36 @@ export const SreniCalendarPage: React.FC<Props> = ({ sreniId, sreniName }) => {
     })
     .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
 
+  const monthEvents = useMemo(
+    () => filterSreniEventsForMonth(events, year, month),
+    [events, year, month],
+  );
+
+  const calendarExportSections = formatExportSections([
+    {
+      title: `${MONTH_NAMES[month]} ${year}`,
+      disabled: monthEvents.length === 0,
+      onExport: (format) => exportSreniCalendar(monthEvents, {
+        entityName: sreniName,
+        year,
+        month,
+        scope: 'month',
+        sthanById,
+      }, format),
+    },
+    {
+      title: 'All Events',
+      disabled: events.length === 0,
+      onExport: (format) => exportSreniCalendar(events, {
+        entityName: sreniName,
+        year,
+        month,
+        scope: 'all',
+        sthanById,
+      }, format),
+    },
+  ]);
+
   return (
     <div className="animate-slide-up">
 
@@ -198,7 +233,11 @@ export const SreniCalendarPage: React.FC<Props> = ({ sreniId, sreniName }) => {
             Scheduler — {events.length} event{events.length !== 1 ? 's' : ''} total{isLoading ? ' (syncing...)' : ''}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <ExportMenu
+            disabled={isLoading}
+            sections={calendarExportSections}
+          />
           <div style={{ display: 'flex', border: '1px solid var(--border-dark)', borderRadius: '8px', overflow: 'hidden' }}>
             <button
               className={`btn ${view === 'month' ? 'btn-primary' : 'btn-secondary'}`}

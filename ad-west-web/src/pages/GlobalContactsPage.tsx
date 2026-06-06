@@ -490,13 +490,11 @@ export const GlobalContactsPage: React.FC = () => {
     backendApi.listSreniDefinitions()
       .then((items) => {
         setSrenies(items);
-        items.forEach((s) => loadDivisions(s.id));
       })
       .catch(() => {});
     backendApi.listSthans()
       .then(setSthans)
       .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

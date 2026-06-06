@@ -1,8 +1,13 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal } from '../components/common/Modal';
 import { useToast } from '../components/common/Toast';
 import { DateField, TimeField } from '../components/common/DateFields';
+import { ExportMenu, formatExportSections } from '../components/common/ExportMenu';
 import { backendApi, SthanCalendarEventApi } from '../utils/backendApi';
+import {
+  exportSthanCalendar,
+  filterSthanEventsForMonth,
+} from '../utils/calendarExport';
 
 interface Props {
   locationId: string;
@@ -162,6 +167,34 @@ export const SthanCalendarPage: React.FC<Props> = ({ locationId, locationName })
     })
     .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
 
+  const monthEvents = useMemo(
+    () => filterSthanEventsForMonth(events, year, month),
+    [events, year, month],
+  );
+
+  const calendarExportSections = formatExportSections([
+    {
+      title: `${MONTH_NAMES[month]} ${year}`,
+      disabled: monthEvents.length === 0,
+      onExport: (format) => exportSthanCalendar(monthEvents, {
+        entityName: locationName,
+        year,
+        month,
+        scope: 'month',
+      }, format),
+    },
+    {
+      title: 'All Events',
+      disabled: events.length === 0,
+      onExport: (format) => exportSthanCalendar(events, {
+        entityName: locationName,
+        year,
+        month,
+        scope: 'all',
+      }, format),
+    },
+  ]);
+
   return (
     <div>
       <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
@@ -176,7 +209,11 @@ export const SthanCalendarPage: React.FC<Props> = ({ locationId, locationName })
             </p>
           )}
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <ExportMenu
+            disabled={isLoading}
+            sections={calendarExportSections}
+          />
           <div style={{ display: 'flex', border: '1px solid var(--border-dark)', borderRadius: '8px', overflow: 'hidden' }}>
             <button
               className={`btn ${view === 'month' ? 'btn-primary' : 'btn-secondary'}`}

@@ -761,4 +761,117 @@ export class CoreBusinessDbHydrationService {
       });
     }
   }
+
+  async mergeSreniesFromDatabase(): Promise<void> {
+    const srenyRows = await this.ctx.dataSource.query(
+      'SELECT id, zone_id, name, description, code, active, is_service_sreny, join_us_visible, enrollment_scope, primary_contact_strategy, created_by, updated_by, created_at, updated_at FROM adwest.srenies ORDER BY created_at ASC',
+    ).catch(() => [] as unknown[]);
+
+    for (const row of srenyRows as Array<{
+      id: string; zone_id: string | null; name: string; description: string | null; code: string | null;
+      active: boolean; is_service_sreny: boolean; join_us_visible?: boolean | null;
+      enrollment_scope?: string | null; primary_contact_strategy?: string | null;
+      created_by: string | null; updated_by: string | null;
+      created_at: string | Date; updated_at: string | Date;
+    }>) {
+      this.ctx.srenies.set(row.id, {
+        id: row.id,
+        name: row.name,
+        zoneId: row.zone_id ?? undefined,
+        isServiceSreny: row.is_service_sreny,
+        joinUsVisible: row.join_us_visible ?? false,
+        enrollmentScope: row.enrollment_scope ?? undefined,
+        primaryContactStrategy: row.primary_contact_strategy ?? undefined,
+        code: row.code ?? undefined,
+        description: row.description ?? undefined,
+        active: row.active,
+        createdBy: row.created_by ?? undefined,
+        updatedBy: row.updated_by ?? undefined,
+        createdAt: this.ctx.toIsoTimestamp(row.created_at),
+        updatedAt: this.ctx.toIsoTimestamp(row.updated_at),
+      });
+    }
+  }
+
+  /** Load calendar + attendance runtime rows for one Sreni (handles stale snapshots on serverless). */
+  async hydrateSrenyProgramRuntimeData(sreniId: string): Promise<void> {
+    const [calendarEventRows, attendanceMetricRows, eventAttendanceCaptureRows] = await Promise.all([
+      this.ctx.dataSource.query(
+        `SELECT id, sreni_id, title, event_date, start_time, end_time, color, notes, scope, sthan_ids, created_by, updated_by, created_at, updated_at
+         FROM adwest.sreni_calendar_events WHERE sreni_id=$1 ORDER BY event_date ASC, start_time ASC`,
+        [sreniId],
+      ).catch(() => [] as unknown[]),
+      this.ctx.dataSource.query(
+        `SELECT id, sreni_id, name, description, metric_keys, active, created_by, updated_by, created_at, updated_at
+         FROM adwest.sreni_attendance_metrics WHERE sreni_id=$1 ORDER BY name ASC`,
+        [sreniId],
+      ).catch(() => [] as unknown[]),
+      this.ctx.dataSource.query(
+        `SELECT id, sreni_id, event_id, metric_id, values_json, captured_by, captured_at, updated_at
+         FROM adwest.sreni_event_attendance_captures WHERE sreni_id=$1 ORDER BY captured_at ASC`,
+        [sreniId],
+      ).catch(() => [] as unknown[]),
+    ]);
+
+    for (const row of calendarEventRows as Array<{
+      id: string; sreni_id: string; title: string; event_date: string | Date;
+      start_time: string; end_time: string; color: string; notes: string | null;
+      scope: 'zone' | 'sthan'; sthan_ids: string[] | null;
+      created_by: string; updated_by: string;
+      created_at: string | Date; updated_at: string | Date;
+    }>) {
+      this.ctx.calendarEvents.set(row.id, {
+        id: row.id,
+        sreniId: row.sreni_id,
+        title: row.title,
+        date: this.ctx.toDateOnly(row.event_date),
+        startTime: String(row.start_time).slice(0, 5),
+        endTime: String(row.end_time).slice(0, 5),
+        color: row.color,
+        notes: row.notes ?? undefined,
+        scope: row.scope,
+        sthanIds: Array.isArray(row.sthan_ids) ? row.sthan_ids : [],
+        createdBy: row.created_by,
+        updatedBy: row.updated_by,
+        createdAt: this.ctx.toIsoTimestamp(row.created_at),
+        updatedAt: this.ctx.toIsoTimestamp(row.updated_at),
+      });
+    }
+
+    for (const row of attendanceMetricRows as Array<{
+      id: string; sreni_id: string; name: string; description: string | null;
+      metric_keys: string[] | null; active: boolean; created_by: string; updated_by: string;
+      created_at: string | Date; updated_at: string | Date;
+    }>) {
+      this.ctx.attendanceMetrics.set(row.id, {
+        id: row.id,
+        sreniId: row.sreni_id,
+        name: row.name,
+        description: row.description ?? undefined,
+        keys: Array.isArray(row.metric_keys) ? row.metric_keys : [],
+        active: row.active,
+        createdBy: row.created_by,
+        updatedBy: row.updated_by,
+        createdAt: this.ctx.toIsoTimestamp(row.created_at),
+        updatedAt: this.ctx.toIsoTimestamp(row.updated_at),
+      });
+    }
+
+    for (const row of eventAttendanceCaptureRows as Array<{
+      id: string; sreni_id: string; event_id: string; metric_id: string;
+      values_json: Record<string, string | number | boolean | null> | null;
+      captured_by: string; captured_at: string | Date; updated_at: string | Date;
+    }>) {
+      this.ctx.eventAttendanceCaptures.set(row.id, {
+        id: row.id,
+        sreniId: row.sreni_id,
+        eventId: row.event_id,
+        metricId: row.metric_id,
+        values: row.values_json ?? {},
+        capturedBy: row.captured_by,
+        capturedAt: this.ctx.toIsoTimestamp(row.captured_at),
+        updatedAt: this.ctx.toIsoTimestamp(row.updated_at),
+      });
+    }
+  }
 }

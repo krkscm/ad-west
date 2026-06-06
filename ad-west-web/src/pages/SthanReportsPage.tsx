@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { backendApi, ReportMetricDefinitionApi, SthanReportApi } from '../utils/backendApi';
 import { useToast } from '../components/common/Toast';
+import { ExportMenu, formatExportSections, RowExportButton } from '../components/common/ExportMenu';
+import { exportSthanReports } from '../utils/reportExport';
+import type { ExportFormat } from '../utils/tableExport';
 
 interface Props {
   locationId: string;
@@ -10,7 +13,7 @@ interface Props {
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
 
-export const SthanReportsPage: React.FC<Props> = ({ locationId, locationName: _locationName }) => {
+export const SthanReportsPage: React.FC<Props> = ({ locationId, locationName }) => {
   const { addToast } = useToast();
 
   const [metrics, setMetrics] = useState<ReportMetricDefinitionApi[]>([]);
@@ -82,6 +85,39 @@ export const SthanReportsPage: React.FC<Props> = ({ locationId, locationName: _l
 
   const yearOptions = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
 
+  const reportExportSections = formatExportSections([
+    {
+      title: `${MONTHS[formMonth - 1]} ${formYear}`,
+      disabled: !reports.some((report) => report.periodYear === formYear && report.periodMonth === formMonth),
+      onExport: (format) => exportSthanReports(
+        reports.filter((report) => report.periodYear === formYear && report.periodMonth === formMonth),
+        metrics,
+        {
+          entityName: locationName,
+          scope: 'single',
+          periodLabel: `${MONTHS[formMonth - 1]} ${formYear}`,
+        },
+        format,
+      ),
+    },
+    {
+      title: 'All Reports',
+      disabled: reports.length === 0,
+      onExport: (format) => exportSthanReports(reports, metrics, {
+        entityName: locationName,
+        scope: 'all',
+      }, format),
+    },
+  ]);
+
+  const exportSingleReport = (report: SthanReportApi, format: ExportFormat) => {
+    exportSthanReports([report], metrics, {
+      entityName: locationName,
+      scope: 'single',
+      periodLabel: `${MONTHS[report.periodMonth - 1]} ${report.periodYear}`,
+    }, format);
+  };
+
   return (
     <div>
       {/* Header */}
@@ -100,11 +136,17 @@ export const SthanReportsPage: React.FC<Props> = ({ locationId, locationName: _l
           </div>
         </div>
         {!isFormOpen && metrics.length > 0 && (
-          <button type="button" className="btn btn-primary"
-            style={{ fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-            onClick={() => openForm(formYear, formMonth, existingReport)}>
-            📤 Submit Report
-          </button>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <ExportMenu
+              disabled={isLoading}
+              sections={reportExportSections}
+            />
+            <button type="button" className="btn btn-primary"
+              style={{ fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+              onClick={() => openForm(formYear, formMonth, existingReport)}>
+              📤 Submit Report
+            </button>
+          </div>
         )}
       </div>
 
@@ -221,7 +263,11 @@ export const SthanReportsPage: React.FC<Props> = ({ locationId, locationName: _l
                     <td key={m.id} style={{ fontSize: '0.85rem' }}>{report.entries[m.id] ?? '—'}</td>
                   ))}
                   <td>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                      <RowExportButton
+                        title={`Export ${MONTHS[report.periodMonth - 1]} ${report.periodYear}`}
+                        onExport={(format) => exportSingleReport(report, format)}
+                      />
                       <button type="button" className="btn btn-secondary" style={{ padding: '6px 14px', fontSize: '0.82rem' }}
                         onClick={() => openForm(report.periodYear, report.periodMonth, report)}>
                         ✏️ Edit

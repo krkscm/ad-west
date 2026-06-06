@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { SthanReportsPage } from './SthanReportsPage';
 import { SthanExpensesPage } from './SthanExpensesPage';
 import { SthanContactsPage } from './SthanContactsPage';
 import { SthanCalendarPage } from './SthanCalendarPage';
+import type { SthanSection } from '../utils/adminNavigation';
 
 interface Props {
   locationId: string;
   locationName: string;
+  activeSection?: SthanSection;
+  onSectionChange?: (section: SthanSection) => void;
 }
 
-type SthanTab = 'calendar' | 'reports' | 'expenses' | 'contacts';
+type SthanTab = SthanSection;
 
 const TABS: Array<{ key: SthanTab; label: string; icon: string }> = [
   { key: 'calendar', label: 'Calendar', icon: '📅' },
@@ -18,8 +21,22 @@ const TABS: Array<{ key: SthanTab; label: string; icon: string }> = [
   { key: 'contacts', label: 'Contacts', icon: '📋' },
 ];
 
-export const SthanDetailPage: React.FC<Props> = ({ locationId, locationName }) => {
-  const [activeTab, setActiveTab] = useState<SthanTab>('calendar');
+export const SthanDetailPage: React.FC<Props> = ({
+  locationId,
+  locationName,
+  activeSection = 'calendar',
+  onSectionChange,
+}) => {
+  const [activeTab, setActiveTab] = useState<SthanTab>(activeSection);
+
+  useEffect(() => {
+    setActiveTab(activeSection);
+  }, [activeSection, locationId]);
+
+  const selectTab = (tab: SthanTab) => {
+    setActiveTab(tab);
+    onSectionChange?.(tab);
+  };
 
   return (
     <div className="animate-slide-up">
@@ -41,7 +58,7 @@ export const SthanDetailPage: React.FC<Props> = ({ locationId, locationName }) =
             <button
               key={tab.key}
               type="button"
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => selectTab(tab.key)}
               style={{
                 padding: '10px 20px',
                 fontSize: '0.9rem',

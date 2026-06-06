@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { MOBILE_LAYOUT_QUERY, useMediaQuery } from '../hooks/useMediaQuery';
 import { useAuth } from '../context/auth-context';
 import { useToast } from '../components/common/Toast';
@@ -44,9 +44,24 @@ import { GlobalContactsPage } from './GlobalContactsPage';
 import {
   ApprovalWorkflowDefinitionApi,
   backendApi,
+  LocationDefinitionApi,
   MenuItemApi,
+  SreniDefinitionApi,
   UserApi,
 } from '../utils/backendApi';
+import {
+  AdminNavigationContext,
+  adminTabToPath,
+  getInitialAdminTab,
+  getInitialSthanSection,
+  getAdminPageTitle,
+  navigateToAdminTab,
+  navigateToSthanSection,
+  parseSthanSectionFromPath,
+  resolveAdminTabFromHash,
+  resolveAdminTabFromPath,
+  SthanSection,
+} from '../utils/adminNavigation';
 
 const toUiError = (error: unknown, fallback: string): string => {
   if (!(error instanceof Error)) {
@@ -134,44 +149,8 @@ type ActiveTab =
 
 const SETTINGS_ROOT_TAB: ActiveTab = 'settings-admins';
 
-const ALL_TABS: ActiveTab[] = [
-  'dashboard', 'logs', 'ops', 'my-approvals',
-  'settings-admins', 'settings-admins-form', 'settings-users-form', 'settings-roles-definition', 'settings-location-definition',
-  'settings-sreni-definition', 'settings-permissions', 'settings-permission-sets', 'settings-enum-values',
-  'settings-users', 'settings-approval-workflows', 'settings-approval-workflows-form', 'settings-attendance-metrics',
-  'settings-responsibility-chart', 'settings-report-config',
-  'settings-google-integration', 'settings-smtp-integration',
-  'insights',
-  'helpdesk-tickets', 'job-postings', 'job-applications',
-  'member-services-reimbursements', 'member-services-events', 'member-services-notifications', 'member-services-gmail',
-  'governance-contacts',
-];
-
-const LEGACY_TAB_REDIRECTS: Record<string, ActiveTab> = {
-  'permission-sets': 'settings-permission-sets',
-  'users': 'settings-users',
-  'approval-workflows': 'settings-approval-workflows',
-  'responsibility-chart': 'settings-responsibility-chart',
-  'ai-chatbot': 'insights',
-};
-
-const resolveTabFromHash = (hash: string): ActiveTab | null => {
-  const normalizedHash = LEGACY_TAB_REDIRECTS[hash] ?? hash;
-  if ((ALL_TABS as string[]).includes(normalizedHash)) return normalizedHash as ActiveTab;
-  if (normalizedHash.startsWith('sreni-calendar-')) return normalizedHash as ActiveTab;
-  if (normalizedHash.startsWith('sreni-contacts-')) return normalizedHash as ActiveTab;
-  if (normalizedHash.startsWith('sreni-attendance-')) return normalizedHash as ActiveTab;
-  if (normalizedHash.startsWith('sreni-documents-')) return normalizedHash as ActiveTab;
-  if (normalizedHash.startsWith('sreni-reports-')) return normalizedHash as ActiveTab;
-  if (normalizedHash.startsWith('sreni-analytics-')) return normalizedHash as ActiveTab;
-  if (normalizedHash.startsWith('sthan-')) return normalizedHash as ActiveTab;
-  return null;
-};
-
-const getInitialTab = (): ActiveTab => {
-  const hash = window.location.hash.replace(/^#/, '');
-  return resolveTabFromHash(hash) ?? 'dashboard';
-};
+const getInitialTab = (): ActiveTab =>
+  getInitialAdminTab({ srenis: [], locations: [] }) as ActiveTab;
 
 const TAB_METADATA: { [key: string]: { label: string; parent?: 'settings' | 'governance' } } = {
   dashboard: { label: 'Dashboard' },
@@ -286,18 +265,43 @@ export const AdminDashboardPage: React.FC = () => {
   const [usersFormEdit, setUsersFormEdit] = useState<UserApi | null>(null);
   const [approvalWorkflowFormEdit, setApprovalWorkflowFormEdit] = useState<ApprovalWorkflowDefinitionApi | null>(null);
   const [sidebarMenuItems, setSidebarMenuItems] = useState<MenuItemApi[]>([]);
+  const [sreniDefinitions, setSreniDefinitions] = useState<SreniDefinitionApi[]>([]);
+  const [locationDefinitions, setLocationDefinitions] = useState<LocationDefinitionApi[]>([]);
   const [openSreniKeys, setOpenSreniKeys] = useState<Set<string>>(new Set());
   const [openSthanKeys, setOpenSthanKeys] = useState<Set<string>>(new Set());
+  const [activeSthanSection, setActiveSthanSection] = useState<SthanSection>(getInitialSthanSection);
   const { adminUser, logout } = useAuth();
   const { addToast } = useToast();
 
-  const setActiveTab = useCallback((tab: ActiveTab) => {
-    window.location.hash = tab;
+  const navigationContext = useMemo<AdminNavigationContext>(
+    () => ({
+      srenis: sreniDefinitions,
+      locations: locationDefinitions,
+      sthanSection: activeSthanSection,
+    }),
+    [sreniDefinitions, locationDefinitions, activeSthanSection],
+  );
+  const navigationContextRef = useRef<AdminNavigationContext>(navigationContext);
+  navigationContextRef.current = navigationContext;
+
+  const setActiveTab = useCallback((tab: ActiveTab, options?: { sthanSection?: SthanSection; replace?: boolean }) => {
+    const ctx: AdminNavigationContext = {
+      ...navigationContextRef.current,
+      sthanSection: options?.sthanSection ?? (
+        (tab as string).startsWith('sthan-') ? activeSthanSection : undefined
+      ),
+    };
+    navigateToAdminTab(tab, ctx, { replace: options?.replace });
     setActiveTabState(tab);
+    if (options?.sthanSection) {
+      setActiveSthanSection(options.sthanSection);
+    } else if ((tab as string).startsWith('sthan-') && !options?.sthanSection) {
+      setActiveSthanSection('calendar');
+    }
     if (isMobileLayout) {
       setIsMobileNavOpen(false);
     }
-  }, [isMobileLayout]);
+  }, [activeSthanSection, isMobileLayout]);
 
   useEffect(() => {
     if (!isMobileLayout) {
@@ -360,21 +364,49 @@ export const AdminDashboardPage: React.FC = () => {
   }, [setActiveTab]);
 
   useEffect(() => {
-    const onHashChange = () => {
-      const hash = window.location.hash.replace(/^#/, '');
-      const resolvedTab = resolveTabFromHash(hash);
-      if (resolvedTab) {
-        if ((LEGACY_TAB_REDIRECTS[hash] ?? null) === resolvedTab) {
-          window.location.hash = resolvedTab;
-        }
-        setActiveTabState(resolvedTab);
-        return;
-      }
-      setActiveTabState('dashboard');
+    const onPopState = () => {
+      const tab = resolveAdminTabFromPath(window.location.pathname, navigationContextRef.current);
+      setActiveTabState((tab ?? 'dashboard') as ActiveTab);
+      setActiveSthanSection(parseSthanSectionFromPath(window.location.pathname) ?? 'calendar');
     };
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
   }, []);
+
+  useEffect(() => {
+    document.title = `${getAdminPageTitle(activeTab, navigationContext)} | AD West Admin`;
+  }, [activeTab, navigationContext]);
+
+  useEffect(() => {
+    const hash = window.location.hash.replace(/^#/, '');
+    if (hash) {
+      const tab = resolveAdminTabFromHash(hash, navigationContext);
+      if (tab) {
+        navigateToAdminTab(tab, navigationContext, { replace: true });
+        window.location.hash = '';
+        setActiveTabState(tab as ActiveTab);
+      }
+      return;
+    }
+
+    const tab = resolveAdminTabFromPath(window.location.pathname, navigationContext);
+    if (tab) {
+      setActiveTabState(tab as ActiveTab);
+      setActiveSthanSection(parseSthanSectionFromPath(window.location.pathname) ?? 'calendar');
+      const expectedPath = window.location.pathname.replace(/\/+$/, '') || '/';
+      const normalizedPath = expectedPath === '/login' ? '/admin/dashboard' : expectedPath;
+      const canonicalPath = adminTabToPath(tab, {
+        ...navigationContext,
+        sthanSection: parseSthanSectionFromPath(window.location.pathname) ?? 'calendar',
+      });
+      if (normalizedPath !== canonicalPath) {
+        navigateToAdminTab(tab, {
+          ...navigationContext,
+          sthanSection: parseSthanSectionFromPath(window.location.pathname) ?? 'calendar',
+        }, { replace: true });
+      }
+    }
+  }, [navigationContext]);
 
   // Load sidebar menu items (sreni menus live in this table)
   const loadSidebarMenus = useCallback(() => {
@@ -428,24 +460,12 @@ export const AdminDashboardPage: React.FC = () => {
   const [sthanReportingTotal, setSthanReportingTotal] = useState(0);
 
   useEffect(() => {
-    const loadDashboard = async () => {
+    const loadCoreData = async () => {
       try {
-        const [
-          pendingApprovalsResult,
-          sreniesResult,
-          locationsResult,
-          ticketsResult,
-          jobPostingsResult,
-          jobApplicationsResult,
-          monthlyReportsResult,
-        ] = await Promise.allSettled([
+        const [pendingApprovalsResult, sreniesResult, locationsResult] = await Promise.allSettled([
           backendApi.listMyApprovalActions('pending'),
           backendApi.listSreniDefinitions(),
           backendApi.listLocationDefinitions(),
-          backendApi.listHelpdeskTickets(),
-          backendApi.listJobPostings(),
-          backendApi.listAllJobApplications(),
-          backendApi.listAllMonthlyReports(),
         ]);
 
         if (pendingApprovalsResult.status === 'fulfilled') {
@@ -455,9 +475,10 @@ export const AdminDashboardPage: React.FC = () => {
         }
 
         const sreniItems = sreniesResult.status === 'fulfilled' ? sreniesResult.value : [];
-        const locationItems = locationsResult.status === 'fulfilled'
-          ? locationsResult.value.filter((location) => location.level === 'STHAN' && location.active)
-          : [];
+        const locationItems = locationsResult.status === 'fulfilled' ? locationsResult.value : [];
+
+        setSreniDefinitions(sreniItems);
+        setLocationDefinitions(locationItems);
 
         if (sreniItems.length > 0) {
           setSrenyId((prev) => prev || sreniItems[0]?.id || '');
@@ -471,6 +492,41 @@ export const AdminDashboardPage: React.FC = () => {
         } else {
           setPrograms([]);
         }
+      } catch {
+        setPendingApprovalsCount(0);
+        setPrograms([]);
+        setSreniDefinitions([]);
+        setLocationDefinitions([]);
+      }
+    };
+
+    void loadCoreData();
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'dashboard') {
+      return;
+    }
+
+    const loadDashboardMetrics = async () => {
+      const sreniItems = sreniDefinitions;
+      const sthanItems = locationDefinitions.filter((location) => location.level === 'STHAN' && location.active);
+      if (sreniItems.length === 0 && sthanItems.length === 0) {
+        return;
+      }
+
+      try {
+        const [
+          ticketsResult,
+          jobPostingsResult,
+          jobApplicationsResult,
+          monthlyReportsResult,
+        ] = await Promise.allSettled([
+          backendApi.listHelpdeskTickets(),
+          backendApi.listJobPostings(),
+          backendApi.listAllJobApplications(),
+          backendApi.listAllMonthlyReports(),
+        ]);
 
         if (monthlyReportsResult.status === 'fulfilled') {
           setSreniReportingTotal(monthlyReportsResult.value.length);
@@ -491,9 +547,9 @@ export const AdminDashboardPage: React.FC = () => {
           sthanReportsResults,
         ] = await Promise.all([
           Promise.allSettled(sreniItems.map((sreni) => backendApi.listSreniContacts(sreni.id, 1, 1))),
-          Promise.allSettled(locationItems.map((location) => backendApi.listSthanContacts(location.id, 1, 1))),
+          Promise.allSettled(sthanItems.map((location) => backendApi.listSthanContacts(location.id, 1, 1))),
           Promise.allSettled(sreniItems.map((sreni) => backendApi.listSreniAttendanceListing(sreni.id))),
-          Promise.allSettled(locationItems.map((location) => backendApi.listSthanReports(location.id))),
+          Promise.allSettled(sthanItems.map((location) => backendApi.listSthanReports(location.id))),
         ]);
 
         const totalSreniContacts = sreniContactsResults.reduce((sum, result) => {
@@ -582,8 +638,6 @@ export const AdminDashboardPage: React.FC = () => {
           setUnderReviewApplicationsCount(0);
         }
       } catch {
-        setPendingApprovalsCount(0);
-        setPrograms([]);
         setOpenTicketsCount(0);
         setNewApplicationsCount(0);
         setUnderReviewApplicationsCount(0);
@@ -598,8 +652,8 @@ export const AdminDashboardPage: React.FC = () => {
       }
     };
 
-    void loadDashboard();
-  }, [activeTab]);
+    void loadDashboardMetrics();
+  }, [activeTab, sreniDefinitions, locationDefinitions]);
 
   if (!adminUser) return null;
 
@@ -669,6 +723,12 @@ export const AdminDashboardPage: React.FC = () => {
   const activeSthanMenuLabel = activeSthanKey
     ? sthanChildMenus.find(m => m.key === `sthan-${activeSthanKey}`)?.label
     : undefined;
+
+  const handleSthanSectionChange = useCallback((section: SthanSection) => {
+    if (!activeSthanKey) return;
+    setActiveSthanSection(section);
+    navigateToSthanSection(activeSthanKey, section, navigationContextRef.current);
+  }, [activeSthanKey]);
 
   const activeSreniCalendarKey = (activeTab as string).startsWith('sreni-calendar-')
     ? (activeTab as string).slice('sreni-calendar-'.length)
@@ -1239,7 +1299,7 @@ export const AdminDashboardPage: React.FC = () => {
                     return (
                       <button
                         key={child.key}
-                        onClick={() => setActiveTab(childTab)}
+                        onClick={() => setActiveTab(childTab, { sthanSection: 'calendar' })}
                         className={`btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
                         style={{
                           justifyContent: 'flex-start',
@@ -2070,7 +2130,12 @@ export const AdminDashboardPage: React.FC = () => {
           {(activeTab as string).startsWith('sthan-') && activeSthanKey && (() => {
             const sthanMenu = sthanChildMenus.find(m => m.key === `sthan-${activeSthanKey}`);
             return sthanMenu ? (
-              <SthanDetailPage locationId={activeSthanKey} locationName={sthanMenu.label} />
+              <SthanDetailPage
+                locationId={activeSthanKey}
+                locationName={sthanMenu.label}
+                activeSection={activeSthanSection}
+                onSectionChange={handleSthanSectionChange}
+              />
             ) : null;
           })()}
 

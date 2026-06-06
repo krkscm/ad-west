@@ -406,6 +406,10 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
       } else {
         await this.flushStateToStore(true);
       }
+
+      if (this.dataSource) {
+        await this.getCoreBusinessDbHydrationService().mergeSreniesFromDatabase();
+      }
     } catch (error) {
       this.logger.warn(
         `Failed to initialize Core Business runtime snapshot from store: ${(error as Error).message}`,
@@ -1042,6 +1046,22 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getCoreBusinessDbHydrationService().hydrateRuntimeStateFromDatabase();
   }
 
+  private async ensureSrenyProgramRuntime(sreniId: string): Promise<void> {
+    if (this.runtimeMode === 'db' && this.dataSource) {
+      if (!this.srenies.has(sreniId)) {
+        await this.getCoreBusinessDbHydrationService().mergeSreniesFromDatabase();
+      }
+      if (!this.srenies.has(sreniId)) {
+        throw new NotFoundException('Sreni not found');
+      }
+      await this.getCoreBusinessDbHydrationService().hydrateSrenyProgramRuntimeData(sreniId);
+      return;
+    }
+    if (!this.srenies.has(sreniId)) {
+      throw new NotFoundException('Sreni not found');
+    }
+  }
+
   private async flushStateToStore(force = false): Promise<void> {
     if (this.store.getMode() !== 'db') {
       return;
@@ -1196,36 +1216,40 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
 
   // ── Sreni Calendar Events ────────────────────────────────────────────────
 
-  listSreniCalendarEvents(
+  async listSreniCalendarEvents(
     sreniId: string,
     principal: AuthPrincipal,
     accessibleSthanIds: string[] = [],
-  ): CalendarEventRecord[] {
+  ): Promise<CalendarEventRecord[]> {
+    await this.ensureSrenyProgramRuntime(sreniId);
     return this.getCalendarEventsRuntime().listSreniCalendarEvents(sreniId, principal, accessibleSthanIds);
   }
 
-  createSreniCalendarEvent(
+  async createSreniCalendarEvent(
     sreniId: string,
     dto: CreateCalendarEventDto,
     principal: AuthPrincipal,
-  ): CalendarEventRecord {
+  ): Promise<CalendarEventRecord> {
+    await this.ensureSrenyProgramRuntime(sreniId);
     return this.getCalendarEventsRuntime().createSreniCalendarEvent(sreniId, dto, principal);
   }
 
-  updateSreniCalendarEvent(
+  async updateSreniCalendarEvent(
     sreniId: string,
     eventId: string,
     dto: UpdateCalendarEventDto,
     principal: AuthPrincipal,
-  ): CalendarEventRecord {
+  ): Promise<CalendarEventRecord> {
+    await this.ensureSrenyProgramRuntime(sreniId);
     return this.getCalendarEventsRuntime().updateSreniCalendarEvent(sreniId, eventId, dto, principal);
   }
 
-  deleteSreniCalendarEvent(
+  async deleteSreniCalendarEvent(
     sreniId: string,
     eventId: string,
     principal: AuthPrincipal,
-  ): { success: boolean; deletedBy: string } {
+  ): Promise<{ success: boolean; deletedBy: string }> {
+    await this.ensureSrenyProgramRuntime(sreniId);
     return this.getCalendarEventsRuntime().deleteSreniCalendarEvent(sreniId, eventId, principal);
   }
 
@@ -1271,11 +1295,12 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getAttendanceRuntime().deleteAttendanceMetric(metricId);
   }
 
-  listSreniAttendanceListing(
+  async listSreniAttendanceListing(
     sreniId: string,
     principal: AuthPrincipal,
     accessibleSthanIds: string[] = [],
-  ): Array<{ event: CalendarEventRecord; metrics: Array<{ metric: AttendanceMetricRecord; capture?: EventAttendanceCaptureRecord }> }> {
+  ): Promise<Array<{ event: CalendarEventRecord; metrics: Array<{ metric: AttendanceMetricRecord; capture?: EventAttendanceCaptureRecord }> }>> {
+    await this.ensureSrenyProgramRuntime(sreniId);
     return this.getAttendanceRuntime().listSreniAttendanceListing(sreniId, principal, accessibleSthanIds);
   }
 
@@ -1377,6 +1402,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     dto: UpsertEventAttendanceCaptureDto,
     principal: AuthPrincipal,
   ): Promise<EventAttendanceCaptureRecord> {
+    await this.ensureSrenyProgramRuntime(sreniId);
     return this.getAttendanceRuntime().upsertEventAttendanceCapture(sreniId, eventId, dto, principal);
   }
 
@@ -1400,7 +1426,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
         this.getCoreBusinessAccessUtilsService().canViewCreatorData(principal, creatorUserId, this.users),
       toIsoTimestamp: (value) => this.getCoreBusinessDomainUtilsService().toIsoTimestamp(value),
       listSreniCalendarEvents: (sreniId, principal, accessibleSthanIds) =>
-        this.listSreniCalendarEvents(sreniId, principal, accessibleSthanIds),
+        this.getCalendarEventsRuntime().listSreniCalendarEvents(sreniId, principal, accessibleSthanIds),
       isTargetApproved: (targetType, targetId) => this.isTargetApproved(targetType, targetId),
     };
   }
