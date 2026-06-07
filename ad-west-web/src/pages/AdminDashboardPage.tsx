@@ -1006,11 +1006,11 @@ export const AdminDashboardPage: React.FC = () => {
             type="button"
             className="admin-header__brand"
             onClick={() => setActiveTab('dashboard')}
-            title="IFCA Abu Dhabi — Home"
-            aria-label="IFCA Abu Dhabi — go to dashboard"
+            title="AD West - IFCA — Home"
+            aria-label="AD West - IFCA — go to dashboard"
           >
             <img src="/favicon.png" alt="" className="admin-header__brand-logo" />
-            <span className="admin-header__brand-name">IFCA Abu Dhabi</span>
+            <span className="admin-header__brand-name">AD West - IFCA</span>
           </button>
           <button
             type="button"
@@ -2140,7 +2140,7 @@ export const AdminDashboardPage: React.FC = () => {
           }}
         >
           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>
-            © {currentYear} IFCA Abu Dhabi
+            © {currentYear} AD West - IFCA
           </span>
           <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>
             Powered by <a style={{ color: 'var(--text-secondary-dark)', textDecoration: 'underline' }}>VGK Technologies</a>

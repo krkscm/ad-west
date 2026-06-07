@@ -358,7 +358,7 @@ export function PublicJobsPage() {
           <div style={{ maxWidth: '760px', margin: '0 auto' }}>
             <div style={{ marginBottom: '32px', textAlign: 'center' }}>
               <h2 style={{ margin: '0 0 8px', fontSize: '1.8rem', fontWeight: 800, color: 'var(--public-text-primary)' }}>Open Positions</h2>
-              <p style={{ margin: '0 0 16px', color: 'var(--public-text-secondary)' }}>Join IFCA Abu Dhabi — serving our community with purpose.</p>
+              <p style={{ margin: '0 0 16px', color: 'var(--public-text-secondary)' }}>Join AD West - IFCA — serving our community with purpose.</p>
               <button
                 onClick={handlePostJob}
                 style={{

@@ -35,7 +35,7 @@ const PORTAL_CARDS: PortalCard[] = [
 ]
 
 export function PublicPortalPage() {
-  useEffect(() => { document.title = 'IFCA Abu Dhabi — Public Portal' }, [])
+  useEffect(() => { document.title = 'AD West - IFCA — Public Portal' }, [])
 
   const navigate = (href: string) => { window.location.pathname = href }
 
@@ -103,12 +103,12 @@ export function PublicPortalPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <img
               src="/favicon.png"
-              alt="IFCA Abu Dhabi"
+              alt="AD West - IFCA"
               style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'contain' }}
             />
             <div>
               <h1 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--public-text-primary)', lineHeight: 1.2 }}>
-                IFCA Abu Dhabi
+                AD West - IFCA
               </h1>
               <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--public-text-secondary)' }}>
                 Public Services Portal
@@ -170,7 +170,7 @@ export function PublicPortalPage() {
               textShadow: '0 2px 12px rgba(0,0,0,0.4)',
             }}
           >
-            IFCA Abu Dhabi
+            AD West - IFCA
           </h2>
           <p
             style={{
@@ -315,7 +315,7 @@ export function PublicPortalPage() {
             color: 'var(--public-text-muted)',
           }}
         >
-          © {new Date().getFullYear()} IFCA Abu Dhabi · Powered by VGK Technologies
+          © {new Date().getFullYear()} AD West - IFCA · Powered by VGK Technologies
         </footer>
 
       </div>

@@ -8,7 +8,7 @@ interface AuthPageLayoutProps {
 
 export const AuthPageLayout: React.FC<AuthPageLayoutProps> = ({ children, title, backgroundImage = '/Indian-culture.jpg' }) => {
   useEffect(() => {
-    if (title) document.title = `IFCA Abu Dhabi — ${title}`
+    if (title) document.title = `AD West - IFCA — ${title}`
   }, [title])
 
   return (
@@ -49,10 +49,10 @@ export const AuthPageLayout: React.FC<AuthPageLayoutProps> = ({ children, title,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <a href="/portal" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
-            <img src="/favicon.png" alt="IFCA Abu Dhabi" style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'contain' }} />
+            <img src="/favicon.png" alt="AD West - IFCA" style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'contain' }} />
             <div>
               <h1 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--public-text-primary)', lineHeight: 1.2 }}>
-                IFCA Abu Dhabi
+                AD West - IFCA
               </h1>
               <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--public-text-secondary)' }}>
                 Admin Portal
@@ -88,7 +88,7 @@ export const AuthPageLayout: React.FC<AuthPageLayoutProps> = ({ children, title,
           fontSize: '0.75rem',
           color: 'var(--public-text-muted)',
         }}>
-          © {new Date().getFullYear()} IFCA Abu Dhabi · Powered by VGK Technologies
+          © {new Date().getFullYear()} AD West - IFCA · Powered by VGK Technologies
         </footer>
 
       </div>

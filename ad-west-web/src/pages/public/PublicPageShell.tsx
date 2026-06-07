@@ -74,12 +74,12 @@ export function PublicPageShell({ subtitle, children }: Props) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <img
               src="/favicon.png"
-              alt="IFCA Abu Dhabi"
+              alt="AD West - IFCA"
               style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'contain' }}
             />
             <div>
               <h1 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--public-text-primary)', lineHeight: 1.2 }}>
-                IFCA Abu Dhabi
+                AD West - IFCA
               </h1>
               <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--public-text-secondary)' }}>{subtitle}</p>
             </div>
@@ -127,7 +127,7 @@ export function PublicPageShell({ subtitle, children }: Props) {
             color: 'var(--public-text-muted)',
           }}
         >
-          © {new Date().getFullYear()} IFCA Abu Dhabi · Powered by VGK Technologies
+          © {new Date().getFullYear()} AD West - IFCA · Powered by VGK Technologies
         </footer>
       </div>
     </div>
