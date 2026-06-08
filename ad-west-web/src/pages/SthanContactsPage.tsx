@@ -6,7 +6,7 @@ import { ContactUploadModal, STHAN_CONTACT_UPLOAD_DESCRIPTION } from '../compone
 import { TableRowActionsMenu } from '../components/common/TableRowActionsMenu';
 import { TableLayoutModal } from '../components/common/TableLayoutModal';
 import { PageHeader } from '../components/common/PageHeader';
-import { PaginationBar } from '../components/common/PaginationBar';
+import { PAGE_SIZE_OPTIONS, PaginationBar } from '../components/common/PaginationBar';
 import { buildContactEditFields, MASTER_CONTACT_COLUMN_LABELS, orderContactColumns } from '../constants/contactColumns';
 import { backendApi, SthanContactRowApi } from '../utils/backendApi';
 import { useTableLayout } from '../hooks/useTableLayout';
@@ -30,7 +30,7 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(50);
   const [isLoading, setIsLoading] = useState(false);
   const [sourceFile, setSourceFile] = useState<string | null>(null);
   const [showLayoutModal, setShowLayoutModal] = useState(false);
@@ -46,9 +46,10 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
   );
   const visibleCols = layout.visibleKeys(colDefs);
 
-  const load = useCallback((p: number) => {
+  const load = useCallback((p: number, ps?: number) => {
     setIsLoading(true);
-    backendApi.listSthanContacts(locationId, p, pageSize)
+    const size = ps ?? pageSize;
+    backendApi.listSthanContacts(locationId, p, size)
       .then((res) => {
         setRows(res.items);
         setTotal(res.total);
@@ -273,7 +274,13 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
             totalPages={totalPages}
             totalItems={total}
             pageSize={pageSize}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
             onPageChange={(p) => { setPage(p); load(p); }}
+            onPageSizeChange={(ps) => {
+              setPageSize(ps);
+              setPage(1);
+              load(1, ps);
+            }}
           />
         </>
       )}

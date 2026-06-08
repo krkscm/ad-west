@@ -247,7 +247,7 @@ export const LocationDefinitionPage: React.FC = () => {
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button type="button" className="btn btn-secondary btn-md" onClick={resetForm} style={{ flex: 1 }}>Cancel</button>
                 <button type="submit" className="btn btn-primary btn-md" disabled={isSaving} style={{ flex: 2 }}>
-                  {isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Location'}
+                  {isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create'}
                 </button>
               </div>
             </div>

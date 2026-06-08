@@ -407,7 +407,7 @@ export const AdminUserForm: React.FC<Props> = ({ editingId, onBack, onSaved }) =
             Cancel
           </button>
           <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ minWidth: '140px' }}>
-            {isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Administrator'}
+            {isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create'}
           </button>
         </div>
       </form>

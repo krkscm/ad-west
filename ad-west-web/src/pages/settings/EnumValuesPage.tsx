@@ -390,7 +390,7 @@ export const EnumValuesPage: React.FC = () => {
                     disabled={isSaving}
                     style={{ padding: '8px 20px', fontSize: '0.85rem' }}
                   >
-                    {isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Add'}
+                    {isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create'}
                   </button>
                   <button
                     className="btn btn-secondary"

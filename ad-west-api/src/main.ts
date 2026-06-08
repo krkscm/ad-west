@@ -93,7 +93,15 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   const port = process.env.PORT || 3001;
-  await app.listen(port);
+  const contactUploadTimeoutMs = Number(process.env.CONTACT_UPLOAD_TIMEOUT_MS || 300_000);
+  const server = await app.listen(port);
+  server.setTimeout(contactUploadTimeoutMs);
+  if ('requestTimeout' in server) {
+    server.requestTimeout = contactUploadTimeoutMs;
+  }
+  if ('headersTimeout' in server) {
+    server.headersTimeout = contactUploadTimeoutMs + 10_000;
+  }
   console.log(`Application is running on: http://localhost:${port}`);
   if (enableSwagger) {
     console.log(`Swagger UI is available on: http://localhost:${port}/api/docs`);

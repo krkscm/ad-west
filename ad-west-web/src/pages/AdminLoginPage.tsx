@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useAuth } from '../context/auth-context'
 import { useToast } from '../components/common/Toast'
 import { AuthPageLayout } from '../components/common/AuthPageLayout'
+import { AppLoader } from '../components/common/AppLoader'
 
 interface AdminLoginPageProps {
 }
@@ -13,6 +14,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = () => {
   const [captchaToken, setCaptchaToken] = useState('')
   const [captchaImage, setCaptchaImage] = useState('')
   const [captchaAnswer, setCaptchaAnswer] = useState('')
+  const [isLoggingIn, setIsLoggingIn] = useState(false)
 
   const { login, loginWithGoogle, getCaptchaChallenge } = useAuth()
   const { addToast } = useToast()
@@ -44,24 +46,48 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = () => {
       return
     }
 
-    const res = await login(identifier, password, captchaToken, captchaAnswer)
-    if (!res.success) {
-      addToast(res.error || 'Authentication failed.', 'error')
-      void loadCaptcha()
-      return
-    }
+    setIsLoggingIn(true)
+    try {
+      const res = await login(identifier, password, captchaToken, captchaAnswer)
+      if (!res.success) {
+        setIsLoggingIn(false)
+        addToast(res.error || 'Authentication failed.', 'error')
+        void loadCaptcha()
+        return
+      }
 
-    addToast('Welcome back. Logged in successfully.', 'success')
+      addToast('Welcome back. Logged in successfully.', 'success')
+    } catch {
+      setIsLoggingIn(false)
+      addToast('Authentication failed. Please try again.', 'error')
+      void loadCaptcha()
+    }
   }
 
   const handleGoogleLogin = async () => {
-    const result = await loginWithGoogle()
-    if (!result.success) {
-      addToast(result.error || 'Google sign-in failed.', 'error')
-      return
-    }
+    setIsLoggingIn(true)
+    try {
+      const result = await loginWithGoogle()
+      if (!result.success) {
+        setIsLoggingIn(false)
+        addToast(result.error || 'Google sign-in failed.', 'error')
+        return
+      }
 
-    addToast('Signed in with Google successfully.', 'success')
+      addToast('Signed in with Google successfully.', 'success')
+    } catch {
+      setIsLoggingIn(false)
+      addToast('Google sign-in failed. Please try again.', 'error')
+    }
+  }
+
+  if (isLoggingIn) {
+    return (
+      <AppLoader
+        title="Signing in"
+        message="Verifying your credentials and loading your workspace."
+      />
+    )
   }
 
   return (
@@ -195,7 +221,12 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = () => {
             />
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '10px', minHeight: '46px' }}>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            style={{ width: '100%', marginTop: '10px', minHeight: '46px' }}
+            disabled={isLoggingIn}
+          >
             Continue
           </button>
 
@@ -209,6 +240,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = () => {
             type="button"
             className="btn btn-secondary"
             style={{ width: '100%', minHeight: '42px', justifyContent: 'center', gap: '10px' }}
+            disabled={isLoggingIn}
             onClick={() => void handleGoogleLogin()}
           >
             <span style={{ fontSize: '1rem' }}>🔐</span>

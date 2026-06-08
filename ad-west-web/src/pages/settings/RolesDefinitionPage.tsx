@@ -283,7 +283,7 @@ export const RolesDefinitionPage: React.FC = () => {
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary btn-md" disabled={isSaving} style={{ flex: 2 }}>
-                  {isSaving ? 'Saving…' : editingRoleId ? 'Save Changes' : 'Create Role'}
+                  {isSaving ? 'Saving…' : editingRoleId ? 'Save Changes' : 'Create'}
                 </button>
               </div>
             </div>

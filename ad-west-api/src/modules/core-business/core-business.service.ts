@@ -1589,8 +1589,9 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   async listAllContacts(
     page = 1,
     pageSize = 50,
+    filters?: { sreniId?: string; sthanId?: string; search?: string },
   ): Promise<{ items: (SreniContactRecord & { sreniName: string })[]; total: number; page: number; pageSize: number; totalPages: number }> {
-    return this.getSreniAdminRuntime().listAllContacts(page, pageSize);
+    return this.getSreniAdminRuntime().listAllContacts(page, pageSize, filters);
   }
 
   async updateContactData(

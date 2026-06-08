@@ -1,6 +1,8 @@
 import { api } from './api'
 import { normalizeApiBaseUrl } from './apiBaseUrl'
 
+const CONTACT_UPLOAD_TIMEOUT_MS = 180_000
+
 export interface AdminRoleAssignment {
   role: 'SUPER_ADMIN' | 'ZONE_ADMIN' | 'SRENY_ADMIN'
   scopeType: 'global' | 'zone' | 'sreny'
@@ -1449,10 +1451,17 @@ export const backendApi = {
     api.patch<SmtpIntegrationConfigApi>('/settings/smtp-integration-config', payload),
 
   // All contacts (across all Srenis)
-  listAllContacts: (page = 1, pageSize = 50) =>
-    api.get<PaginatedResponse<SreniContactRowApi>>(
-      `/org/contacts?page=${page}&pageSize=${pageSize}`,
-    ),
+  listAllContacts: (
+    page = 1,
+    pageSize = 50,
+    filters?: { sreniId?: string; sthanId?: string; search?: string },
+  ) => {
+    const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+    if (filters?.sreniId) qs.set('sreniId', filters.sreniId)
+    if (filters?.sthanId) qs.set('sthanId', filters.sthanId)
+    if (filters?.search?.trim()) qs.set('search', filters.search.trim())
+    return api.get<PaginatedResponse<SreniContactRowApi>>(`/org/contacts?${qs}`)
+  },
 
   // Sreni Contact List
   listSreniContacts: (sreniId: string, page = 1, pageSize = 50) =>
@@ -1466,6 +1475,7 @@ export const backendApi = {
     return api.postForm<{ inserted: number; sreniId: string }>(
       `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/upload`,
       form,
+      { timeoutMs: CONTACT_UPLOAD_TIMEOUT_MS },
     )
   },
 
@@ -1555,7 +1565,11 @@ export const backendApi = {
   uploadGlobalContacts: (file: File) => {
     const form = new FormData()
     form.append('file', file)
-    return api.postForm<GlobalContactUploadResultApi>('/org/contacts/upload', form)
+    return api.postForm<GlobalContactUploadResultApi>(
+      '/org/contacts/upload',
+      form,
+      { timeoutMs: CONTACT_UPLOAD_TIMEOUT_MS },
+    )
   },
 
   // Contact Sreni Tags (multi-sreni assignment)
@@ -1885,6 +1899,7 @@ export const backendApi = {
     return api.postForm<{ inserted: number; locationId: string }>(
       `/org/locations/${encodeURIComponent(locationId)}/contacts/upload`,
       form,
+      { timeoutMs: CONTACT_UPLOAD_TIMEOUT_MS },
     )
   },
   clearSthanContacts: (locationId: string) =>

@@ -150,6 +150,9 @@ type ActiveTab =
 
 const SETTINGS_ROOT_TAB: ActiveTab = 'settings-admins';
 
+/** Temporarily hide Approval Workflows from Settings navigation. */
+const SHOW_APPROVAL_WORKFLOWS_TAB = false;
+
 const getInitialTab = (): ActiveTab =>
   getInitialAdminTab({ srenis: [], locations: [] }) as ActiveTab;
 
@@ -187,7 +190,11 @@ const TAB_METADATA: { [key: string]: { label: string; parent?: 'settings' | 'gov
 };
 
 const SETTINGS_TABS: ActiveTab[] = Object.entries(TAB_METADATA)
-  .filter(([tab, meta]) => meta.parent === 'settings' && tab !== 'settings-admins-form' && tab !== 'settings-users-form' && tab !== 'settings-approval-workflows-form')
+  .filter(([tab, meta]) => meta.parent === 'settings'
+    && tab !== 'settings-admins-form'
+    && tab !== 'settings-users-form'
+    && tab !== 'settings-approval-workflows-form'
+    && (SHOW_APPROVAL_WORKFLOWS_TAB || tab !== 'settings-approval-workflows'))
   .map(([tab]) => tab as ActiveTab);
 
 const GOVERNANCE_TABS: ActiveTab[] = Object.entries(TAB_METADATA)
@@ -408,6 +415,13 @@ export const AdminDashboardPage: React.FC = () => {
       }
     }
   }, [navigationContext]);
+
+  useEffect(() => {
+    if (!SHOW_APPROVAL_WORKFLOWS_TAB
+      && (activeTab === 'settings-approval-workflows' || activeTab === 'settings-approval-workflows-form')) {
+      setActiveTab('settings-roles-definition', { replace: true });
+    }
+  }, [activeTab, setActiveTab]);
 
   // Load sidebar menu items (sreni menus live in this table)
   const loadSidebarMenus = useCallback(() => {
@@ -672,7 +686,10 @@ export const AdminDashboardPage: React.FC = () => {
   // Sreny Admin: dashboard
   const showAdminsTab = isSuperAdmin;
   const showLogsTab = isSuperAdmin || isZoneAdmin;
-  const isSettingsTabActive = SETTINGS_TABS.includes(activeTab) || activeTab === 'settings-admins-form' || activeTab === 'settings-users-form' || activeTab === 'settings-approval-workflows-form';
+  const isSettingsTabActive = SETTINGS_TABS.includes(activeTab)
+    || activeTab === 'settings-admins-form'
+    || activeTab === 'settings-users-form'
+    || (SHOW_APPROVAL_WORKFLOWS_TAB && activeTab === 'settings-approval-workflows-form');
   const hasMenuKey = (key: string) => sidebarMenuItems.some((item) => item.active && item.key === key);
 
   const showInsightsTab = isSuperAdmin || hasMenuKey('insights');
@@ -1535,13 +1552,15 @@ export const AdminDashboardPage: React.FC = () => {
                 </button>
               )}
 
-              <button
-                onClick={() => setActiveTab('settings-approval-workflows')}
-                className={`sidebar-nav-item${activeTab === 'settings-approval-workflows' ? ' is-active' : ''}`}
-                
-              >
-                ✅ Approval Workflows
-              </button>
+              {SHOW_APPROVAL_WORKFLOWS_TAB && (
+                <button
+                  onClick={() => setActiveTab('settings-approval-workflows')}
+                  className={`sidebar-nav-item${activeTab === 'settings-approval-workflows' ? ' is-active' : ''}`}
+                  
+                >
+                  ✅ Approval Workflows
+                </button>
+              )}
 
               <button
                 onClick={() => setActiveTab('settings-users')}
@@ -1844,7 +1863,7 @@ export const AdminDashboardPage: React.FC = () => {
 
           {activeTab === 'governance-contacts' && showContactsTab && <GlobalContactsPage />}
 
-          {activeTab === 'settings-approval-workflows' && (
+          {SHOW_APPROVAL_WORKFLOWS_TAB && activeTab === 'settings-approval-workflows' && (
             <ApprovalWorkflowPage
               onAdd={() => openApprovalWorkflowForm(null)}
               onEdit={(workflow: ApprovalWorkflowDefinitionApi) => openApprovalWorkflowForm(workflow)}
@@ -1852,7 +1871,7 @@ export const AdminDashboardPage: React.FC = () => {
             />
           )}
 
-          {activeTab === 'settings-approval-workflows-form' && (
+          {SHOW_APPROVAL_WORKFLOWS_TAB && activeTab === 'settings-approval-workflows-form' && (
             <ApprovalWorkflowFormPage
               editingWorkflow={approvalWorkflowFormEdit}
               onBack={closeApprovalWorkflowForm}

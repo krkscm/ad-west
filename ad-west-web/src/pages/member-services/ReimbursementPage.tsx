@@ -189,7 +189,7 @@ export function ReimbursementPage() {
               />
             </div>
             <FormActions>
-              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Create Request'}</button>
+              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Create'}</button>
               <button type="button" className="btn btn-secondary" onClick={() => { setMode('list'); setForm(BLANK) }}>Cancel</button>
             </FormActions>
           </form>

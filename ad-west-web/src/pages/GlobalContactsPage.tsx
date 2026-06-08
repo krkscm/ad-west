@@ -8,7 +8,7 @@ import { buildContactEditFields, MASTER_CONTACT_COLUMN_LABELS, orderContactColum
 import { TableLayoutModal } from '../components/common/TableLayoutModal';
 import { SwitchToggle } from '../components/common/SwitchToggle';
 import { PageHeader } from '../components/common/PageHeader';
-import { PaginationBar } from '../components/common/PaginationBar';
+import { PAGE_SIZE_OPTIONS, PaginationBar } from '../components/common/PaginationBar';
 import { EmptyState } from '../components/common/EmptyState';
 import { TableRowActionsMenu } from '../components/common/TableRowActionsMenu';
 import { useTableLayout } from '../hooks/useTableLayout';
@@ -239,7 +239,7 @@ export const GlobalContactsPage: React.FC = () => {
   const [editTarget, setEditTarget] = useState<SreniContactRowApi | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
-  const pageSize = 50;
+  const [pageSize, setPageSize] = useState(50);
 
   // Columns available to the layout modal (excludes 'name' which is always pinned)
   const colDefs = useMemo(
@@ -272,14 +272,15 @@ export const GlobalContactsPage: React.FC = () => {
       .catch(() => {/* non-critical */});
   }, [divisionsBySreni]);
 
-  const load = useCallback((p: number, sreniId: string, sthanId: string, search: string) => {
+  const load = useCallback((p: number, sreniId: string, sthanId: string, search: string, ps?: number) => {
     setIsLoading(true);
-    const qs = new URLSearchParams({ page: String(p), pageSize: String(pageSize) });
-    if (sreniId) qs.set('sreniId', sreniId);
-    if (sthanId) qs.set('sthanId', sthanId);
-    if (search.trim()) qs.set('search', search.trim());
+    const size = ps ?? pageSize;
 
-    backendApi.listAllContacts(p, pageSize)
+    backendApi.listAllContacts(p, size, {
+      sreniId: sreniId || undefined,
+      sthanId: sthanId || undefined,
+      search: search || undefined,
+    })
       .then((res) => {
         setRows(res.items);
         setTotal(res.total);
@@ -671,7 +672,13 @@ export const GlobalContactsPage: React.FC = () => {
             totalPages={totalPages}
             totalItems={total}
             pageSize={pageSize}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
             onPageChange={(p) => { setPage(p); load(p, filterSreniId, filterSthanId, appliedSearch); }}
+            onPageSizeChange={(ps) => {
+              setPageSize(ps);
+              setPage(1);
+              load(1, filterSreniId, filterSthanId, appliedSearch, ps);
+            }}
           />
         </>
       )}

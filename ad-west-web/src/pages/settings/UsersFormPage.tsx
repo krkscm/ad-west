@@ -482,7 +482,7 @@ export const UsersFormPage: React.FC<UsersFormPageProps> = ({ editingUser, onBac
         <FormActions>
           <button type="button" className="btn btn-secondary" onClick={onBack} style={{ minWidth: '100px' }}>Cancel</button>
           <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ minWidth: '140px' }}>
-            {isSaving ? 'Saving...' : editingUser ? 'Save Changes' : 'Create User'}
+            {isSaving ? 'Saving...' : editingUser ? 'Save Changes' : 'Create'}
           </button>
         </FormActions>
       </form>

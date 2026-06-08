@@ -796,10 +796,18 @@ export class CoreBusinessController {
   listAllContacts(
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @Query('sreniId') sreniId?: string,
+    @Query('sthanId') sthanId?: string,
+    @Query('search') search?: string,
   ) {
     return this.service.listAllContacts(
       page ? parseInt(page, 10) : 1,
       pageSize ? parseInt(pageSize, 10) : 50,
+      {
+        sreniId: sreniId?.trim() || undefined,
+        sthanId: sthanId?.trim() || undefined,
+        search: search?.trim() || undefined,
+      },
     );
   }
 

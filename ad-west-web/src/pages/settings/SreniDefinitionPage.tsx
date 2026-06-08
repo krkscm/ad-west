@@ -287,7 +287,7 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
             </div>
             <FormActions>
               <button type="button" className="btn btn-secondary" onClick={resetForm}>Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Sreni'}</button>
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create'}</button>
             </FormActions>
           </form>
         </FormSection>

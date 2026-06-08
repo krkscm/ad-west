@@ -10,6 +10,7 @@ import type {
   SreniContactCellValue,
 } from '../core-business.types';
 import type { SreniAdminRuntimeContext } from './sreni-admin-runtime.service';
+import { CONTACT_UPLOAD_BATCH_SIZE } from './contact-upload.constants';
 import { HOUSEHOLD_ENUM_TYPES } from './household-enum-config.service';
 
 type DbMemberRow = {
@@ -142,6 +143,179 @@ export class HouseholdMemberService {
         }
       }
     }
+  }
+
+  async syncMembersFromContactDataBulk(
+    rows: Array<{ contactId: string; data: Record<string, SreniContactCellValue> }>,
+  ): Promise<void> {
+    if (!rows.length) return;
+    if (this.ctx.runtimeMode !== 'db' || !this.ctx.dataSource) {
+      for (const row of rows) {
+        await this.syncMembersFromContactData(row.contactId, row.data);
+      }
+      return;
+    }
+
+    for (let offset = 0; offset < rows.length; offset += CONTACT_UPLOAD_BATCH_SIZE) {
+      await this.syncImportMembersBatchDb(rows.slice(offset, offset + CONTACT_UPLOAD_BATCH_SIZE));
+    }
+  }
+
+  /** Use after a full contact-list replace — prior household members were cascade-deleted. */
+  async syncMembersFromContactDataBulkInsertOnly(
+    rows: Array<{ contactId: string; data: Record<string, SreniContactCellValue> }>,
+  ): Promise<void> {
+    if (!rows.length) return;
+    if (this.ctx.runtimeMode !== 'db' || !this.ctx.dataSource) {
+      for (const row of rows) {
+        await this.syncMembersFromContactData(row.contactId, row.data);
+      }
+      return;
+    }
+
+    for (let offset = 0; offset < rows.length; offset += CONTACT_UPLOAD_BATCH_SIZE) {
+      await this.insertImportMembersBatchDb(rows.slice(offset, offset + CONTACT_UPLOAD_BATCH_SIZE));
+    }
+  }
+
+  private async insertImportMembersBatchDb(
+    rows: Array<{ contactId: string; data: Record<string, SreniContactCellValue> }>,
+  ): Promise<void> {
+    if (!this.ctx.dataSource || rows.length === 0) return;
+
+    await this.bulkInsertImportMembersDb(
+      'head',
+      rows.map((row) => ({
+        contactId: row.contactId,
+        name: cellToString(row.data.name) ?? 'Unknown',
+        phone: cellToString(row.data.personalNumber),
+      })),
+      0,
+      null,
+    );
+
+    const spouseRows = rows
+      .filter((row) => cellToString(row.data.wifeName))
+      .map((row) => ({
+        contactId: row.contactId,
+        name: cellToString(row.data.wifeName)!,
+        phone: cellToString(row.data.mobileNo4),
+      }));
+    if (spouseRows.length > 0) {
+      await this.bulkInsertImportMembersDb('spouse', spouseRows, 1, 'female');
+    }
+  }
+
+  private async bulkInsertImportMembersDb(
+    role: HouseholdMemberRole,
+    rows: Array<{ contactId: string; name: string; phone: string | null }>,
+    sortOrder: number,
+    gender: string | null,
+  ): Promise<void> {
+    if (!this.ctx.dataSource || rows.length === 0) return;
+
+    const contactIds = rows.map((row) => row.contactId);
+    const names = rows.map((row) => row.name);
+    const phones = rows.map((row) => row.phone);
+    const sortOrders = rows.map(() => sortOrder);
+
+    await this.ctx.dataSource.query(
+      `INSERT INTO adwest.household_members (contact_id, role, source, name, phone, gender, sort_order)
+       SELECT contact_id, $4, 'import', name, phone, $5, sort_order
+       FROM UNNEST($1::uuid[], $2::text[], $3::text[], $6::int[])
+         AS t(contact_id, name, phone, sort_order)`,
+      [contactIds, names, phones, role, gender, sortOrders],
+    );
+  }
+
+  private async syncImportMembersBatchDb(
+    rows: Array<{ contactId: string; data: Record<string, SreniContactCellValue> }>,
+  ): Promise<void> {
+    if (!this.ctx.dataSource || rows.length === 0) return;
+
+    const noSpouseIds = rows
+      .filter((row) => !cellToString(row.data.wifeName))
+      .map((row) => row.contactId);
+    if (noSpouseIds.length > 0) {
+      await this.ctx.dataSource.query(
+        `UPDATE adwest.household_members
+         SET active = false, updated_at = now()
+         WHERE contact_id = ANY($1::uuid[]) AND role = 'spouse' AND source = 'import'`,
+        [noSpouseIds],
+      );
+    }
+
+    await this.bulkUpsertImportMembersDb(
+      'head',
+      rows.map((row) => ({
+        contactId: row.contactId,
+        name: cellToString(row.data.name) ?? 'Unknown',
+        phone: cellToString(row.data.personalNumber),
+      })),
+      0,
+      null,
+    );
+
+    const spouseRows = rows
+      .filter((row) => cellToString(row.data.wifeName))
+      .map((row) => ({
+        contactId: row.contactId,
+        name: cellToString(row.data.wifeName)!,
+        phone: cellToString(row.data.mobileNo4),
+      }));
+    if (spouseRows.length > 0) {
+      await this.bulkUpsertImportMembersDb('spouse', spouseRows, 1, 'female');
+    }
+  }
+
+  private async bulkUpsertImportMembersDb(
+    role: HouseholdMemberRole,
+    rows: Array<{ contactId: string; name: string; phone: string | null }>,
+    sortOrder: number,
+    gender: string | null,
+  ): Promise<void> {
+    if (!this.ctx.dataSource || rows.length === 0) return;
+
+    const contactIds = rows.map((row) => row.contactId);
+    const names = rows.map((row) => row.name);
+    const phones = rows.map((row) => row.phone);
+    const sortOrders = rows.map(() => sortOrder);
+
+    await this.ctx.dataSource.query(
+      `WITH incoming AS (
+         SELECT * FROM UNNEST($1::uuid[], $2::text[], $3::text[], $4::int[])
+           AS t(contact_id, name, phone, sort_order)
+       )
+       UPDATE adwest.household_members hm
+       SET name = i.name,
+           phone = i.phone,
+           sort_order = i.sort_order,
+           active = true,
+           gender = CASE
+             WHEN hm.role = 'spouse' AND hm.source = 'import'
+             THEN COALESCE(NULLIF(TRIM(hm.gender), ''), 'female')
+             ELSE hm.gender
+           END,
+           updated_at = now()
+       FROM incoming i
+       WHERE hm.contact_id = i.contact_id AND hm.role = $5 AND hm.source = 'import'`,
+      [contactIds, names, phones, sortOrders, role],
+    );
+
+    await this.ctx.dataSource.query(
+      `WITH incoming AS (
+         SELECT * FROM UNNEST($1::uuid[], $2::text[], $3::text[], $4::int[])
+           AS t(contact_id, name, phone, sort_order)
+       )
+       INSERT INTO adwest.household_members (contact_id, role, source, name, phone, gender, sort_order)
+       SELECT i.contact_id, $5, 'import', i.name, i.phone, $6, i.sort_order
+       FROM incoming i
+       WHERE NOT EXISTS (
+         SELECT 1 FROM adwest.household_members hm
+         WHERE hm.contact_id = i.contact_id AND hm.role = $5 AND hm.source = 'import'
+       )`,
+      [contactIds, names, phones, sortOrders, role, gender],
+    );
   }
 
   private async upsertImportMemberDb(

@@ -576,6 +576,53 @@ body {
   color: #fff;
 }
 
+.pagination-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-dark);
+}
+
+.pagination-bar__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pagination-bar__range {
+  font-size: 0.72rem;
+  color: var(--text-secondary-dark);
+}
+
+.pagination-bar__size {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pagination-bar__size-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary-dark);
+}
+
+.pagination-bar__nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.pagination-bar__ellipsis {
+  padding: 4px 2px;
+  color: var(--text-secondary-dark);
+  font-size: 0.75rem;
+}
+
 /* Modal overlay */
 .modal-overlay {
   position: fixed;

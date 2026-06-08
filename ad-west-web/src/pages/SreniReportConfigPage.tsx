@@ -251,7 +251,7 @@ export const SreniReportConfigPage: React.FC<Props> = ({ sreniId, sreniName }) =
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                 <button type="button" className="btn btn-secondary btn-md" onClick={closeForm}>Cancel</button>
                 <button type="submit" className="btn btn-primary btn-md" disabled={isSaving}>
-                  {isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Add Parameter'}
+                  {isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create'}
                 </button>
               </div>
             </form>

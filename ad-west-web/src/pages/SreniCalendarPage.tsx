@@ -581,7 +581,7 @@ export const SreniCalendarPage: React.FC<Props> = ({ sreniId, sreniName }) => {
               onClick={handleSave}
               disabled={!formTitle.trim()}
             >
-              {editingEvent ? 'Save Changes' : 'Create Event'}
+              {editingEvent ? 'Save Changes' : 'Create'}
             </button>
           </div>
         </div>

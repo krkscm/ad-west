@@ -200,7 +200,7 @@ export const PermissionDefinitionsPage: React.FC = () => {
             </div>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button type="button" className="btn btn-secondary btn-md" onClick={resetForm}>Cancel</button>
-              <button type="submit" className="btn btn-primary btn-md" disabled={isSaving}>{isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Permission'}</button>
+              <button type="submit" className="btn btn-primary btn-md" disabled={isSaving}>{isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create'}</button>
             </div>
           </form>
         </div>

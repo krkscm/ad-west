@@ -18,6 +18,7 @@ import type {
   SthanExpenseStatus,
   SthanReportRecord,
 } from '../core-business.types';
+import { assertContactUploadRowLimit, CONTACT_UPLOAD_BATCH_SIZE } from './contact-upload.constants';
 
 export interface SthanRuntimeContext {
   runtimeMode: 'in-memory' | 'db';
@@ -274,6 +275,7 @@ export class SthanRuntimeService {
     }).filter((row) => Object.values(row.data).some((v) => v !== null));
 
     if (parsedRows.length === 0) return { inserted: 0, locationId };
+    assertContactUploadRowLimit(parsedRows.length);
 
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
       const hierarchy = await this.resolveLocationHierarchy(locationId);
@@ -282,7 +284,8 @@ export class SthanRuntimeService {
         `DELETE FROM adwest.sreni_contacts WHERE location_id=$1::uuid`,
         [locationId],
       );
-      for (const r of parsedRows) {
+      for (let offset = 0; offset < parsedRows.length; offset += CONTACT_UPLOAD_BATCH_SIZE) {
+        const batch = parsedRows.slice(offset, offset + CONTACT_UPLOAD_BATCH_SIZE);
         await this.ctx.dataSource.query(
           `INSERT INTO adwest.sreni_contacts (
              location_id,
@@ -294,16 +297,36 @@ export class SthanRuntimeService {
              source_file,
              uploaded_by
            )
-           VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5, $6::jsonb, $7, $8)`,
+           SELECT location_id, zone_location_id, sthan_location_id, division_location_id,
+                  row_index, data::jsonb, source_file, uploaded_by
+           FROM UNNEST(
+             $1::uuid[],
+             $2::uuid[],
+             $3::uuid[],
+             $4::uuid[],
+             $5::int[],
+             $6::text[],
+             $7::text[],
+             $8::text[]
+           ) AS t(
+             location_id,
+             zone_location_id,
+             sthan_location_id,
+             division_location_id,
+             row_index,
+             data,
+             source_file,
+             uploaded_by
+           )`,
           [
-            locationId,
-            hierarchy.zoneLocationId,
-            hierarchy.sthanLocationId,
-            hierarchy.divisionLocationId,
-            r.rowIndex,
-            JSON.stringify(r.data),
-            originalName,
-            uploadedBy ?? null,
+            batch.map(() => locationId),
+            batch.map(() => hierarchy.zoneLocationId),
+            batch.map(() => hierarchy.sthanLocationId),
+            batch.map(() => hierarchy.divisionLocationId),
+            batch.map((row) => row.rowIndex),
+            batch.map((row) => JSON.stringify(row.data)),
+            batch.map(() => originalName),
+            batch.map(() => uploadedBy ?? null),
           ],
         );
       }

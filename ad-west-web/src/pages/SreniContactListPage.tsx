@@ -2,12 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToast } from '../components/common/Toast';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { Modal } from '../components/common/Modal';
+import { DateField } from '../components/common/DateFields';
 import { ContactEditModal } from '../components/common/ContactEditModal';
 import { ContactUploadModal, SRENI_CONTACT_UPLOAD_DESCRIPTION } from '../components/common/ContactUploadModal';
 import { TableRowActionsMenu } from '../components/common/TableRowActionsMenu';
 import { TableLayoutModal } from '../components/common/TableLayoutModal';
 import { PageHeader, PageStat } from '../components/common/PageHeader';
-import { PaginationBar } from '../components/common/PaginationBar';
+import { PAGE_SIZE_OPTIONS, PaginationBar } from '../components/common/PaginationBar';
 import { buildContactEditFields, MASTER_CONTACT_COLUMN_LABELS, orderContactColumns } from '../constants/contactColumns';
 import { backendApi, HouseholdMemberApi, HouseholdResolverKey, SreniContactRowApi, SreniDivisionApi, SthanBasicApi } from '../utils/backendApi';
 import { useTableLayout } from '../hooks/useTableLayout';
@@ -335,7 +336,7 @@ const HouseholdMembersModal: React.FC<HouseholdMembersModalProps> = ({
                       {isEditing ? (
                         <div style={{ display: 'grid', gap: '8px' }}>
                           <input className="form-input" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Name" disabled={saving} />
-                          <input className="form-input" type="date" value={editDob} onChange={(e) => setEditDob(e.target.value)} disabled={saving} />
+                          <DateField value={editDob} onChange={(e) => setEditDob(e.target.value)} disabled={saving} />
                           {divisions.length > 0 && (
                             <select className="form-input" value={editDivisionId} onChange={(e) => setEditDivisionId(e.target.value)} disabled={saving}>
                               <option value="">— Division —</option>
@@ -367,7 +368,7 @@ const HouseholdMembersModal: React.FC<HouseholdMembersModalProps> = ({
             <div style={{ padding: '14px', borderRadius: '8px', border: '1px dashed var(--border-dark)', display: 'grid', gap: '10px' }}>
               <p style={{ margin: 0, fontSize: '0.8rem', fontWeight: 600 }}>Add child</p>
               <input className="form-input" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Child name" disabled={saving} />
-              <input className="form-input" type="date" value={newDob} onChange={(e) => setNewDob(e.target.value)} disabled={saving} />
+              <DateField value={newDob} onChange={(e) => setNewDob(e.target.value)} disabled={saving} />
               {divisions.length > 0 ? (
                 <select className="form-input" value={newDivisionId} onChange={(e) => setNewDivisionId(e.target.value)} disabled={saving}>
                   <option value="">— Select division —</option>
@@ -588,7 +589,7 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(50);
   const [isLoading, setIsLoading] = useState(false);
   const [sourceFile, setSourceFile] = useState<string | null>(null);
   const [divisions, setDivisions] = useState<SreniDivisionApi[]>([]);
@@ -628,9 +629,10 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
       .catch(() => {/* non-critical */});
   }, [sreniId]);
 
-  const load = useCallback((p: number) => {
+  const load = useCallback((p: number, ps?: number) => {
     setIsLoading(true);
-    backendApi.listSreniContacts(sreniId, p, pageSize)
+    const size = ps ?? pageSize;
+    backendApi.listSreniContacts(sreniId, p, size)
       .then((res) => {
         setRows(res.items);
         setTotal(res.total);
@@ -957,7 +959,13 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
             totalPages={totalPages}
             totalItems={total}
             pageSize={pageSize}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
             onPageChange={(p) => { setPage(p); load(p); }}
+            onPageSizeChange={(ps) => {
+              setPageSize(ps);
+              setPage(1);
+              load(1, ps);
+            }}
           />
         </>
       )}

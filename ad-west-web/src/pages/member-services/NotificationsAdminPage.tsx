@@ -145,7 +145,7 @@ export function NotificationsAdminPage() {
               </select>
             </div>
             <FormActions>
-              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : mode === 'create' ? 'Create Notification' : 'Save Changes'}</button>
+              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : mode === 'create' ? 'Create' : 'Save Changes'}</button>
               <button type="button" className="btn btn-secondary" onClick={() => setMode('list')}>Cancel</button>
             </FormActions>
           </FormSection>
