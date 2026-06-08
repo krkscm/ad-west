@@ -1100,6 +1100,61 @@ export class SreniAdminRuntimeService {
     return { success: true };
   }
 
+  async updateContactData(
+    sreniId: string,
+    contactId: string,
+    data: Record<string, string | number | boolean | null>,
+  ): Promise<SreniContactRecord> {
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const existingRows = await this.ctx.dataSource.query(
+        `SELECT data FROM adwest.sreni_contacts WHERE id = $1 AND sreni_id = $2`,
+        [contactId, sreniId],
+      ) as Array<{ data: Record<string, string | number | boolean | null> }>;
+      if (!existingRows[0]) throw new NotFoundException('Contact not found');
+
+      const merged = { ...(existingRows[0].data ?? {}), ...data };
+      const rows = await this.ctx.dataSource.query(
+        `UPDATE adwest.sreni_contacts
+         SET data = $1::jsonb, updated_at = now()
+         WHERE id = $2 AND sreni_id = $3
+         RETURNING id, sreni_id, row_index, data, zone_location_id, sthan_location_id, division_location_id, division_id, sthan_id, COALESCE(active, true) AS active, source_file, uploaded_by, created_at, updated_at`,
+        [JSON.stringify(merged), contactId, sreniId],
+      ) as Array<{
+        id: string; sreni_id: string; row_index: number;
+        data: Record<string, string | number | boolean | null>;
+        zone_location_id: string | null; sthan_location_id: string | null; division_location_id: string | null;
+        division_id: string | null; sthan_id: string | null; active: boolean;
+        source_file: string | null; uploaded_by: string | null;
+        created_at: string | Date; updated_at: string | Date;
+      }>;
+      if (!rows[0]) throw new NotFoundException('Contact not found');
+      const r = rows[0];
+      const updated: SreniContactRecord = {
+        id: r.id, sreniId: r.sreni_id, rowIndex: r.row_index,
+        data: r.data ?? {},
+        zoneLocationId: r.zone_location_id ?? undefined,
+        sthanLocationId: r.sthan_location_id ?? undefined,
+        divisionLocationId: r.division_location_id ?? undefined,
+        divisionId: r.division_id ?? undefined,
+        sthanId: r.sthan_id ?? undefined, active: r.active ?? true,
+        sourceFile: r.source_file ?? undefined, uploadedBy: r.uploaded_by ?? undefined,
+        createdAt: this.ctx.toIsoTimestamp(r.created_at), updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+      };
+      this.ctx.sreniContacts.set(`${sreniId}:${contactId}`, updated);
+      return updated;
+    }
+
+    const existing = this.ctx.sreniContacts.get(`${sreniId}:${contactId}`);
+    if (!existing) throw new NotFoundException('Contact not found');
+    const updated: SreniContactRecord = {
+      ...existing,
+      data: { ...existing.data, ...data },
+      updatedAt: new Date().toISOString(),
+    };
+    this.ctx.sreniContacts.set(`${sreniId}:${contactId}`, updated);
+    return updated;
+  }
+
   async toggleContactActive(sreniId: string, contactId: string, active: boolean): Promise<SreniContactRecord> {
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
       const rows = await this.ctx.dataSource.query(

@@ -1474,6 +1474,12 @@ export const backendApi = {
       `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts`,
     ),
 
+  updateSreniContact: (sreniId: string, contactId: string, data: Record<string, string | number | boolean | null>) =>
+    api.patch<SreniContactRowApi>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}`,
+      { data },
+    ),
+
   assignContactDivision: (sreniId: string, contactId: string, divisionId: string | null) =>
     api.patch<SreniContactRowApi>(
       `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}/division`,
@@ -1883,6 +1889,12 @@ export const backendApi = {
   },
   clearSthanContacts: (locationId: string) =>
     api.delete<{ deleted: number }>(`/org/locations/${encodeURIComponent(locationId)}/contacts`),
+
+  updateSthanContact: (locationId: string, contactId: string, data: Record<string, string | number | boolean | null>) =>
+    api.patch<SthanContactRowApi>(
+      `/org/locations/${encodeURIComponent(locationId)}/contacts/${encodeURIComponent(contactId)}`,
+      { data },
+    ),
 
   // ─── Sthan — Calendar ──────────────────────────────────────────────────────
   listSthanCalendarEvents: (locationId: string) =>

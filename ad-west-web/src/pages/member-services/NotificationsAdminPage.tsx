@@ -6,6 +6,7 @@ import { DateTimePicker } from '../../components/common/DateTimePicker'
 import { PageHeader } from '../../components/common/PageHeader'
 import { FormSection } from '../../components/common/FormSection'
 import { FormActions } from '../../components/common/FormActions'
+import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu'
 import { EmptyState } from '../../components/common/EmptyState'
 import { useEnumOptions } from '../../hooks/useEnumOptions'
 
@@ -215,14 +216,15 @@ export function NotificationsAdminPage() {
                         {live ? 'Live' : n.isActive ? 'Scheduled / Expired' : 'Inactive'}
                       </span>
                     </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                        <button type="button" className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 10px' }} onClick={() => handleToggle(n)}>
-                          {n.isActive ? 'Deactivate' : 'Activate'}
-                        </button>
-                        <button type="button" className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 10px' }} onClick={() => openEdit(n)}>Edit</button>
-                        <button type="button" className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 10px', color: 'var(--error)', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => handleDelete(n.id)}>Delete</button>
-                      </div>
+                    <td style={{ textAlign: 'right', verticalAlign: 'middle', width: '56px' }}>
+                      <TableRowActionsMenu
+                        ariaLabel={`Actions for ${n.title}`}
+                        actions={[
+                          { label: n.isActive ? 'Deactivate' : 'Activate', tone: n.isActive ? 'warning' : 'success', onClick: () => handleToggle(n) },
+                          { label: 'Edit', onClick: () => openEdit(n) },
+                          { label: 'Delete', tone: 'danger', onClick: () => handleDelete(n.id) },
+                        ]}
+                      />
                     </td>
                   </tr>
                 )

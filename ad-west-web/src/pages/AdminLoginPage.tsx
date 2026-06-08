@@ -9,6 +9,7 @@ interface AdminLoginPageProps {
 export const AdminLoginPage: React.FC<AdminLoginPageProps> = () => {
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [captchaToken, setCaptchaToken] = useState('')
   const [captchaImage, setCaptchaImage] = useState('')
   const [captchaAnswer, setCaptchaAnswer] = useState('')
@@ -93,14 +94,29 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = () => {
                 Forgot password?
               </a>
             </div>
-            <input
-              type="password"
-              className="form-input"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                className="form-input"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                style={{ paddingRight: '48px' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(p => !p)}
+                style={{
+                  position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
+                  color: 'rgba(255,255,255,0.5)', fontSize: '1rem', lineHeight: 1,
+                }}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? '🙈' : '👁️'}
+              </button>
+            </div>
           </div>
 
           <div className="form-group" style={{ marginBottom: '22px' }}>

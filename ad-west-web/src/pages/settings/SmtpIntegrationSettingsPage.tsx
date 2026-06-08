@@ -22,6 +22,7 @@ export const SmtpIntegrationSettingsPage: React.FC = () => {
   const [imapPort, setImapPort] = useState(993);
   const [enabled, setEnabled] = useState(true);
   const [clearPassword, setClearPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     setIsLoading(true);
@@ -165,13 +166,28 @@ export const SmtpIntegrationSettingsPage: React.FC = () => {
 
             <div className="form-group">
               <label className="form-label">Password / App Password</label>
-              <input
-                className="form-input"
-                type="password"
-                placeholder={config?.hasPassword ? 'Stored in DB — leave empty to keep current' : 'Enter SMTP password or app password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  className="form-input"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder={config?.hasPassword ? 'Stored in DB — leave empty to keep current' : 'Enter SMTP password or app password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  style={{ paddingRight: '48px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(p => !p)}
+                  style={{
+                    position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                    background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
+                    color: 'var(--text-secondary-dark)', fontSize: '1rem', lineHeight: 1,
+                  }}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? '🙈' : '👁️'}
+                </button>
+              </div>
               <SwitchToggle
                 checked={clearPassword}
                 onChange={setClearPassword}

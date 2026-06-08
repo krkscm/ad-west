@@ -6,6 +6,7 @@ import { SwitchToggle } from '../../components/common/SwitchToggle'
 import { useConfirm } from '../../components/common/ConfirmDialog'
 import { FileUploadZone } from '../../components/common/FileUploadZone'
 import { PageHeader } from '../../components/common/PageHeader'
+import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu'
 import { FormSection } from '../../components/common/FormSection'
 import { FormActions } from '../../components/common/FormActions'
 import { EmptyState } from '../../components/common/EmptyState'
@@ -266,15 +267,14 @@ export function ReimbursementPage() {
                         <td style={{ whiteSpace: 'nowrap', fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>
                           {new Date(r.createdAt).toLocaleDateString()}
                         </td>
-                        <td onClick={(e) => e.stopPropagation()}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                            {r.status === 'draft' && (
-                              <button className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 10px' }} onClick={() => handleSubmitRequest(r.id)}>Submit</button>
-                            )}
-                            {(r.status === 'draft' || isSuperAdmin) && (
-                              <button className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 10px', color: 'var(--error)', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => handleDelete(r.id)}>Delete</button>
-                            )}
-                          </div>
+                        <td style={{ textAlign: 'right', verticalAlign: 'middle', width: '56px' }} onClick={(e) => e.stopPropagation()}>
+                          <TableRowActionsMenu
+                            ariaLabel={`Actions for reimbursement ${r.id}`}
+                            actions={[
+                              ...(r.status === 'draft' ? [{ label: 'Submit', onClick: () => handleSubmitRequest(r.id) }] : []),
+                              ...((r.status === 'draft' || isSuperAdmin) ? [{ label: 'Delete', tone: 'danger' as const, onClick: () => handleDelete(r.id) }] : []),
+                            ]}
+                          />
                         </td>
                       </tr>
                     )

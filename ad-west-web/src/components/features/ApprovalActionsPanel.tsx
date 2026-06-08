@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { ApprovalWorkflowRuntimeItemApi, backendApi } from '../../utils/backendApi'
 import { useToast } from '../common/Toast'
+import { TableRowActionsMenu } from '../common/TableRowActionsMenu'
 
 const statusLabel: Record<string, string> = {
   pending: 'Pending Review',
@@ -92,7 +93,7 @@ export const ApprovalActionsPanel: React.FC = () => {
                 <th>Status</th>
                 <th>Updated</th>
                 <th style={{ minWidth: '280px' }}>Note</th>
-                <th style={{ minWidth: '240px' }}>Actions</th>
+                <th style={{ width: '56px' }} />
               </tr>
             </thead>
             <tbody>
@@ -120,16 +121,15 @@ export const ApprovalActionsPanel: React.FC = () => {
                         />
                       )}
                     </td>
-                    <td>
+                    <td style={{ textAlign: 'right', verticalAlign: 'middle' }}>
                       {isPending ? (
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                          <button className="btn btn-primary" disabled={busy} onClick={() => void handleReview(item, 'approved')}>
-                            Approve
-                          </button>
-                          <button className="btn btn-secondary" disabled={busy} onClick={() => void handleReview(item, 'rejected')}>
-                            Reject
-                          </button>
-                        </div>
+                        <TableRowActionsMenu
+                          ariaLabel={`Actions for ${item.summary || item.targetId}`}
+                          actions={[
+                            { label: 'Approve', onClick: () => void handleReview(item, 'approved'), disabled: busy },
+                            { label: 'Reject', tone: 'danger', onClick: () => void handleReview(item, 'rejected'), disabled: busy },
+                          ]}
+                        />
                       ) : (
                         <span style={{ color: 'var(--text-secondary-dark)', fontSize: '0.82rem' }}>Completed</span>
                       )}

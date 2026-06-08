@@ -8,6 +8,7 @@ import { EmptyState } from '../../components/common/EmptyState';
 import { PaginationBar } from '../../components/common/PaginationBar';
 import { backendApi, LocationDefinitionApi, PermissionApi, PermissionSetApi } from '../../utils/backendApi';
 import { SwitchToggle } from '../../components/common/SwitchToggle';
+import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
@@ -181,7 +182,7 @@ export const PermissionSetsPage: React.FC = () => {
           { label: 'Available Permissions', value: activePermCount, variant: 'warning' },
         ]}
         actions={
-          <button type="button" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={toggleFormOpen}>
+          <button type="button" className={`btn ${formOpen && !editingId ? 'btn-secondary' : 'btn-primary'}`} onClick={toggleFormOpen}>
             <span style={{ fontSize: '1.15rem' }}>{formOpen && !editingId ? '✕' : '+'}</span>
             {formOpen && !editingId ? 'Close' : 'New Set'}
           </button>
@@ -336,26 +337,15 @@ export const PermissionSetsPage: React.FC = () => {
                       {s.active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td style={{ width: '240px' }}>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button type="button" className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.8rem' }} onClick={() => startEdit(s)}>✎ Edit</button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ padding: '4px 10px', fontSize: '0.8rem', color: s.active ? 'var(--error)' : 'var(--success)', borderColor: s.active ? 'var(--error)' : 'var(--success)' }}
-                        onClick={() => void handleToggleActive(s)}
-                      >
-                        {s.active ? '⊘ Deactivate' : '✓ Activate'}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ padding: '4px 9px', fontSize: '0.85rem', color: 'var(--error)', borderColor: 'var(--error)' }}
-                        onClick={() => void handleDelete(s)}
-                      >
-                        🗑
-                      </button>
-                    </div>
+                  <td style={{ textAlign: 'right', verticalAlign: 'middle', width: '56px' }}>
+                    <TableRowActionsMenu
+                      ariaLabel={`Actions for ${s.name}`}
+                      actions={[
+                        { label: 'Edit', onClick: () => startEdit(s) },
+                        { label: s.active ? 'Deactivate' : 'Activate', tone: s.active ? 'warning' : 'success', onClick: () => void handleToggleActive(s) },
+                        { label: 'Delete', tone: 'danger', onClick: () => void handleDelete(s) },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}

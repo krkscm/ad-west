@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { backendApi, SreniReportParameterApi } from '../utils/backendApi';
 import { useToast } from '../components/common/Toast';
 import { useConfirm } from '../components/common/ConfirmDialog';
+import { PageHeader } from '../components/common/PageHeader';
 import { useEnumOptions } from '../hooks/useEnumOptions';
+import { TableRowActionsMenu } from '../components/common/TableRowActionsMenu';
 
 interface Props {
   sreniId: string;
@@ -130,15 +132,11 @@ export const SreniReportConfigPage: React.FC<Props> = ({ sreniId, sreniName }) =
 
   return (
     <div className="animate-slide-up">
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>⚙️ {sreniName} — Report Config</h2>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginTop: '4px', marginBottom: 0 }}>
-            Configure report parameters for each submission type. These fields will appear when submitting a report.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon="⚙️"
+        title={`${sreniName} — Report Config`}
+        subtitle="Configure report parameters for each submission type. These fields will appear when submitting a report."
+      />
 
       {/* Submission type tabs */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
@@ -180,7 +178,7 @@ export const SreniReportConfigPage: React.FC<Props> = ({ sreniId, sreniName }) =
             </div>
           </div>
           {!isAdding && !editingId && (
-            <button type="button" className="btn btn-primary" style={{ fontSize: '0.875rem' }} onClick={openAdd}>
+            <button type="button" className="btn btn-primary btn-sm" onClick={openAdd}>
               + Add Parameter
             </button>
           )}
@@ -251,8 +249,8 @@ export const SreniReportConfigPage: React.FC<Props> = ({ sreniId, sreniName }) =
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button type="button" className="btn btn-secondary" onClick={closeForm}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={isSaving}>
+                <button type="button" className="btn btn-secondary btn-md" onClick={closeForm}>Cancel</button>
+                <button type="submit" className="btn btn-primary btn-md" disabled={isSaving}>
                   {isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Add Parameter'}
                 </button>
               </div>
@@ -268,7 +266,7 @@ export const SreniReportConfigPage: React.FC<Props> = ({ sreniId, sreniName }) =
             <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', maxWidth: '360px', margin: '0 auto 16px' }}>
               Add parameters that will appear in the {submissionTypeLabel(activeType).toLowerCase()} report submission form.
             </p>
-            <button type="button" className="btn btn-primary" style={{ fontSize: '0.875rem' }} onClick={openAdd}>Add First Parameter</button>
+            <button type="button" className="btn btn-primary btn-sm" onClick={openAdd}>Add First Parameter</button>
           </div>
         )}
 
@@ -320,11 +318,14 @@ export const SreniReportConfigPage: React.FC<Props> = ({ sreniId, sreniName }) =
                         {p.active ? 'Active' : 'Inactive'}
                       </button>
                     </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                        <button type="button" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.82rem' }} onClick={() => openEdit(p)}>Edit</button>
-                        <button type="button" className="btn btn-danger" style={{ padding: '6px 12px', fontSize: '0.82rem' }} onClick={() => void handleDelete(p)}>Delete</button>
-                      </div>
+                    <td style={{ textAlign: 'right', verticalAlign: 'middle', width: '56px' }}>
+                      <TableRowActionsMenu
+                        ariaLabel={`Actions for ${p.name}`}
+                        actions={[
+                          { label: 'Edit', onClick: () => openEdit(p) },
+                          { label: 'Delete', tone: 'danger', onClick: () => void handleDelete(p) },
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}

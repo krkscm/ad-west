@@ -32,6 +32,7 @@ import type {
 } from '../utils/backendApi';
 import { useToast } from '../components/common/Toast';
 import { useConfirm } from '../components/common/ConfirmDialog';
+import { PageHeader } from '../components/common/PageHeader';
 import { SwitchToggle } from '../components/common/SwitchToggle';
 import { DateField } from '../components/common/DateFields';
 import { TableLayoutModal } from '../components/common/TableLayoutModal';
@@ -950,19 +951,20 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
         onUpdate={handleUpdateTableLayout}
         onDelete={detailTableLayout.deleteLayout}
       />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
-        <div>
-          <h2 style={{ fontSize: '1.55rem', fontWeight: 800, margin: 0 }}>📈 {sreniName} - Analytics Studio</h2>
-          <p style={{ margin: '6px 0 0', color: 'var(--text-secondary-dark)', fontSize: '0.9rem' }}>
-            Domain analytics for contacts, events, attendance, and operational performance.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <span className="badge badge-info">{filteredRecords.length} rows</span>
-          <span className="badge badge-success">{measureKeys.length} numeric measures</span>
-          <button type="button" className="btn btn-secondary" onClick={exportCsv} disabled={!sortedRecords.length}>Export CSV</button>
-        </div>
-      </div>
+      <PageHeader
+        icon="📈"
+        title={`${sreniName} — Analytics Studio`}
+        subtitle="Domain analytics for contacts, events, attendance, and operational performance."
+        stats={[
+          { label: 'Rows', value: filteredRecords.length, variant: 'info' },
+          { label: 'Numeric measures', value: measureKeys.length, variant: 'success' },
+        ]}
+        actions={
+          <button type="button" className="btn btn-secondary btn-sm" onClick={exportCsv} disabled={!sortedRecords.length}>
+            Export CSV
+          </button>
+        }
+      />
 
       <div className="glass-panel" style={{ padding: '14px', display: 'grid', gap: '10px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '10px' }}>
@@ -989,10 +991,10 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-        <button type="button" className={`btn ${tab === 'details' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('details')}>Detailed Reports</button>
-        <button type="button" className={`btn ${tab === 'pivot' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('pivot')}>Pivot Studio</button>
-        <button type="button" className={`btn ${tab === 'graph' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('graph')}>Graph Studio</button>
+      <div className="btn-group" style={{ flexWrap: 'wrap' }}>
+        <button type="button" className={`btn btn-sm ${tab === 'details' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('details')}>Detailed Reports</button>
+        <button type="button" className={`btn btn-sm ${tab === 'pivot' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('pivot')}>Pivot Studio</button>
+        <button type="button" className={`btn btn-sm ${tab === 'graph' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('graph')}>Graph Studio</button>
       </div>
 
       {loading ? (
@@ -1044,7 +1046,7 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
                 <div style={savedLayoutButtonRowStyle}>
                   <button
                     type="button"
-                    className="btn btn-secondary"
+                    className="btn btn-secondary btn-sm"
                     onClick={() => {
                       const layout = detailsLayouts.find((item) => item.id === selectedDetailsLayoutId);
                       if (!layout) {
@@ -1059,7 +1061,7 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
                   </button>
                   <button
                     type="button"
-                    className="btn btn-primary"
+                    className="btn btn-primary btn-sm"
                     onClick={() => void handleSaveLayout('details')}
                     disabled={savingLayoutType === 'details'}
                   >
@@ -1067,7 +1069,7 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
                   </button>
                   <button
                     type="button"
-                    className="btn btn-secondary"
+                    className="btn btn-danger-outline btn-sm"
                     onClick={() => void handleDeleteLayout('details')}
                     disabled={!selectedDetailsLayoutId || deletingLayoutId === selectedDetailsLayoutId}
                   >
@@ -1082,9 +1084,8 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
                     <div className="form-label" style={{ margin: 0 }}>Visible Columns</div>
                     <button
                       type="button"
-                      className="btn btn-secondary"
+                      className="btn btn-secondary btn-sm"
                       onClick={() => setShowTableLayoutModal(true)}
-                      style={{ fontSize: '0.82rem' }}
                     >
                       Table Customization
                       {detailTableLayout.activeLayoutName ? `: ${detailTableLayout.activeLayoutName}` : ''}
@@ -1156,8 +1157,8 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <span style={{ color: 'var(--text-secondary-dark)', fontSize: '0.82rem' }}>Page {safePage} of {totalPages}</span>
                 <div style={{ display: 'flex', gap: '6px' }}>
-                  <button type="button" className="btn btn-secondary" disabled={safePage <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>Previous</button>
-                  <button type="button" className="btn btn-secondary" disabled={safePage >= totalPages} onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}>Next</button>
+                  <button type="button" className="btn btn-secondary btn-sm" disabled={safePage <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>Previous</button>
+                  <button type="button" className="btn btn-secondary btn-sm" disabled={safePage >= totalPages} onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}>Next</button>
                 </div>
               </div>
             </div>
@@ -1211,7 +1212,7 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <button
                     type="button"
-                    className="btn btn-primary"
+                    className="btn btn-primary btn-sm"
                     onClick={() => void handleSaveLayout('pivot')}
                     disabled={savingLayoutType === 'pivot'}
                   >
@@ -1219,7 +1220,7 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
                   </button>
                   <button
                     type="button"
-                    className="btn btn-secondary"
+                    className="btn btn-secondary btn-sm"
                     onClick={() => {
                       const layout = pivotLayouts.find((item) => item.id === selectedPivotLayoutId);
                       if (!layout) {
@@ -1234,7 +1235,7 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
                   </button>
                   <button
                     type="button"
-                    className="btn btn-secondary"
+                    className="btn btn-danger-outline btn-sm"
                     onClick={() => void handleDeleteLayout('pivot')}
                     disabled={!selectedPivotLayoutId || deletingLayoutId === selectedPivotLayoutId}
                   >

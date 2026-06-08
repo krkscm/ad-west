@@ -3,6 +3,7 @@ import { Modal } from '../components/common/Modal';
 import { useToast } from '../components/common/Toast';
 import { DateField, TimeField } from '../components/common/DateFields';
 import { ExportMenu, formatExportSections } from '../components/common/ExportMenu';
+import { PageHeader } from '../components/common/PageHeader';
 import { backendApi, SthanCalendarEventApi } from '../utils/backendApi';
 import {
   exportSthanCalendar,
@@ -197,42 +198,38 @@ export const SthanCalendarPage: React.FC<Props> = ({ locationId, locationName })
 
   return (
     <div>
-      <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>📅 {locationName} Calendar</h3>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginTop: '4px', marginBottom: 0 }}>
-            Plan events for this Sthan — {localCount} local, {syncedCount} from Sreni calendar{isLoading ? ' (syncing…)' : ''}
-          </p>
-          {syncedCount > 0 && (
-            <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.78rem', marginTop: '6px', marginBottom: 0 }}>
-              Zone and Sreni events appear here automatically (read-only). Edit them from the Sreni calendar.
-            </p>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <ExportMenu
-            disabled={isLoading}
-            sections={calendarExportSections}
-          />
-          <div style={{ display: 'flex', border: '1px solid var(--border-dark)', borderRadius: '8px', overflow: 'hidden' }}>
+      <PageHeader
+        icon="📅"
+        title={locationName}
+        subtitle={`Plan events for this Sthan — ${localCount} local, ${syncedCount} from Sreni calendar${isLoading ? ' (syncing…)' : ''}`}
+        actions={
+          <>
+            <ExportMenu
+              disabled={isLoading}
+              sections={calendarExportSections}
+            />
+            <div className="btn-group">
+              <button
+                className={`btn ${view === 'month' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setView('month')}
+              >Month</button>
+              <button
+                className={`btn ${view === 'agenda' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setView('agenda')}
+              >Agenda</button>
+            </div>
             <button
-              className={`btn ${view === 'month' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ fontSize: '0.84rem', padding: '7px 16px', border: 'none', borderRadius: 0 }}
-              onClick={() => setView('month')}
-            >Month</button>
-            <button
-              className={`btn ${view === 'agenda' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ fontSize: '0.84rem', padding: '7px 16px', border: 'none', borderRadius: 0 }}
-              onClick={() => setView('agenda')}
-            >Agenda</button>
-          </div>
-          <button
-            className="btn btn-primary"
-            style={{ fontSize: '0.84rem', padding: '7px 16px' }}
-            onClick={() => openAdd(todayStr)}
-          >+ Add Event</button>
-        </div>
-      </div>
+              className="btn btn-primary"
+              onClick={() => openAdd(todayStr)}
+            >+ Add Event</button>
+          </>
+        }
+      />
+      {syncedCount > 0 && (
+        <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.78rem', marginTop: '-12px', marginBottom: '24px' }}>
+          Zone and Sreni events appear here automatically (read-only). Edit them from the Sreni calendar.
+        </p>
+      )}
 
       <div
         className="glass-panel"
@@ -247,14 +244,14 @@ export const SthanCalendarPage: React.FC<Props> = ({ locationId, locationName })
           justifyContent: 'space-between',
         }}
       >
-        <button className="btn btn-secondary" style={{ padding: '6px 16px', fontSize: '0.84rem' }} onClick={prevMonth}>← Prev</button>
+        <button className="btn btn-secondary btn-sm page-nav-btn" onClick={prevMonth}>← Prev</button>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{MONTH_NAMES[month]} {year}</div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary-dark)', marginTop: '2px' }}>
             {agendaEvents.length} event{agendaEvents.length !== 1 ? 's' : ''} this month
           </div>
         </div>
-        <button className="btn btn-secondary" style={{ padding: '6px 16px', fontSize: '0.84rem' }} onClick={nextMonth}>Next →</button>
+        <button className="btn btn-secondary btn-sm page-nav-btn" onClick={nextMonth}>Next →</button>
       </div>
 
       {view === 'month' ? (
@@ -559,8 +556,8 @@ export const SthanCalendarPage: React.FC<Props> = ({ locationId, locationName })
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '4px' }}>
             {editingEvent && !isSyncedEvent(editingEvent) && (
               <button
-                className="btn btn-secondary"
-                style={{ marginRight: 'auto', color: 'var(--error)', borderColor: 'rgba(239,68,68,0.3)' }}
+                className="btn btn-danger-outline"
+                style={{ marginRight: 'auto' }}
                 onClick={() => void handleDelete()}
               >
                 Delete

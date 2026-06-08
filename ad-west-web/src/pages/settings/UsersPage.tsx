@@ -3,6 +3,7 @@ import { useToast } from '../../components/common/Toast';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import { PageHeader } from '../../components/common/PageHeader';
 import { EmptyState } from '../../components/common/EmptyState';
+import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
 import { PaginationBar } from '../../components/common/PaginationBar';
 import {
   backendApi,
@@ -137,7 +138,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onAdd, onEdit, editingUser
           { label: 'Active', value: users.filter((u) => u.active).length, variant: 'success' },
         ]}
         actions={
-          <button type="button" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={onAdd}>
+          <button type="button" className="btn btn-primary" onClick={onAdd}>
             <span style={{ fontSize: '1.15rem' }}>+</span>
             New User
           </button>
@@ -222,24 +223,15 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onAdd, onEdit, editingUser
                         {u.active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td style={{ width: '230px' }}>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.8rem' }} onClick={() => onEdit(u)}>{editingUserId === u.id ? 'Editing...' : '✎ Edit'}</button>
-                        <button
-                          className="btn btn-secondary"
-                          style={{ padding: '4px 10px', fontSize: '0.8rem', color: u.active ? 'var(--error)' : 'var(--success)', borderColor: u.active ? 'var(--error)' : 'var(--success)' }}
-                          onClick={() => void handleToggleActive(u)}
-                        >
-                          {u.active ? '⊘ Deactivate' : '✓ Activate'}
-                        </button>
-                        <button
-                          className="btn btn-secondary"
-                          style={{ padding: '4px 9px', fontSize: '0.85rem', color: 'var(--error)', borderColor: 'var(--error)' }}
-                          onClick={() => void handleDelete(u)}
-                        >
-                          🗑
-                        </button>
-                      </div>
+                    <td style={{ textAlign: 'right', verticalAlign: 'middle', width: '56px' }}>
+                      <TableRowActionsMenu
+                        ariaLabel={`Actions for ${u.name}`}
+                        actions={[
+                          { label: editingUserId === u.id ? 'Editing…' : 'Edit', onClick: () => onEdit(u), disabled: editingUserId === u.id },
+                          { label: u.active ? 'Deactivate' : 'Activate', tone: u.active ? 'warning' : 'success', onClick: () => void handleToggleActive(u) },
+                          { label: 'Delete', tone: 'danger', onClick: () => void handleDelete(u) },
+                        ]}
+                      />
                     </td>
                   </tr>
                 );

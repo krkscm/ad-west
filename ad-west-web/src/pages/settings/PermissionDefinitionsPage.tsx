@@ -4,6 +4,8 @@ import { useConfirm } from '../../components/common/ConfirmDialog';
 import { PageHeader } from '../../components/common/PageHeader';
 import { EmptyState } from '../../components/common/EmptyState';
 import { backendApi, LocationDefinitionApi, PermissionApi, SreniDefinitionApi } from '../../utils/backendApi';
+import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
+import { PaginationBar } from '../../components/common/PaginationBar';
 
 const toUiError = (error: unknown, fallback: string): string => {
   if (!(error instanceof Error)) return fallback;
@@ -124,13 +126,6 @@ export const PermissionDefinitionsPage: React.FC = () => {
     setFormOpen(true); window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const pageNums = (() => {
-    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
-    if (page <= 4) return [1, 2, 3, 4, 5, '…', totalPages];
-    if (page >= totalPages - 3) return [1, '…', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-    return [1, '…', page - 1, page, page + 1, '…', totalPages];
-  })();
-
   const hasTable = !isLoading && items.length > 0;
 
   return (
@@ -141,7 +136,7 @@ export const PermissionDefinitionsPage: React.FC = () => {
         subtitle="Each permission maps a Location to a Sreni and defines an operational scope."
         stats={[{ label: 'Total', value: total, variant: 'info' }]}
         actions={
-          <button type="button" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '16px', paddingRight: '16px' }}
+          <button type="button" className={`btn ${formOpen && !editingId ? 'btn-secondary' : 'btn-primary'}`}
             onClick={() => { if (formOpen && !editingId) setFormOpen(false); else { resetForm(); setFormOpen(true); } }}>
             {formOpen && !editingId ? (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -204,8 +199,8 @@ export const PermissionDefinitionsPage: React.FC = () => {
               <input className="form-input" placeholder="What does this permission govern?" value={description} onChange={(e) => setDescription(e.target.value)} style={{ fontSize: '0.875rem' }} />
             </div>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button type="button" className="btn btn-secondary" onClick={resetForm} style={{ fontSize: '0.875rem' }}>Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ fontSize: '0.875rem' }}>{isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Permission'}</button>
+              <button type="button" className="btn btn-secondary btn-md" onClick={resetForm}>Cancel</button>
+              <button type="submit" className="btn btn-primary btn-md" disabled={isSaving}>{isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Permission'}</button>
             </div>
           </form>
         </div>
@@ -221,7 +216,7 @@ export const PermissionDefinitionsPage: React.FC = () => {
           {activeLocations.map((l) => <option key={l.id} value={l.id}>{l.name} ({l.level})</option>)}
         </select>
         {(search || locationFilter) && (
-          <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.82rem' }} onClick={() => { setSearch(''); handleLocationFilter(''); }}>Clear Filters</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => { setSearch(''); handleLocationFilter(''); }}>Clear Filters</button>
         )}
         <div className="list-toolbar__meta">
           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>Rows:</span>
@@ -313,70 +308,29 @@ export const PermissionDefinitionsPage: React.FC = () => {
                         {p.active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td style={{ padding: '10px 20px', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <button type="button" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }} onClick={() => startEdit(p)}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-                          Edit
-                        </button>
-                        <button type="button" className="btn btn-secondary" style={{ 
-                          padding: '6px 12px', 
-                          fontSize: '0.8rem', 
-                          color: p.active ? 'var(--error)' : 'var(--success)',
-                          borderColor: p.active ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-                          background: p.active ? 'rgba(239, 68, 68, 0.02)' : 'rgba(16, 185, 129, 0.02)',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }} onClick={() => void handleToggleActive(p)}>
-                          {p.active ? (
-                            <>
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                              Deactivate
-                            </>
-                          ) : (
-                            <>
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
-                              Activate
-                            </>
-                          )}
-                        </button>
-                        <button type="button" className="btn btn-secondary" style={{
-                          padding: '6px 10px',
-                          color: 'var(--error)',
-                          borderColor: 'rgba(239, 68, 68, 0.2)',
-                          background: 'rgba(239, 68, 68, 0.02)',
-                        }} onClick={() => void handleDelete(p)}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                        </button>
-                      </div>
+                    <td style={{ padding: '10px 20px', textAlign: 'right', verticalAlign: 'middle', width: '56px' }}>
+                      <TableRowActionsMenu
+                        ariaLabel={`Actions for ${p.name}`}
+                        actions={[
+                          { label: 'Edit', onClick: () => startEdit(p) },
+                          { label: p.active ? 'Deactivate' : 'Activate', tone: p.active ? 'warning' : 'success', onClick: () => void handleToggleActive(p) },
+                          { label: 'Delete', tone: 'danger', onClick: () => void handleDelete(p) },
+                        ]}
+                      />
                     </td>
                   </tr>
                 );
               })}
           </tbody>
         </table>
+        <PaginationBar
+          page={page}
+          totalPages={totalPages}
+          totalItems={total}
+          pageSize={pageSize}
+          onPageChange={setPage}
+        />
       </div>
-      )}
-
-      {/* Pagination */}
-      {hasTable && totalPages > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '14px 18px', borderTop: '1px solid var(--border-dark)' }}>
-          <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-            style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid var(--border-dark)', background: 'transparent', color: page === 1 ? 'var(--text-secondary-dark)' : 'var(--text-primary-dark)', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1, fontSize: '0.82rem' }}>
-            ← Prev
-          </button>
-          {pageNums.map((n, i) => (
-            <button key={i} type="button" onClick={() => typeof n === 'number' && setPage(n)} disabled={n === '…'}
-              style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid', minWidth: '34px', borderColor: n === page ? 'var(--primary)' : 'var(--border-dark)', background: n === page ? 'var(--primary)' : 'transparent', color: n === page ? '#fff' : 'var(--text-primary-dark)', fontWeight: n === page ? 700 : 400, cursor: n === '…' ? 'default' : 'pointer', fontSize: '0.82rem' }}>
-              {n}
-            </button>
-          ))}
-          <button type="button" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-            style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid var(--border-dark)', background: 'transparent', color: page === totalPages ? 'var(--text-secondary-dark)' : 'var(--text-primary-dark)', cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.4 : 1, fontSize: '0.82rem' }}>
-            Next →
-          </button>
-        </div>
       )}
     </div>
   );

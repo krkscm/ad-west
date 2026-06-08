@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { backendApi, ReportMetricDefinitionApi, SthanReportApi } from '../utils/backendApi';
 import { useToast } from '../components/common/Toast';
-import { ExportMenu, formatExportSections, RowExportButton } from '../components/common/ExportMenu';
+import { PageHeader } from '../components/common/PageHeader';
+import { EXPORT_FORMATS, ExportMenu, formatExportSections } from '../components/common/ExportMenu';
+import { TableRowActionsMenu } from '../components/common/TableRowActionsMenu';
+import { formatLabels } from '../utils/tableExport';
 import { exportSthanReports } from '../utils/reportExport';
 import type { ExportFormat } from '../utils/tableExport';
 
@@ -120,35 +123,23 @@ export const SthanReportsPage: React.FC<Props> = ({ locationId, locationName }) 
 
   return (
     <div>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
-        <div>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', margin: 0 }}>
-            Submit and review monthly activity reports for this sthan.
-          </p>
-          <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <span className="badge badge-info" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid currentColor', background: 'transparent', fontSize: '0.8rem', fontWeight: 600 }}>
-              <span style={{ fontWeight: 800 }}>{reports.length}</span> {reports.length === 1 ? 'Report' : 'Reports'}
-            </span>
-            <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid currentColor', background: 'transparent', fontSize: '0.8rem', fontWeight: 600 }}>
-              <span style={{ fontWeight: 800 }}>{metrics.length}</span> Metrics
-            </span>
-          </div>
-        </div>
-        {!isFormOpen && metrics.length > 0 && (
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <ExportMenu
-              disabled={isLoading}
-              sections={reportExportSections}
-            />
-            <button type="button" className="btn btn-primary"
-              style={{ fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-              onClick={() => openForm(formYear, formMonth, existingReport)}>
-              📤 Submit Report
+      <PageHeader
+        icon="📊"
+        title={`${locationName} — Reports`}
+        subtitle="Submit and review monthly activity reports for this sthan."
+        stats={[
+          { label: reports.length === 1 ? 'Report' : 'Reports', value: reports.length, variant: 'info' },
+          { label: 'Metrics', value: metrics.length, variant: 'warning' },
+        ]}
+        actions={!isFormOpen && metrics.length > 0 ? (
+          <>
+            <ExportMenu disabled={isLoading} sections={reportExportSections} />
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => openForm(formYear, formMonth, existingReport)}>
+              Submit Report
             </button>
-          </div>
-        )}
-      </div>
+          </>
+        ) : undefined}
+      />
 
       {/* No metrics — point to settings */}
       {metrics.length === 0 && !isLoading && (
@@ -166,7 +157,7 @@ export const SthanReportsPage: React.FC<Props> = ({ locationId, locationName }) 
         <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px', borderLeft: '3px solid var(--primary)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>📤 Submit Monthly Report</h4>
-            <button type="button" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.82rem' }} onClick={() => setIsFormOpen(false)}>Cancel</button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIsFormOpen(false)}>Cancel</button>
           </div>
 
           <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
@@ -262,17 +253,17 @@ export const SthanReportsPage: React.FC<Props> = ({ locationId, locationName }) 
                   {metrics.slice(0, 4).map((m) => (
                     <td key={m.id} style={{ fontSize: '0.85rem' }}>{report.entries[m.id] ?? '—'}</td>
                   ))}
-                  <td>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
-                      <RowExportButton
-                        title={`Export ${MONTHS[report.periodMonth - 1]} ${report.periodYear}`}
-                        onExport={(format) => exportSingleReport(report, format)}
-                      />
-                      <button type="button" className="btn btn-secondary" style={{ padding: '6px 14px', fontSize: '0.82rem' }}
-                        onClick={() => openForm(report.periodYear, report.periodMonth, report)}>
-                        ✏️ Edit
-                      </button>
-                    </div>
+                  <td style={{ textAlign: 'right', verticalAlign: 'middle', width: '56px' }}>
+                    <TableRowActionsMenu
+                      ariaLabel={`Actions for ${MONTHS[report.periodMonth - 1]} ${report.periodYear}`}
+                      actions={[
+                        ...EXPORT_FORMATS.map((format) => ({
+                          label: `Export ${formatLabels[format]}`,
+                          onClick: () => exportSingleReport(report, format),
+                        })),
+                        { label: 'Edit', onClick: () => openForm(report.periodYear, report.periodMonth, report) },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}

@@ -1,16 +1,20 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToast } from '../components/common/Toast';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { Modal } from '../components/common/Modal';
+import { ContactEditModal } from '../components/common/ContactEditModal';
+import { ContactUploadModal, GLOBAL_CONTACT_UPLOAD_DESCRIPTION } from '../components/common/ContactUploadModal';
+import { buildContactEditFields, MASTER_CONTACT_COLUMN_LABELS, orderContactColumns } from '../constants/contactColumns';
 import { TableLayoutModal } from '../components/common/TableLayoutModal';
 import { SwitchToggle } from '../components/common/SwitchToggle';
 import { PageHeader } from '../components/common/PageHeader';
+import { PaginationBar } from '../components/common/PaginationBar';
 import { EmptyState } from '../components/common/EmptyState';
+import { TableRowActionsMenu } from '../components/common/TableRowActionsMenu';
 import { useTableLayout } from '../hooks/useTableLayout';
 import {
   backendApi,
   ContactSreniTagApi,
-  GlobalContactUploadDuplicateApi,
   SreniContactRowApi,
   SreniDefinitionApi,
   SreniDivisionApi,
@@ -21,13 +25,6 @@ const toUiError = (error: unknown, fallback: string): string => {
   if (!(error instanceof Error)) return fallback;
   const match = error.message.match(/^API error \(\d+\):\s*(.*)$/i);
   return match?.[1] ?? error.message ?? fallback;
-};
-
-const buildPageNums = (page: number, totalPages: number): (number | '…')[] => {
-  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
-  if (page <= 4) return [1, 2, 3, 4, 5, '…', totalPages];
-  if (page >= totalPages - 3) return [1, '…', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-  return [1, '…', page - 1, page, page + 1, '…', totalPages];
 };
 
 // ── Assign Tags Modal ─────────────────────────────────────────────────────────
@@ -203,198 +200,7 @@ const AssignTagsModal: React.FC<AssignTagsModalProps> = ({
   );
 };
 
-// ── Upload Modal ──────────────────────────────────────────────────────────────
-
-interface UploadModalProps {
-  isOpen: boolean;
-  sreniById: Map<string, string>;
-  onClose: () => void;
-  onUploaded: (inserted: number) => void;
-}
-
-const UploadModal: React.FC<UploadModalProps> = ({ isOpen, sreniById, onClose, onUploaded }) => {
-  const { addToast } = useToast();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [fileName, setFileName] = useState('');
-  const [duplicates, setDuplicates] = useState<GlobalContactUploadDuplicateApi[]>([]);
-  const [uploadDone, setUploadDone] = useState(false);
-  const [insertedCount, setInsertedCount] = useState(0);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setFileName('');
-      setDuplicates([]);
-      setUploadDone(false);
-      setInsertedCount(0);
-    }
-  }, [isOpen]);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFileName(e.target.files?.[0]?.name ?? '');
-    setDuplicates([]);
-    setUploadDone(false);
-  };
-
-  const handleUpload = async () => {
-    const file = fileRef.current?.files?.[0];
-    if (!file) return;
-    setIsUploading(true);
-    try {
-      const result = await backendApi.uploadGlobalContacts(file);
-      setInsertedCount(result.inserted);
-      setDuplicates(result.duplicates);
-      setUploadDone(true);
-      onUploaded(result.inserted);
-      if (result.duplicates.length === 0) {
-        addToast(`Uploaded ${result.inserted} contact${result.inserted !== 1 ? 's' : ''}.`, 'success');
-        onClose();
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? (err.message.match(/^API error \(\d+\):\s*(.*)$/i)?.[1] ?? err.message) : 'Upload failed.';
-      addToast(msg, 'error');
-    } finally {
-      setIsUploading(false);
-      if (fileRef.current) fileRef.current.value = '';
-    }
-  };
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Upload Contacts" maxWidth="500px">
-      {!uploadDone ? (
-        <div style={{ display: 'grid', gap: '18px' }}>
-          <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary-dark)', margin: 0 }}>
-            Upload an Excel file (.xlsx / .xls). Contacts with a matching <strong>Personal Number</strong> already in the system will be flagged as duplicates and skipped — new contacts will be added to the global list.
-          </p>
-
-          <div>
-            <label className="form-label">Excel File</label>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ fontSize: '0.84rem', whiteSpace: 'nowrap' }}
-                disabled={isUploading}
-                onClick={() => fileRef.current?.click()}
-              >
-                Choose file
-              </button>
-              <span style={{ fontSize: '0.82rem', color: fileName ? 'var(--text-primary-dark)' : 'var(--text-secondary-dark)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {fileName || 'No file selected'}
-              </span>
-            </div>
-            <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleFileChange} />
-          </div>
-
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isUploading}>Cancel</button>
-            <a href="/templates/master-sreni-contact-template.xlsx" download className="btn btn-secondary" style={{ fontSize: '0.84rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
-              Template
-            </a>
-            <button
-              type="button"
-              className="btn btn-primary"
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-              disabled={!fileName || isUploading}
-              onClick={() => void handleUpload()}
-            >
-              {isUploading
-                ? <><span style={{ display: 'inline-block', width: '13px', height: '13px', border: '2px solid #fff4', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />Uploading…</>
-                : 'Upload'}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gap: '16px' }}>
-          {/* Summary */}
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <span className="badge badge-success" style={{ padding: '5px 12px', fontSize: '0.82rem' }}>
-              {insertedCount} inserted
-            </span>
-            {duplicates.length > 0 && (
-              <span className="badge badge-warning" style={{ padding: '5px 12px', fontSize: '0.82rem' }}>
-                {duplicates.length} duplicate{duplicates.length !== 1 ? 's' : ''} skipped
-              </span>
-            )}
-          </div>
-
-          {/* Duplicate list */}
-          {duplicates.length > 0 && (
-            <>
-              <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary-dark)', margin: 0 }}>
-                The following rows were skipped because a contact with the same Personal Number already exists:
-              </p>
-              <div style={{ maxHeight: '260px', overflowY: 'auto', border: '1px solid var(--border-dark)', borderRadius: '8px' }}>
-                <table className="custom-table" style={{ fontSize: '0.8rem' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ width: '48px' }}>Row</th>
-                      <th>Name</th>
-                      <th>Personal No.</th>
-                      <th>Existing Sreni</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {duplicates.map((d) => (
-                      <tr key={`${d.rowIndex}-${d.personalNumber}`}>
-                        <td style={{ textAlign: 'center', color: 'var(--text-secondary-dark)' }}>{d.rowIndex}</td>
-                        <td>{d.name ?? <span style={{ opacity: 0.4 }}>—</span>}</td>
-                        <td style={{ fontFamily: 'monospace' }}>{d.personalNumber ?? <span style={{ opacity: 0.4 }}>—</span>}</td>
-                        <td>
-                          {d.existingSreniId
-                            ? <span style={{ fontSize: '0.75rem', fontWeight: 600, background: 'rgba(99,102,241,0.1)', color: '#818cf8', padding: '2px 7px', borderRadius: '4px' }}>
-                                {sreniById.get(d.existingSreniId) ?? d.existingSreniId}
-                              </span>
-                            : <span style={{ opacity: 0.4 }}>—</span>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button type="button" className="btn btn-primary" onClick={onClose}>Done</button>
-          </div>
-        </div>
-      )}
-    </Modal>
-  );
-};
-
 // ── Main Page ─────────────────────────────────────────────────────────────────
-
-const MASTER_CONTACT_COLUMNS: Array<{ key: string; label: string }> = [
-  { key: 'name', label: 'Name' },
-  { key: 'personalNumber', label: 'Personal Number' },
-  { key: 'updatesAsPerAug2024', label: 'Updates as per Aug2024' },
-  { key: 'ss', label: 'SS' },
-  { key: 'companyMobileNo2', label: 'Company Mobile No 2' },
-  { key: 'bhag', label: 'Bhag' },
-  { key: 'samithi', label: 'Samithi' },
-  { key: 'samithiStatus', label: 'Samithi Status' },
-  { key: 'balabarathi', label: 'Balabarathi' },
-  { key: 'bbStatus', label: 'BB Status' },
-  { key: 'yoga', label: 'Yoga' },
-  { key: 'familyOrBachelor', label: 'Family / Bachelor' },
-  { key: 'family', label: 'Family' },
-  { key: 'bachelor', label: 'Bachelor' },
-  { key: 'addressInUae', label: 'Address in UAE' },
-  { key: 'company', label: 'Company' },
-  { key: 'profession', label: 'Profession' },
-  { key: 'wifeName', label: 'Wife Name' },
-  { key: 'mobileNo4', label: 'Mobile No 4' },
-  { key: 'landLine', label: 'Land Line' },
-  { key: 'zoneOrLandmark', label: 'Zone / Land Mark' },
-  { key: 'district', label: 'District' },
-  { key: 'company8', label: 'Company8' },
-  { key: 'profession7', label: 'Profession7' },
-  { key: 'yogaSecondary', label: 'Yoga (Secondary)' },
-];
-
-const MASTER_CONTACT_COLUMN_LABELS = new Map(MASTER_CONTACT_COLUMNS.map((c) => [c.key, c.label]));
 
 export const GlobalContactsPage: React.FC = () => {
   const { addToast } = useToast();
@@ -430,6 +236,8 @@ export const GlobalContactsPage: React.FC = () => {
   const [isLoadingTags, setIsLoadingTags] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [editTarget, setEditTarget] = useState<SreniContactRowApi | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const pageSize = 50;
 
@@ -480,9 +288,7 @@ export const GlobalContactsPage: React.FC = () => {
         const colSet = new Set<string>();
         for (const r of res.items) Object.keys(r.data).forEach((k) => colSet.add(k));
         if (colSet.size > 0) {
-          const masterOrdered = MASTER_CONTACT_COLUMNS.map((c) => c.key).filter((k) => colSet.has(k));
-          const extras = Array.from(colSet).filter((k) => !MASTER_CONTACT_COLUMN_LABELS.has(k)).sort((a, b) => a.localeCompare(b));
-          setColumns([...masterOrdered, ...extras]);
+          setColumns(orderContactColumns(colSet));
         }
       })
       .catch((err) => addToast(toUiError(err, 'Failed to load contacts.'), 'error'))
@@ -577,6 +383,21 @@ export const GlobalContactsPage: React.FC = () => {
     }
   };
 
+  const handleSaveEdit = async (data: Record<string, string | number | boolean | null>) => {
+    if (!editTarget) return;
+    setIsSavingEdit(true);
+    try {
+      const updated = await backendApi.updateSreniContact(editTarget.sreniId, editTarget.id, data);
+      setRows((prev) => prev.map((r) => r.id !== editTarget.id ? r : { ...r, data: updated.data }));
+      setEditTarget(null);
+      addToast('Contact updated.', 'success');
+    } catch (err) {
+      addToast(toUiError(err, 'Failed to update contact.'), 'error');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   const handleDelete = async (row: SreniContactRowApi) => {
     const name = row.data['name'] != null ? String(row.data['name']) : 'this contact';
     const ok = await confirm({
@@ -626,11 +447,23 @@ export const GlobalContactsPage: React.FC = () => {
         onNeedDivisions={loadDivisions}
       />
 
-      <UploadModal
+      <ContactEditModal
+        isOpen={editTarget !== null}
+        title={editTarget?.data['name'] != null ? `Edit — ${String(editTarget.data['name'])}` : 'Edit Contact'}
+        fields={editTarget ? buildContactEditFields(columns, editTarget.data) : []}
+        data={editTarget?.data ?? {}}
+        isSaving={isSavingEdit}
+        onClose={() => setEditTarget(null)}
+        onSave={handleSaveEdit}
+      />
+
+      <ContactUploadModal
         isOpen={showUploadModal}
-        sreniById={sreniById}
+        description={GLOBAL_CONTACT_UPLOAD_DESCRIPTION}
+        duplicateSreniById={sreniById}
         onClose={() => setShowUploadModal(false)}
-        onUploaded={(_inserted) => {
+        onUpload={(file) => backendApi.uploadGlobalContacts(file)}
+        onUploaded={() => {
           setPage(1);
           load(1, filterSreniId, filterSthanId, appliedSearch);
         }}
@@ -655,7 +488,6 @@ export const GlobalContactsPage: React.FC = () => {
             <button
               type="button"
               className="btn btn-primary"
-              style={{ fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '6px' }}
               onClick={() => setShowUploadModal(true)}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -681,9 +513,9 @@ export const GlobalContactsPage: React.FC = () => {
               onChange={(e) => setSearchText(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') setAppliedSearch(searchText); }}
             />
-            <button type="button" className="btn btn-secondary" style={{ fontSize: '0.82rem' }} onClick={() => setAppliedSearch(searchText)}>Search</button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAppliedSearch(searchText)}>Search</button>
             {appliedSearch && (
-              <button type="button" className="btn btn-secondary" style={{ fontSize: '0.82rem' }} onClick={() => { setSearchText(''); setAppliedSearch(''); }}>✕</button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setSearchText(''); setAppliedSearch(''); }}>✕</button>
             )}
           </div>
         </div>
@@ -755,7 +587,7 @@ export const GlobalContactsPage: React.FC = () => {
                   {visibleCols.map((k) => (
                     <th key={k} style={{ whiteSpace: 'nowrap' }}>{MASTER_CONTACT_COLUMN_LABELS.get(k) ?? k}</th>
                   ))}
-                  <th style={{ width: '140px' }} />
+                  <th style={{ width: '56px' }} />
                 </tr>
               </thead>
               <tbody>
@@ -812,35 +644,20 @@ export const GlobalContactsPage: React.FC = () => {
                               </td>
                             );
                           })}
-                          <td style={{ whiteSpace: 'nowrap' }}>
-                            <div style={{ display: 'flex', gap: '5px' }}>
-                              <button
-                                type="button"
-                                className="btn btn-secondary"
-                                style={{ padding: '4px 9px', fontSize: '0.78rem' }}
-                                onClick={() => void openAssign(row)}
-                              >
-                                Assign
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-secondary"
-                                style={{ padding: '4px 9px', fontSize: '0.78rem', color: isInactive ? 'var(--success)' : 'var(--warning)', borderColor: isInactive ? 'var(--success)' : 'var(--warning)' }}
-                                onClick={() => void handleToggleActive(row)}
-                                title={isInactive ? 'Reactivate' : 'Deactivate'}
-                              >
-                                {isInactive ? 'Activate' : 'Deactivate'}
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-secondary"
-                                style={{ padding: '4px 9px', fontSize: '0.78rem', color: 'var(--error)', borderColor: 'var(--error)' }}
-                                onClick={() => void handleDelete(row)}
-                                title="Delete permanently"
-                              >
-                                Delete
-                              </button>
-                            </div>
+                          <td style={{ textAlign: 'right', verticalAlign: 'middle' }}>
+                            <TableRowActionsMenu
+                              ariaLabel={`Actions for ${row.data['name'] != null ? String(row.data['name']) : 'contact'}`}
+                              actions={[
+                                { label: 'Edit', onClick: () => setEditTarget(row) },
+                                { label: 'Assign', onClick: () => void openAssign(row) },
+                                {
+                                  label: isInactive ? 'Activate' : 'Deactivate',
+                                  tone: isInactive ? 'success' : 'warning',
+                                  onClick: () => void handleToggleActive(row),
+                                },
+                                { label: 'Delete', tone: 'danger', onClick: () => void handleDelete(row) },
+                              ]}
+                            />
                           </td>
                         </tr>
                       );
@@ -849,20 +666,13 @@ export const GlobalContactsPage: React.FC = () => {
             </table>
           </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (() => {
-            const nums = buildPageNums(page, totalPages);
-            return (
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '20px 0', flexWrap: 'wrap' }}>
-                <button className="btn btn-secondary" style={{ padding: '6px 14px', fontSize: '0.82rem' }} disabled={page <= 1} onClick={() => { const p = page - 1; setPage(p); load(p, filterSreniId, filterSthanId, appliedSearch); }}>← Prev</button>
-                {nums.map((n, i) => n === '…'
-                  ? <span key={`e-${i}`} style={{ padding: '6px 4px', color: 'var(--text-secondary-dark)' }}>…</span>
-                  : <button key={n} className={`btn ${page === n ? 'btn-primary' : 'btn-secondary'}`} style={{ padding: '6px 12px', fontSize: '0.82rem', minWidth: '36px' }} onClick={() => { const p = n as number; setPage(p); load(p, filterSreniId, filterSthanId, appliedSearch); }}>{n}</button>
-                )}
-                <button className="btn btn-secondary" style={{ padding: '6px 14px', fontSize: '0.82rem' }} disabled={page >= totalPages} onClick={() => { const p = page + 1; setPage(p); load(p, filterSreniId, filterSthanId, appliedSearch); }}>Next →</button>
-              </div>
-            );
-          })()}
+          <PaginationBar
+            page={page}
+            totalPages={totalPages}
+            totalItems={total}
+            pageSize={pageSize}
+            onPageChange={(p) => { setPage(p); load(p, filterSreniId, filterSthanId, appliedSearch); }}
+          />
         </>
       )}
     </div>

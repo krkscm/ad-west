@@ -51,6 +51,7 @@ export const UsersFormPage: React.FC<UsersFormPageProps> = ({ editingUser, onBac
   const [changePassword, setChangePassword] = useState(false);
   const [formPassword, setFormPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const [reportingDropdownOpen, setReportingDropdownOpen] = useState(false);
   const [dropdownRect, setDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const reportingTriggerRef = useRef<HTMLButtonElement>(null);
@@ -252,9 +253,31 @@ export const UsersFormPage: React.FC<UsersFormPageProps> = ({ editingUser, onBac
                   {changePassword && (
                     <div>
                       <label className="form-label">New Password *</label>
-                      <input className="form-input" type="password" value={formPassword}
-                        onChange={(e) => setFormPassword(e.target.value)}
-                        placeholder="Minimum 8 characters" minLength={8} required autoFocus />
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          className="form-input"
+                          type={showChangePassword ? 'text' : 'password'}
+                          value={formPassword}
+                          onChange={(e) => setFormPassword(e.target.value)}
+                          placeholder="Minimum 8 characters"
+                          minLength={8}
+                          required
+                          autoFocus
+                          style={{ paddingRight: '48px' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowChangePassword(p => !p)}
+                          style={{
+                            position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                            background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
+                            color: 'var(--text-secondary-dark)', fontSize: '1rem', lineHeight: 1,
+                          }}
+                          aria-label={showChangePassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showChangePassword ? '🙈' : '👁️'}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

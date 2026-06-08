@@ -93,7 +93,7 @@ const LocationReportMetricsPanel: React.FC = () => {
           </p>
         </div>
         {!showForm && (
-          <button type="button" className="btn btn-primary" style={{ fontSize: '0.875rem' }} onClick={openCreate}>
+          <button type="button" className="btn btn-primary" onClick={openCreate}>
             + Add Metric
           </button>
         )}
@@ -170,7 +170,7 @@ const LocationReportMetricsPanel: React.FC = () => {
                 </div>
                 {m.description && <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>{m.description}</p>}
               </div>
-              <button type="button" className="btn btn-secondary" style={{ padding: '5px 12px', fontSize: '0.8rem', whiteSpace: 'nowrap' }} onClick={() => openEdit(m)}>
+              <button type="button" className="btn btn-secondary btn-sm" style={{ whiteSpace: 'nowrap' }} onClick={() => openEdit(m)}>
                 ✏️ Edit
               </button>
             </div>

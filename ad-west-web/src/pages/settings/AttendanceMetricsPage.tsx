@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import { useToast } from '../../components/common/Toast';
+import { PageHeader } from '../../components/common/PageHeader';
 import { AttendanceMetricApi, backendApi, SreniDefinitionApi } from '../../utils/backendApi';
+import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
 
 interface AttendanceMetricFormState {
   name: string;
@@ -286,12 +288,11 @@ export const AttendanceMetricsPage: React.FC = () => {
 
   return (
     <div className="animate-slide-up">
-      <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>📏 Attendance Config</h2>
-        <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginTop: '4px', marginBottom: 0 }}>
-          Configure attendance metrics per Sreni using the same settings workflow as report configuration.
-        </p>
-      </div>
+      <PageHeader
+        icon="📏"
+        title="Attendance Config"
+        subtitle="Configure attendance metrics per Sreni using the same settings workflow as report configuration."
+      />
 
       <div
         className="glass-panel"
@@ -356,7 +357,7 @@ export const AttendanceMetricsPage: React.FC = () => {
               </div>
             </div>
             {!isFormOpen && (
-              <button type="button" className="btn btn-primary" style={{ fontSize: '0.875rem' }} onClick={() => void openAdd()}>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => void openAdd()}>
                 + Add Metric
               </button>
             )}
@@ -418,7 +419,7 @@ export const AttendanceMetricsPage: React.FC = () => {
                       aria-invalid={Boolean(formErrors.keys)}
                       style={formErrors.keys ? { borderColor: 'var(--error)' } : undefined}
                     />
-                    <button type="button" className="btn btn-secondary" onClick={addDraftKey}>Add Key</button>
+                    <button type="button" className="btn btn-secondary btn-md" onClick={addDraftKey}>Add Key</button>
                   </div>
 
                   {form.keys.length > 0 ? (
@@ -519,8 +520,8 @@ export const AttendanceMetricsPage: React.FC = () => {
                 </div>
 
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                  <button type="button" className="btn btn-secondary" onClick={() => void closeForm()}>Cancel</button>
-                  <button type="submit" className="btn btn-primary" disabled={isSaving}>
+                  <button type="button" className="btn btn-secondary btn-md" onClick={() => void closeForm()}>Cancel</button>
+                  <button type="submit" className="btn btn-primary btn-md" disabled={isSaving}>
                     {isSaving ? 'Saving...' : editingId ? 'Save Changes' : 'Add Metric'}
                   </button>
                 </div>
@@ -535,7 +536,7 @@ export const AttendanceMetricsPage: React.FC = () => {
               <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', maxWidth: '360px', margin: '0 auto 16px' }}>
                 Add attendance metrics that users will fill during event attendance capture.
               </p>
-              <button type="button" className="btn btn-primary" style={{ fontSize: '0.875rem' }} onClick={() => void openAdd()}>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => void openAdd()}>
                 Add First Metric
               </button>
             </div>
@@ -584,15 +585,14 @@ export const AttendanceMetricsPage: React.FC = () => {
                           {metric.active ? 'Active' : 'Inactive'}
                         </button>
                       </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                          <button type="button" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.82rem' }} onClick={() => void openEdit(metric)}>
-                            Edit
-                          </button>
-                          <button type="button" className="btn btn-danger" style={{ padding: '6px 12px', fontSize: '0.82rem' }} onClick={() => void handleDelete(metric)}>
-                            Delete
-                          </button>
-                        </div>
+                      <td style={{ textAlign: 'right', verticalAlign: 'middle', width: '56px' }}>
+                        <TableRowActionsMenu
+                          ariaLabel={`Actions for ${metric.name}`}
+                          actions={[
+                            { label: 'Edit', onClick: () => void openEdit(metric) },
+                            { label: 'Delete', tone: 'danger', onClick: () => void handleDelete(metric) },
+                          ]}
+                        />
                       </td>
                     </tr>
                   ))}

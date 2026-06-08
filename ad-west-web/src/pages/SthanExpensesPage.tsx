@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { backendApi, SthanExpenseApi, SthanExpenseCategory } from '../utils/backendApi';
 import { useAuth } from '../context/auth-context';
+import { TableRowActionsMenu } from '../components/common/TableRowActionsMenu';
 import { useToast } from '../components/common/Toast';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { SwitchToggle } from '../components/common/SwitchToggle';
 import { useEnumOptions } from '../hooks/useEnumOptions';
+import { PageHeader } from '../components/common/PageHeader';
 
 interface Props {
   locationId: string;
@@ -119,32 +121,26 @@ export const SthanExpensesPage: React.FC<Props> = ({ locationId, locationName })
 
   return (
     <div className="animate-slide-up">
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>💰 {locationName} — Expenses</h2>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginTop: '4px', marginBottom: 0 }}>
-            Expense requests for this sthan.
-          </p>
-          <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <span className="badge badge-info" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid currentColor', background: 'transparent', fontSize: '0.8rem', fontWeight: 600 }}>
-              <span style={{ fontWeight: 800 }}>{items.length}</span> {items.length === 1 ? 'Record' : 'Records'}
-            </span>
-          </div>
-        </div>
-        {!showForm && (
-          <button type="button" className="btn btn-primary" style={{ fontSize: '0.875rem' }} onClick={() => setShowForm(true)}>
+      <PageHeader
+        icon="💰"
+        title={`${locationName} — Expenses`}
+        subtitle="Expense requests for this sthan."
+        stats={[
+          { label: items.length === 1 ? 'Record' : 'Records', value: items.length, variant: 'info' },
+        ]}
+        actions={!showForm ? (
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
             + New Expense
           </button>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       {/* Create form */}
       {showForm && (
         <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px', borderLeft: '3px solid var(--primary)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
             <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>New Expense Request</h4>
-            <button type="button" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.82rem' }} onClick={() => { setShowForm(false); setForm(BLANK); }}>Cancel</button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setShowForm(false); setForm(BLANK); }}>Cancel</button>
           </div>
           <form onSubmit={(e) => void handleCreate(e)}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '14px' }}>
@@ -182,8 +178,8 @@ export const SthanExpensesPage: React.FC<Props> = ({ locationId, locationName })
               />
             </div>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button type="button" className="btn btn-secondary" onClick={() => { setShowForm(false); setForm(BLANK); }}>Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={saving}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setShowForm(false); setForm(BLANK); }}>Cancel</button>
+              <button type="submit" className="btn btn-primary btn-sm" disabled={saving}>
                 {saving ? 'Saving…' : form.asDraft ? 'Save as Draft' : 'Submit Expense'}
               </button>
             </div>
@@ -196,7 +192,7 @@ export const SthanExpensesPage: React.FC<Props> = ({ locationId, locationName })
         <div className="glass-panel" style={{ padding: '20px', marginBottom: '20px', borderLeft: '3px solid var(--warning)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
             <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>Review: {selected.description}</h4>
-            <button type="button" className="btn btn-secondary" style={{ padding: '5px 10px', fontSize: '0.8rem' }} onClick={() => { setSelected(null); setReviewNotes(''); }}>Close</button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setSelected(null); setReviewNotes(''); }}>Close</button>
           </div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
             {(['approved', 'pending_review', 'rejected'] as const).map((s) => (
@@ -217,11 +213,14 @@ export const SthanExpensesPage: React.FC<Props> = ({ locationId, locationName })
         </div>
       )}
 
-      {/* Status filter */}
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
+      <div className="btn-group" style={{ marginBottom: '16px', flexWrap: 'wrap' }}>
         {statusFilters.map((f) => (
-          <button key={f.value} type="button" onClick={() => setFilterStatus(f.value)}
-            style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid', borderColor: filterStatus === f.value ? 'var(--primary)' : 'var(--border-dark)', background: filterStatus === f.value ? 'rgba(99,102,241,0.1)' : 'transparent', color: filterStatus === f.value ? 'var(--primary)' : 'var(--text-secondary-dark)', fontWeight: filterStatus === f.value ? 700 : 400, fontSize: '0.8rem', cursor: 'pointer' }}>
+          <button
+            key={f.value}
+            type="button"
+            className={`btn btn-sm ${filterStatus === f.value ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setFilterStatus(f.value)}
+          >
             {f.label}
           </button>
         ))}
@@ -270,19 +269,14 @@ export const SthanExpensesPage: React.FC<Props> = ({ locationId, locationName })
                   <td style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)', whiteSpace: 'nowrap' }}>
                     {new Date(item.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </td>
-                  <td>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
-                      {isZoneOrSuper && item.status === 'submitted' && (
-                        <button type="button" className="btn btn-secondary" style={{ padding: '5px 10px', fontSize: '0.8rem' }} onClick={() => { setSelected(item); setReviewStatus('approved'); setReviewNotes(''); }}>
-                          Review
-                        </button>
-                      )}
-                      {(item.status === 'draft' || item.status === 'rejected') && (
-                        <button type="button" className="btn btn-secondary" style={{ padding: '5px 10px', fontSize: '0.8rem', color: 'var(--error)', borderColor: 'rgba(239,68,68,0.2)' }} onClick={() => void handleDelete(item)}>
-                          Delete
-                        </button>
-                      )}
-                    </div>
+                  <td style={{ textAlign: 'right', verticalAlign: 'middle', width: '56px' }}>
+                    <TableRowActionsMenu
+                      ariaLabel={`Actions for expense ${item.id}`}
+                      actions={[
+                        ...(isZoneOrSuper && item.status === 'submitted' ? [{ label: 'Review', onClick: () => { setSelected(item); setReviewStatus('approved'); setReviewNotes(''); } }] : []),
+                        ...((item.status === 'draft' || item.status === 'rejected') ? [{ label: 'Delete', tone: 'danger' as const, onClick: () => void handleDelete(item) }] : []),
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}

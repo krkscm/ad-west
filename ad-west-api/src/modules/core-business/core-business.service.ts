@@ -1593,6 +1593,14 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getSreniAdminRuntime().listAllContacts(page, pageSize);
   }
 
+  async updateContactData(
+    sreniId: string,
+    contactId: string,
+    data: Record<string, string | number | boolean | null>,
+  ): Promise<SreniContactRecord> {
+    return this.getSreniAdminRuntime().updateContactData(sreniId, contactId, data);
+  }
+
   async toggleContactActive(sreniId: string, contactId: string, active: boolean): Promise<SreniContactRecord> {
     return this.getSreniAdminRuntime().toggleContactActive(sreniId, contactId, active);
   }
@@ -1798,6 +1806,14 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
 
   async clearSthanContacts(locationId: string): Promise<{ deleted: number }> {
     return this.getSthanRuntime().clearSthanContacts(locationId);
+  }
+
+  async updateSthanContact(
+    locationId: string,
+    contactId: string,
+    data: Record<string, string | number | boolean | null>,
+  ): Promise<SthanContactRecord> {
+    return this.getSthanRuntime().updateSthanContact(locationId, contactId, data);
   }
 
   async listSthanCalendarEvents(locationId: string): Promise<SthanCalendarEventRecord[]> {

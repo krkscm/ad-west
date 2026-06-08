@@ -1,8 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToast } from '../components/common/Toast';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { Modal } from '../components/common/Modal';
+import { ContactEditModal } from '../components/common/ContactEditModal';
+import { ContactUploadModal, SRENI_CONTACT_UPLOAD_DESCRIPTION } from '../components/common/ContactUploadModal';
+import { TableRowActionsMenu } from '../components/common/TableRowActionsMenu';
 import { TableLayoutModal } from '../components/common/TableLayoutModal';
+import { PageHeader, PageStat } from '../components/common/PageHeader';
+import { PaginationBar } from '../components/common/PaginationBar';
+import { buildContactEditFields, MASTER_CONTACT_COLUMN_LABELS, orderContactColumns } from '../constants/contactColumns';
 import { backendApi, HouseholdMemberApi, HouseholdResolverKey, SreniContactRowApi, SreniDivisionApi, SthanBasicApi } from '../utils/backendApi';
 import { useTableLayout } from '../hooks/useTableLayout';
 
@@ -10,38 +16,6 @@ interface Props {
   sreniId: string;
   sreniName: string;
 }
-
-const MASTER_CONTACT_COLUMNS: Array<{ key: string; label: string }> = [
-  { key: 'name', label: 'Name' },
-  { key: 'personalNumber', label: 'Personal Number' },
-  { key: 'updatesAsPerAug2024', label: 'Updates as per Aug2024' },
-  { key: 'ss', label: 'SS' },
-  { key: 'companyMobileNo2', label: 'Company Mobile No 2' },
-  { key: 'bhag', label: 'Bhag' },
-  { key: 'samithi', label: 'Samithi' },
-  { key: 'samithiStatus', label: 'Samithi Status' },
-  { key: 'balabarathi', label: 'Balabarathi' },
-  { key: 'bbStatus', label: 'BB Status' },
-  { key: 'yoga', label: 'Yoga' },
-  { key: 'familyOrBachelor', label: 'Family / Bachelor' },
-  { key: 'family', label: 'Family' },
-  { key: 'bachelor', label: 'Bachelor' },
-  { key: 'addressInUae', label: 'Address in UAE' },
-  { key: 'company', label: 'Company' },
-  { key: 'profession', label: 'Profession' },
-  { key: 'wifeName', label: 'Wife Name' },
-  { key: 'mobileNo4', label: 'Mobile No 4' },
-  { key: 'landLine', label: 'Land Line' },
-  { key: 'zoneOrLandmark', label: 'Zone / Land Mark' },
-  { key: 'district', label: 'District' },
-  { key: 'company8', label: 'Company8' },
-  { key: 'profession7', label: 'Profession7' },
-  { key: 'yogaSecondary', label: 'Yoga (Secondary)' },
-];
-
-const MASTER_CONTACT_COLUMN_LABELS = new Map<string, string>(
-  MASTER_CONTACT_COLUMNS.map((column) => [column.key, column.label]),
-);
 
 const toUiError = (error: unknown, fallback: string): string => {
   if (!(error instanceof Error)) return fallback;
@@ -369,8 +343,8 @@ const HouseholdMembersModal: React.FC<HouseholdMembersModalProps> = ({
                             </select>
                           )}
                           <div style={{ display: 'flex', gap: '8px' }}>
-                            <button type="button" className="btn btn-primary" style={{ fontSize: '0.82rem' }} onClick={() => void handleSaveEdit(child.id)} disabled={saving}>Save</button>
-                            <button type="button" className="btn btn-secondary" style={{ fontSize: '0.82rem' }} onClick={() => setEditingId(null)}>Cancel</button>
+                            <button type="button" className="btn btn-primary btn-sm" onClick={() => void handleSaveEdit(child.id)} disabled={saving}>Save</button>
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingId(null)}>Cancel</button>
                           </div>
                         </div>
                       ) : (
@@ -380,8 +354,8 @@ const HouseholdMembersModal: React.FC<HouseholdMembersModalProps> = ({
                           {divisionName && (
                             <span style={{ fontSize: '0.72rem', fontWeight: 600, background: 'rgba(99,102,241,0.1)', color: '#818cf8', padding: '2px 8px', borderRadius: '5px' }}>{divisionName}</span>
                           )}
-                          <button type="button" className="btn btn-secondary" style={{ fontSize: '0.78rem', padding: '4px 8px' }} onClick={() => { setEditingId(child.id); setEditName(child.name); setEditDob(child.dateOfBirth ?? ''); setEditDivisionId(divisionId); }}>Edit</button>
-                          <button type="button" className="btn btn-secondary" style={{ fontSize: '0.78rem', padding: '4px 8px', color: 'var(--error)', borderColor: 'var(--error)' }} onClick={() => void handleDeleteChild(child)}>Remove</button>
+                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setEditingId(child.id); setEditName(child.name); setEditDob(child.dateOfBirth ?? ''); setEditDivisionId(divisionId); }}>Edit</button>
+                          <button type="button" className="btn btn-danger-outline btn-xs" onClick={() => void handleDeleteChild(child)}>Remove</button>
                         </div>
                       )}
                     </div>
@@ -402,7 +376,7 @@ const HouseholdMembersModal: React.FC<HouseholdMembersModalProps> = ({
               ) : (
                 <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--error)' }}>Create divisions first (Manage Divisions).</p>
               )}
-              <button type="button" className="btn btn-primary" style={{ fontSize: '0.84rem' }} onClick={() => void handleAddChild()} disabled={saving}>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => void handleAddChild()} disabled={saving}>
                 {saving ? 'Saving…' : 'Add Child'}
               </button>
             </div>
@@ -426,7 +400,7 @@ const HouseholdMembersModal: React.FC<HouseholdMembersModalProps> = ({
                       <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>{member.phone ?? String(contact?.data['personalNumber'] ?? '')}</span>
                     )}
                     {member.source === 'manual' && (
-                      <button type="button" className="btn btn-secondary" style={{ fontSize: '0.78rem', padding: '4px 8px', color: 'var(--error)', borderColor: 'var(--error)' }} onClick={() => void handleDeleteFemaleMember(member)}>Remove</button>
+                      <button type="button" className="btn btn-danger-outline btn-xs" onClick={() => void handleDeleteFemaleMember(member)}>Remove</button>
                     )}
                   </div>
                 ))}
@@ -437,7 +411,7 @@ const HouseholdMembersModal: React.FC<HouseholdMembersModalProps> = ({
               <p style={{ margin: 0, fontSize: '0.8rem', fontWeight: 600 }}>Add female participant</p>
               <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>For single mothers, widows, or other female members not in the Excel spouse field.</p>
               <input className="form-input" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Name" disabled={saving} />
-              <button type="button" className="btn btn-primary" style={{ fontSize: '0.84rem' }} onClick={() => void handleAddFemaleMember()} disabled={saving}>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => void handleAddFemaleMember()} disabled={saving}>
                 {saving ? 'Saving…' : 'Add Participant'}
               </button>
             </div>
@@ -575,14 +549,14 @@ const DivisionsModal: React.FC<DivisionsModalProps> = ({ isOpen, sreniId, divisi
                     autoFocus
                     disabled={saving}
                   />
-                  <button type="button" className="btn btn-primary" style={{ fontSize: '0.82rem', padding: '6px 12px' }} onClick={() => void handleSaveEdit(d.id)} disabled={saving}>Save</button>
-                  <button type="button" className="btn btn-secondary" style={{ fontSize: '0.82rem', padding: '6px 12px' }} onClick={() => setEditingId(null)}>Cancel</button>
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => void handleSaveEdit(d.id)} disabled={saving}>Save</button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingId(null)}>Cancel</button>
                 </>
               ) : (
                 <>
                   <span style={{ flex: 1, fontWeight: 500, fontSize: '0.9rem', color: 'var(--text-primary-dark)' }}>{d.name}</span>
-                  <button type="button" className="btn btn-secondary" style={{ fontSize: '0.82rem', padding: '6px 12px' }} onClick={() => { setEditingId(d.id); setEditName(d.name); }}>Edit</button>
-                  <button type="button" className="btn btn-secondary" style={{ fontSize: '0.82rem', padding: '6px 12px', color: 'var(--error)', borderColor: 'var(--error)' }} onClick={() => void handleDelete(d.id, d.name)}>Delete</button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setEditingId(d.id); setEditName(d.name); }}>Edit</button>
+                  <button type="button" className="btn btn-danger-outline btn-sm" onClick={() => void handleDelete(d.id, d.name)}>Delete</button>
                 </>
               )}
             </div>
@@ -597,23 +571,13 @@ const DivisionsModal: React.FC<DivisionsModalProps> = ({ isOpen, sreniId, divisi
   );
 };
 
-// ── Pagination helper ─────────────────────────────────────────────────────────
-
-const buildPageNums = (page: number, totalPages: number): (number | '…')[] => {
-  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
-  if (page <= 4) return [1, 2, 3, 4, 5, '…', totalPages];
-  if (page >= totalPages - 3) return [1, '…', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-  return [1, '…', page - 1, page, page + 1, '…', totalPages];
-};
-
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) => {
   const { addToast } = useToast();
   const confirm = useConfirm();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   const [showLayoutModal, setShowLayoutModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   // ── Table layout ──
   const sreniLayout = useTableLayout('sreni-contacts');
@@ -626,7 +590,6 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
   const [isLoading, setIsLoading] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const [sourceFile, setSourceFile] = useState<string | null>(null);
   const [divisions, setDivisions] = useState<SreniDivisionApi[]>([]);
   const [showDivisionsModal, setShowDivisionsModal] = useState(false);
@@ -638,6 +601,8 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
   const [femaleGenderMatches, setFemaleGenderMatches] = useState<string[]>(['f', 'female', 'woman', 'women']);
   const [participantTotal, setParticipantTotal] = useState(0);
   const [isSavingAssign, setIsSavingAssign] = useState(false);
+  const [editTarget, setEditTarget] = useState<SreniContactRowApi | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const memberEnrollment = enrollmentScope === 'MEMBER' || resolverKey === 'enrolled_children';
   const femaleParticipantsMode = resolverKey === 'female_participants';
@@ -676,9 +641,7 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
         const colSet = new Set<string>();
         for (const r of res.items) Object.keys(r.data).forEach((k) => colSet.add(k));
         if (colSet.size > 0) {
-          const masterOrdered = MASTER_CONTACT_COLUMNS.map((c) => c.key).filter((k) => colSet.has(k));
-          const extras = Array.from(colSet).filter((k) => !MASTER_CONTACT_COLUMN_LABELS.has(k)).sort((a, b) => a.localeCompare(b));
-          setColumns([...masterOrdered, ...extras]);
+          setColumns(orderContactColumns(colSet));
         }
         if (res.items.length > 0 && res.items[0].sourceFile) setSourceFile(res.items[0].sourceFile);
       })
@@ -699,23 +662,6 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
     loadDivisions();
   }, [sreniId, load, loadDivisions]);
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
-    setIsUploading(true);
-    try {
-      const result = await backendApi.uploadSreniContacts(sreniId, file);
-      addToast(`Uploaded ${result.inserted} contact${result.inserted !== 1 ? 's' : ''} from "${file.name}".`, 'success');
-      setPage(1);
-      load(1);
-    } catch (err) {
-      addToast(toUiError(err, 'Upload failed.'), 'error');
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
   const handleClear = async () => {
     const ok = await confirm({
       title: 'Clear Contact List',
@@ -730,6 +676,21 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
       setRows([]); setColumns([]); setTotal(0); setTotalPages(1); setSourceFile(null);
     } catch (err) {
       addToast(toUiError(err, 'Failed to clear contacts.'), 'error');
+    }
+  };
+
+  const handleSaveEdit = async (data: Record<string, string | number | boolean | null>) => {
+    if (!editTarget) return;
+    setIsSavingEdit(true);
+    try {
+      const updated = await backendApi.updateSreniContact(editTarget.sreniId, editTarget.id, data);
+      setRows((prev) => prev.map((r) => r.id !== editTarget.id ? r : { ...r, data: updated.data }));
+      setEditTarget(null);
+      addToast('Contact updated.', 'success');
+    } catch (err) {
+      addToast(toUiError(err, 'Failed to update contact.'), 'error');
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -757,24 +718,26 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
     }
   };
 
-  const renderPagination = (
-    currentPage: number,
-    currentTotalPages: number,
-    onPageChange: (p: number) => void,
-  ) => {
-    if (currentTotalPages <= 1) return null;
-    const nums = buildPageNums(currentPage, currentTotalPages);
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '20px 0', flexWrap: 'wrap' }}>
-        <button className="btn btn-secondary" style={{ padding: '6px 14px', fontSize: '0.82rem' }} disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)}>← Prev</button>
-        {nums.map((n, i) => n === '…'
-          ? <span key={`e-${i}`} style={{ padding: '6px 4px', color: 'var(--text-secondary-dark)' }}>…</span>
-          : <button key={n} className={`btn ${currentPage === n ? 'btn-primary' : 'btn-secondary'}`} style={{ padding: '6px 12px', fontSize: '0.82rem', minWidth: '36px' }} onClick={() => onPageChange(n as number)}>{n}</button>
-        )}
-        <button className="btn btn-secondary" style={{ padding: '6px 14px', fontSize: '0.82rem' }} disabled={currentPage >= currentTotalPages} onClick={() => onPageChange(currentPage + 1)}>Next →</button>
-      </div>
-    );
-  };
+  const headerStats = useMemo(() => {
+    const stats: PageStat[] = [
+      {
+        label: memberEnrollment || femaleParticipantsMode ? 'participants' : 'contacts',
+        value: memberEnrollment || femaleParticipantsMode ? participantTotal : total,
+        variant: 'info',
+      },
+    ];
+    if (memberEnrollment || femaleParticipantsMode) {
+      stats.push({
+        label: total !== 1 ? 'households' : 'household',
+        value: total,
+      });
+    }
+    stats.push({
+      label: divisions.length !== 1 ? 'divisions' : 'division',
+      value: divisions.length,
+    });
+    return stats;
+  }, [memberEnrollment, femaleParticipantsMode, participantTotal, total, divisions.length]);
 
   return (
     <div className="animate-slide-up">
@@ -806,6 +769,15 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
         onClose={() => setAssignTarget(null)}
         onSave={handleSaveAssign}
       />
+      <ContactEditModal
+        isOpen={editTarget !== null}
+        title={editTarget?.data['name'] != null ? `Edit — ${String(editTarget.data['name'])}` : 'Edit Contact'}
+        fields={editTarget ? buildContactEditFields(columns, editTarget.data) : []}
+        data={editTarget?.data ?? {}}
+        isSaving={isSavingEdit}
+        onClose={() => setEditTarget(null)}
+        onSave={handleSaveEdit}
+      />
       <HouseholdMembersModal
         isOpen={householdTarget !== null}
         sreniId={sreniId}
@@ -817,49 +789,38 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
         onClose={() => setHouseholdTarget(null)}
         onChanged={() => load(page)}
       />
+      <ContactUploadModal
+        isOpen={showUploadModal}
+        description={SRENI_CONTACT_UPLOAD_DESCRIPTION}
+        onClose={() => setShowUploadModal(false)}
+        onUpload={(file) => backendApi.uploadSreniContacts(sreniId, file)}
+        onUploaded={() => {
+          setPage(1);
+          load(1);
+        }}
+      />
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>📋 {sreniName} — Contacts</h2>
-          <div style={{ marginTop: '10px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <span className="badge badge-info" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid currentColor', background: 'transparent', fontSize: '0.8rem', fontWeight: 600 }}>
-              <span style={{ fontWeight: 800 }}>{memberEnrollment || femaleParticipantsMode ? participantTotal : total}</span>
-              {memberEnrollment || femaleParticipantsMode ? 'participants' : 'contacts'}
-            </span>
-            {(memberEnrollment || femaleParticipantsMode) && (
-              <span className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid var(--border-dark)', background: 'transparent', fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>
-                {total} household{total !== 1 ? 's' : ''}
-              </span>
-            )}
-            <span className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid var(--border-dark)', background: 'transparent', fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>
-              {divisions.length} division{divisions.length !== 1 ? 's' : ''}
-            </span>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button type="button" className="btn btn-secondary" style={{ fontSize: '0.875rem' }} onClick={() => setShowDivisionsModal(true)}>
+      <PageHeader
+        icon="📋"
+        title={`${sreniName} — Contacts`}
+        stats={headerStats}
+        actions={
+          <>
+            <button type="button" className="btn btn-secondary" onClick={() => setShowDivisionsModal(true)}>
               Manage Divisions
             </button>
-            <a href="/templates/master-sreni-contact-template.xlsx" download className="btn btn-secondary" style={{ fontSize: '0.875rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
-              Download Template
-            </a>
             {total > 0 && (
-              <button type="button" className="btn btn-secondary" onClick={handleClear} style={{ fontSize: '0.875rem', color: 'var(--error)', borderColor: 'var(--error)' }}>
+              <button type="button" className="btn btn-danger-outline" onClick={handleClear}>
                 Clear All
               </button>
             )}
-            <button type="button" className="btn btn-primary" style={{ fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
-              {isUploading ? (
-                <><span style={{ display: 'inline-block', width: '14px', height: '14px', border: '2px solid #fff4', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />Uploading…</>
-              ) : (
-                <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path></svg>{total > 0 ? 'Re-upload Excel' : 'Upload Excel'}</>
-              )}
+            <button type="button" className="btn btn-primary" onClick={() => setShowUploadModal(true)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path></svg>
+              Upload Contacts
             </button>
-            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={(e) => void handleUpload(e)} />
-          </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Columns button */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
@@ -889,7 +850,7 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
           <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', margin: '0 auto 24px', maxWidth: '400px' }}>
             Upload the master contact Excel template, or tag contacts from other Srenies to this Sreni via the global Contacts page.
           </p>
-          <button type="button" className="btn btn-primary" onClick={() => fileInputRef.current?.click()}>Upload Excel File</button>
+          <button type="button" className="btn btn-primary" onClick={() => setShowUploadModal(true)}>Upload Contacts</button>
         </div>
       ) : (
         <>
@@ -911,7 +872,7 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
                   {isLoading && columns.length === 0 ? <th>Loading…</th> : visibleSreniCols.map((col) => (
                     <th key={col} style={{ whiteSpace: 'nowrap' }}>{MASTER_CONTACT_COLUMN_LABELS.get(col) ?? col}</th>
                   ))}
-                  <th style={{ width: '140px' }} />
+                  <th style={{ width: '56px' }} />
                 </tr>
               </thead>
               <tbody>
@@ -975,25 +936,15 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
                           </td>
                         );
                       })}
-                      <td style={{ whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            style={{ padding: '4px 10px', fontSize: '0.8rem' }}
-                            onClick={() => setHouseholdTarget(row)}
-                          >
-                            Household
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            style={{ padding: '4px 10px', fontSize: '0.8rem' }}
-                            onClick={() => setAssignTarget(row)}
-                          >
-                            Assign
-                          </button>
-                        </div>
+                      <td style={{ textAlign: 'right', verticalAlign: 'middle' }}>
+                        <TableRowActionsMenu
+                          ariaLabel={`Actions for ${row.data['name'] != null ? String(row.data['name']) : 'contact'}`}
+                          actions={[
+                            { label: 'Edit', onClick: () => setEditTarget(row) },
+                            { label: 'Household', onClick: () => setHouseholdTarget(row) },
+                            { label: 'Assign', onClick: () => setAssignTarget(row) },
+                          ]}
+                        />
                       </td>
                     </tr>
                   );
@@ -1001,7 +952,13 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
               </tbody>
             </table>
           </div>
-          {renderPagination(page, totalPages, (p) => { setPage(p); load(p); })}
+          <PaginationBar
+            page={page}
+            totalPages={totalPages}
+            totalItems={total}
+            pageSize={pageSize}
+            onPageChange={(p) => { setPage(p); load(p); }}
+          />
         </>
       )}
     </div>

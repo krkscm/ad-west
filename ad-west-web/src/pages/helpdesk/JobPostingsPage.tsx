@@ -6,6 +6,7 @@ import { DateField } from '../../components/common/DateFields'
 import { PageHeader } from '../../components/common/PageHeader'
 import { FormSection } from '../../components/common/FormSection'
 import { FormActions } from '../../components/common/FormActions'
+import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu'
 import { EmptyState } from '../../components/common/EmptyState'
 import { useEnumOptions } from '../../hooks/useEnumOptions'
 
@@ -232,24 +233,15 @@ export function JobPostingsPage() {
                     Created {new Date(job.createdAt).toLocaleDateString()}
                     {job.expiresAt && <div>Closes {new Date(job.expiresAt).toLocaleDateString()}</div>}
                   </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                      <button type="button" className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 12px' }} onClick={() => handleToggleActive(job)}>
-                        {job.isActive ? 'Deactivate' : 'Activate'}
-                      </button>
-                      <button type="button" className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 12px' }} onClick={() => openEdit(job)}>
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ fontSize: '0.8rem', padding: '5px 12px', color: 'var(--error)', borderColor: 'rgba(239,68,68,0.3)' }}
-                        onClick={() => handleDelete(job.id)}
-                        disabled={deleting === job.id}
-                      >
-                        {deleting === job.id ? '…' : 'Delete'}
-                      </button>
-                    </div>
+                  <td style={{ textAlign: 'right', verticalAlign: 'middle', width: '56px' }}>
+                    <TableRowActionsMenu
+                      ariaLabel={`Actions for ${job.title}`}
+                      actions={[
+                        { label: job.isActive ? 'Deactivate' : 'Activate', tone: job.isActive ? 'warning' : 'success', onClick: () => handleToggleActive(job) },
+                        { label: 'Edit', onClick: () => openEdit(job) },
+                        { label: deleting === job.id ? 'Deleting…' : 'Delete', tone: 'danger', onClick: () => handleDelete(job.id), disabled: deleting === job.id },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}

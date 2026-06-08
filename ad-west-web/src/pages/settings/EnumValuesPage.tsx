@@ -6,6 +6,7 @@ import { PaginationBar } from '../../components/common/PaginationBar'
 import { backendApi, EnumValueApi } from '../../utils/backendApi'
 import { formatEnumTypeName } from '../../constants/enumTypeLabels'
 import { SwitchToggle } from '../../components/common/SwitchToggle'
+import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu'
 
 interface FormState {
   value: string
@@ -216,7 +217,7 @@ export const EnumValuesPage: React.FC = () => {
           { label: 'Types', value: types.length, variant: 'warning' },
         ]}
         actions={
-          <button className="btn btn-primary" onClick={openAdd} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button className="btn btn-primary" onClick={openAdd}>
             + Add Value
           </button>
         }
@@ -453,26 +454,14 @@ export const EnumValuesPage: React.FC = () => {
                             {item.active ? 'Active' : 'Inactive'}
                           </span>
                         </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                            <button
-                              className="btn btn-secondary"
-                              onClick={() => openEdit(item)}
-                              style={{ padding: '5px 12px', fontSize: '0.78rem' }}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => void handleDelete(item)}
-                              style={{
-                                padding: '5px 12px', fontSize: '0.78rem', borderRadius: '8px',
-                                border: '1px solid rgba(239,68,68,0.3)', background: 'transparent',
-                                color: '#ef4444', cursor: 'pointer',
-                              }}
-                            >
-                              Delete
-                            </button>
-                          </div>
+                        <td style={{ padding: '12px 16px', textAlign: 'right', verticalAlign: 'middle', width: '56px' }}>
+                          <TableRowActionsMenu
+                            ariaLabel={`Actions for ${item.label}`}
+                            actions={[
+                              { label: 'Edit', onClick: () => openEdit(item) },
+                              { label: 'Delete', tone: 'danger', onClick: () => void handleDelete(item) },
+                            ]}
+                          />
                         </td>
                       </tr>
                     ))}

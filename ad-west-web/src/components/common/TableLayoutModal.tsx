@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { CloseIcon, IconButton } from './IconButton';
 import { Modal } from './Modal';
 import { SwitchToggle } from './SwitchToggle';
 import { buildColumnItems, ColumnItem } from '../../hooks/useTableLayout';
@@ -191,17 +192,18 @@ export const TableLayoutModal: React.FC<Props> = ({
                     ON
                   </span>
                 )}
-                <button
-                  type="button"
-                  onClick={(e) => void handleDelete(l.id, e)}
-                  disabled={saving}
+                <IconButton
+                  label="Delete layout"
                   title="Delete layout"
-                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary-dark)', fontSize: '1rem', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--error)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary-dark)')}
+                  variant="ghost"
+                  disabled={saving}
+                  onClick={(e) => void handleDelete(l.id, e)}
+                  style={{ color: 'var(--text-secondary-dark)', flexShrink: 0 }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--error)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary-dark)'; }}
                 >
-                  ×
-                </button>
+                  <CloseIcon />
+                </IconButton>
               </div>
             );
           })}
@@ -247,8 +249,8 @@ export const TableLayoutModal: React.FC<Props> = ({
               )}
             </div>
             <div style={{ display: 'flex', gap: '6px' }}>
-              <button type="button" className="btn btn-secondary" style={btnStyle} onClick={() => setCols((p) => p.map((c) => ({ ...c, visible: true })))}>All</button>
-              <button type="button" className="btn btn-secondary" style={btnStyle} onClick={() => setCols((p) => p.map((c) => ({ ...c, visible: false })))}>None</button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setCols((p) => p.map((c) => ({ ...c, visible: true })))}>All</button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setCols((p) => p.map((c) => ({ ...c, visible: false })))}>None</button>
             </div>
           </div>
 
@@ -329,8 +331,7 @@ export const TableLayoutModal: React.FC<Props> = ({
               </span>
               <button
                 type="button"
-                className="btn btn-secondary"
-                style={btnStyle}
+                className="btn btn-secondary btn-sm"
                 disabled={saving}
                 onClick={() => { const l = layouts.find((x) => x.id === editingId); if (l) setCols(buildColumnItems(allColumns, l.columns)); }}
               >
@@ -352,7 +353,7 @@ export const TableLayoutModal: React.FC<Props> = ({
 
       {/* Footer */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border-dark)' }}>
-        <button type="button" className="btn btn-secondary" onClick={onClose} style={{ fontSize: '0.875rem' }}>
+        <button type="button" className="btn btn-secondary btn-md" onClick={onClose}>
           Close
         </button>
       </div>

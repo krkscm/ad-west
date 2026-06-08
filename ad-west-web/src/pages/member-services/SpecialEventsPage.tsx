@@ -6,6 +6,7 @@ import { SwitchToggle } from '../../components/common/SwitchToggle'
 import { DateRangePicker } from '../../components/common/DateTimePicker'
 import { PageHeader } from '../../components/common/PageHeader'
 import { FormSection } from '../../components/common/FormSection'
+import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu'
 import { FormActions } from '../../components/common/FormActions'
 import { EmptyState } from '../../components/common/EmptyState'
 import { useEnumOptions } from '../../hooks/useEnumOptions'
@@ -245,7 +246,7 @@ export function SpecialEventsPage() {
             {form.registrationEnabled && (
               <FormSection title="Registration Form Fields" accent="none">
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>
-                  <button type="button" className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 12px' }} onClick={addField}>+ Add Field</button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={addField}>+ Add Field</button>
                 </div>
                 {form.formFields.length === 0 && <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary-dark)' }}>No fields yet. Click "Add Field" to build the registration form.</p>}
                 {form.formFields.length > 0 && (
@@ -285,8 +286,11 @@ export function SpecialEventsPage() {
                                 ariaLabel={`${f.isRequired ? 'Mark' : 'Unmark'} ${f.label || 'field'} as required`}
                               />
                             </td>
-                            <td style={{ textAlign: 'right' }}>
-                              <button type="button" className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '4px 10px', color: 'var(--error)', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeField(i)}>Remove</button>
+                            <td style={{ textAlign: 'right', verticalAlign: 'middle', width: '56px' }}>
+                              <TableRowActionsMenu
+                                ariaLabel={`Actions for field ${f.label || i + 1}`}
+                                actions={[{ label: 'Remove', tone: 'danger', onClick: () => removeField(i) }]}
+                              />
                             </td>
                           </tr>
                         ))}
@@ -362,14 +366,15 @@ export function SpecialEventsPage() {
                       {ev.registrationEnabled && <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>Registration</span>}
                     </div>
                   </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                      {ev.registrationEnabled && (
-                        <button className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 10px' }} onClick={() => openRegistrations(ev)}>Registrations</button>
-                      )}
-                      <button className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 10px' }} onClick={() => openEdit(ev)}>Edit</button>
-                      <button className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 10px', color: 'var(--error)', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => handleDelete(ev.id)}>Delete</button>
-                    </div>
+                  <td style={{ textAlign: 'right', verticalAlign: 'middle', width: '56px' }}>
+                    <TableRowActionsMenu
+                      ariaLabel={`Actions for ${ev.title}`}
+                      actions={[
+                        ...(ev.registrationEnabled ? [{ label: 'Registrations', onClick: () => openRegistrations(ev) }] : []),
+                        { label: 'Edit', onClick: () => openEdit(ev) },
+                        { label: 'Delete', tone: 'danger', onClick: () => handleDelete(ev.id) },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}

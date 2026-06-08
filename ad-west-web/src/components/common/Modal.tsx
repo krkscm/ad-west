@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom';
+import { CloseIcon, IconButton } from './IconButton';
 
 interface ModalProps {
   isOpen: boolean;
@@ -48,15 +49,9 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
           }}
         >
           <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>{title}</h3>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            style={{ padding: '4px 10px', minHeight: 'unset', fontSize: '1.2rem', lineHeight: 1 }}
-            onClick={onClose}
-            aria-label="Close"
-          >
-            ×
-          </button>
+          <IconButton label="Close" onClick={onClose}>
+            <CloseIcon />
+          </IconButton>
         </div>
         {children}
       </div>

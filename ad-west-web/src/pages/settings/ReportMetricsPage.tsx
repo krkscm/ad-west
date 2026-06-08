@@ -6,6 +6,7 @@ import { SwitchToggle } from '../../components/common/SwitchToggle';
 import { PageHeader } from '../../components/common/PageHeader';
 import { FormSection } from '../../components/common/FormSection';
 import { FormActions } from '../../components/common/FormActions';
+import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
 import { EmptyState } from '../../components/common/EmptyState';
 
 const toUiError = (error: unknown, fallback: string): string => {
@@ -119,7 +120,7 @@ export const ReportMetricsPage: React.FC = () => {
         subtitle="Define the fields that appear in each sreni's monthly report submission."
         stats={[{ label: 'Active metrics', value: metrics.filter(m => m.active).length, variant: 'info' }]}
         actions={
-          <button type="button" className="btn btn-primary" style={{ fontSize: '0.875rem' }} onClick={openAdd}>
+          <button type="button" className="btn btn-primary" onClick={openAdd}>
             + Add Metric
           </button>
         }
@@ -254,15 +255,14 @@ export const ReportMetricsPage: React.FC = () => {
                       {m.active ? 'Active' : 'Inactive'}
                     </button>
                   </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                      <button type="button" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.82rem' }} onClick={() => openEdit(m)}>
-                        Edit
-                      </button>
-                      <button type="button" className="btn btn-danger" style={{ padding: '6px 12px', fontSize: '0.82rem' }} onClick={() => void handleDelete(m)}>
-                        Delete
-                      </button>
-                    </div>
+                  <td style={{ textAlign: 'right', verticalAlign: 'middle', width: '56px' }}>
+                    <TableRowActionsMenu
+                      ariaLabel={`Actions for ${m.name}`}
+                      actions={[
+                        { label: 'Edit', onClick: () => openEdit(m) },
+                        { label: 'Delete', tone: 'danger', onClick: () => void handleDelete(m) },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}

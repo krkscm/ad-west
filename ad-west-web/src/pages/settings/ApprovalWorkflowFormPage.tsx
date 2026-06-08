@@ -626,7 +626,7 @@ export const ApprovalWorkflowFormPage: React.FC<ApprovalWorkflowFormPageProps> =
             Configure workflow details and design approval flow visually with node connectors.
           </p>
         </div>
-        <button type="button" className="btn btn-secondary" onClick={onBack}>Back to List</button>
+        <button type="button" className="btn btn-secondary btn-md" onClick={onBack}>Back to List</button>
       </div>
 
       {/* Workflow details */}
@@ -679,8 +679,8 @@ export const ApprovalWorkflowFormPage: React.FC<ApprovalWorkflowFormPageProps> =
           </div>
 
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-            <button type="button" className="btn btn-secondary" onClick={onBack}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={isSaving}>
+            <button type="button" className="btn btn-secondary btn-md" onClick={onBack}>Cancel</button>
+            <button type="submit" className="btn btn-primary btn-md" disabled={isSaving}>
               {isSaving ? 'Saving...' : editingId ? 'Save Changes' : 'Create Workflow'}
             </button>
           </div>

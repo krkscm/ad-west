@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/auth-context';
+import { PageHeader } from '../components/common/PageHeader';
 import { backendApi, LocationDefinitionApi, SreniAttendanceListingItemApi } from '../utils/backendApi';
 
 interface Props {
@@ -124,18 +125,12 @@ export const SreniAttendancePage: React.FC<Props> = ({ sreniId, sreniName }) => 
 
   return (
     <div className="animate-slide-up">
-      {/* Page header */}
-      <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>✅ {sreniName} — Attendance</h2>
-        <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginTop: '4px', marginBottom: 0 }}>
-          Fill attendance values from calendar events using the configurable metric keys.
-        </p>
-        {!hasZoneRights && accessibleSthanIds.length === 0 && (
-          <div className="badge badge-warning" style={{ marginTop: '10px', display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid currentColor', background: 'transparent', fontSize: '0.8rem', fontWeight: 600 }}>
-            Sthan access list is empty — only unrestricted events are visible
-          </div>
-        )}
-      </div>
+      <PageHeader
+        icon="✅"
+        title={`${sreniName} — Attendance`}
+        subtitle="Fill attendance values from calendar events using the configurable metric keys."
+        stats={!hasZoneRights && accessibleSthanIds.length === 0 ? [{ label: 'sthan access empty', value: '⚠', variant: 'warning' }] : undefined}
+      />
 
       {isLoading ? (
         <div className="glass-panel" style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--text-secondary-dark)', fontSize: '0.9rem' }}>
@@ -195,8 +190,8 @@ export const SreniAttendancePage: React.FC<Props> = ({ sreniId, sreniName }) => 
                           </div>
                           <button
                             type="button"
-                            className="btn btn-primary"
-                            style={{ padding: '8px 20px', fontSize: '0.875rem', flexShrink: 0 }}
+                            className="btn btn-primary btn-sm"
+                            style={{ flexShrink: 0 }}
                             onClick={() => void saveCapture(row.event.id, metric.id, values)}
                             disabled={savingKey === rowKey}
                           >

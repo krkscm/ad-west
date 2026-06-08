@@ -1165,15 +1165,8 @@ export const AdminDashboardPage: React.FC = () => {
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', padding: '0 12px' }}>
           <button 
             onClick={() => setActiveTab('dashboard')}
-            className={`btn ${activeTab === 'dashboard' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ 
-              justifyContent: isSidebarCollapsed ? 'center' : 'flex-start', 
-              padding: '10px 16px', 
-              fontSize: '0.9rem',
-              background: activeTab === 'dashboard' ? '' : 'transparent',
-              border: 'none',
-              color: activeTab === 'dashboard' ? '#fff' : 'var(--text-secondary-dark)'
-            }}
+            className={`sidebar-nav-item${activeTab === 'dashboard' ? ' is-active' : ''}`}
+            style={{ justifyContent: isSidebarCollapsed ? 'center' : 'flex-start' }}
             title="Dashboard"
           >
             <span>📊</span>{!isSidebarCollapsed && <span style={{ marginLeft: '8px' }}>Dashboard</span>}
@@ -1182,16 +1175,8 @@ export const AdminDashboardPage: React.FC = () => {
           {showGovernanceSection && (
             <div>
               <button
-                className={`btn ${isGovernanceTabActive ? 'btn-primary' : 'btn-secondary'}`}
-                style={{
-                  justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
-                  padding: '10px 16px',
-                  fontSize: '0.9rem',
-                  background: isGovernanceTabActive ? '' : 'transparent',
-                  border: 'none',
-                  color: isGovernanceTabActive ? '#fff' : 'var(--text-secondary-dark)',
-                  width: '100%',
-                }}
+                className={`sidebar-nav-item${isGovernanceTabActive ? ' is-active' : ''}`}
+                style={{ justifyContent: isSidebarCollapsed ? 'center' : 'space-between', width: '100%' }}
                 title={governanceLabel}
                 onClick={() => {
                   if (isSidebarCollapsed) {
@@ -1229,15 +1214,7 @@ export const AdminDashboardPage: React.FC = () => {
                   {showInsightsTab && (
                     <button
                       onClick={() => setActiveTab('insights')}
-                      className={`btn ${activeTab === 'insights' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{
-                        justifyContent: 'flex-start',
-                        padding: '8px 14px',
-                        fontSize: '0.84rem',
-                        background: activeTab === 'insights' ? '' : 'transparent',
-                        border: 'none',
-                        color: activeTab === 'insights' ? '#fff' : 'var(--text-secondary-dark)',
-                      }}
+                      className={`sidebar-nav-item${activeTab === 'insights' ? ' is-active' : ''}`}
                     >
                       📈 Insights
                     </button>
@@ -1246,15 +1223,8 @@ export const AdminDashboardPage: React.FC = () => {
                   {showMyApprovalsTab && (
                     <button
                       onClick={() => setActiveTab('my-approvals')}
-                      className={`btn ${activeTab === 'my-approvals' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{
-                        justifyContent: 'space-between',
-                        padding: '8px 14px',
-                        fontSize: '0.84rem',
-                        background: activeTab === 'my-approvals' ? '' : 'transparent',
-                        border: 'none',
-                        color: activeTab === 'my-approvals' ? '#fff' : 'var(--text-secondary-dark)',
-                      }}
+                      className={`sidebar-nav-item${activeTab === 'my-approvals' ? ' is-active' : ''}`}
+                      style={{ justifyContent: 'space-between' }}
                     >
                       <span>📝 My Approvals</span>
                       {pendingApprovalsCount > 0 && (
@@ -1268,8 +1238,7 @@ export const AdminDashboardPage: React.FC = () => {
                   {showContactsTab && (
                     <button
                       onClick={() => setActiveTab('governance-contacts')}
-                      className={`btn ${activeTab === 'governance-contacts' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'governance-contacts' ? '' : 'transparent', border: 'none', color: activeTab === 'governance-contacts' ? '#fff' : 'var(--text-secondary-dark)' }}
+                      className={`sidebar-nav-item${activeTab === 'governance-contacts' ? ' is-active' : ''}`}
                     >
                       📋 Contacts
                     </button>
@@ -1278,8 +1247,7 @@ export const AdminDashboardPage: React.FC = () => {
                   {showResponsibilityChartTab && (
                     <button
                       onClick={() => setActiveTab('settings-responsibility-chart')}
-                      className={`btn ${activeTab === 'settings-responsibility-chart' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'settings-responsibility-chart' ? '' : 'transparent', border: 'none', color: activeTab === 'settings-responsibility-chart' ? '#fff' : 'var(--text-secondary-dark)' }}
+                      className={`sidebar-nav-item${activeTab === 'settings-responsibility-chart' ? ' is-active' : ''}`}
                     >
                       🧭 Responsibility Chart
                     </button>
@@ -1288,8 +1256,7 @@ export const AdminDashboardPage: React.FC = () => {
                   {showReimbursementsTab && (
                     <button
                       onClick={() => setActiveTab('member-services-reimbursements')}
-                      className={`btn ${activeTab === 'member-services-reimbursements' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'member-services-reimbursements' ? '' : 'transparent', border: 'none', color: activeTab === 'member-services-reimbursements' ? '#fff' : 'var(--text-secondary-dark)' }}
+                      className={`sidebar-nav-item${activeTab === 'member-services-reimbursements' ? ' is-active' : ''}`}
                     >
                       💰 Reimbursements
                     </button>
@@ -1297,8 +1264,7 @@ export const AdminDashboardPage: React.FC = () => {
                   {showEventsTab && (
                     <button
                       onClick={() => setActiveTab('member-services-events')}
-                      className={`btn ${activeTab === 'member-services-events' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'member-services-events' ? '' : 'transparent', border: 'none', color: activeTab === 'member-services-events' ? '#fff' : 'var(--text-secondary-dark)' }}
+                      className={`sidebar-nav-item${activeTab === 'member-services-events' ? ' is-active' : ''}`}
                     >
                       🗓️ Special Events
                     </button>
@@ -1306,8 +1272,7 @@ export const AdminDashboardPage: React.FC = () => {
                   {showNotificationsTab && (
                     <button
                       onClick={() => setActiveTab('member-services-notifications')}
-                      className={`btn ${activeTab === 'member-services-notifications' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'member-services-notifications' ? '' : 'transparent', border: 'none', color: activeTab === 'member-services-notifications' ? '#fff' : 'var(--text-secondary-dark)' }}
+                      className={`sidebar-nav-item${activeTab === 'member-services-notifications' ? ' is-active' : ''}`}
                     >
                       🔔 Notifications
                     </button>
@@ -1315,8 +1280,7 @@ export const AdminDashboardPage: React.FC = () => {
                   {showGmailTab && (
                     <button
                       onClick={() => setActiveTab('member-services-gmail')}
-                      className={`btn ${activeTab === 'member-services-gmail' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ justifyContent: 'flex-start', padding: '8px 14px', fontSize: '0.84rem', background: activeTab === 'member-services-gmail' ? '' : 'transparent', border: 'none', color: activeTab === 'member-services-gmail' ? '#fff' : 'var(--text-secondary-dark)' }}
+                      className={`sidebar-nav-item${activeTab === 'member-services-gmail' ? ' is-active' : ''}`}
                     >
                       ✉️ Gmail Workspace
                     </button>
@@ -1343,16 +1307,8 @@ export const AdminDashboardPage: React.FC = () => {
               <div key={sreni.key}>
                 <button
                   onClick={() => toggleSreniOpen(sreni.key)}
-                  className={`btn ${isSreniTabActive ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{
-                    justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
-                    padding: '10px 16px',
-                    fontSize: '0.9rem',
-                    background: isSreniTabActive ? '' : 'transparent',
-                    border: 'none',
-                    color: isSreniTabActive ? '#fff' : 'var(--text-secondary-dark)',
-                    width: '100%',
-                  }}
+                  className={`sidebar-nav-item${isSreniTabActive ? ' is-active' : ''}`}
+                  style={{ justifyContent: isSidebarCollapsed ? 'center' : 'space-between', width: '100%' }}
                   title={sreni.label}
                 >
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
@@ -1387,15 +1343,8 @@ export const AdminDashboardPage: React.FC = () => {
                         <button
                           key={child.key}
                           onClick={() => setActiveTab(childTab)}
-                          className={`btn ${isChildActive ? 'btn-primary' : 'btn-secondary'}`}
-                          style={{
-                            justifyContent: 'flex-start',
-                            padding: '8px 14px',
-                            fontSize: '0.84rem',
-                            background: isChildActive ? '' : 'transparent',
-                            border: 'none',
-                            color: isChildActive ? '#fff' : 'var(--text-secondary-dark)',
-                          }}
+                          className={`sidebar-nav-item${isChildActive ? ' is-active' : ''}`}
+                          
                         >
                           {child.icon ?? '📅'} {child.label}
                         </button>
@@ -1412,13 +1361,8 @@ export const AdminDashboardPage: React.FC = () => {
             <div>
               <button
                 onClick={() => toggleSthanOpen('sthans')}
-                className={`btn ${activeSthanKey ? 'btn-primary' : 'btn-secondary'}`}
-                style={{
-                  justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
-                  padding: '10px 16px', fontSize: '0.9rem',
-                  background: activeSthanKey ? '' : 'transparent', border: 'none',
-                  color: activeSthanKey ? '#fff' : 'var(--text-secondary-dark)', width: '100%',
-                }}
+                className={`sidebar-nav-item${activeSthanKey ? ' is-active' : ''}`}
+                style={{ justifyContent: isSidebarCollapsed ? 'center' : 'space-between', width: '100%' }}
                 title="Sthans"
               >
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
@@ -1442,15 +1386,8 @@ export const AdminDashboardPage: React.FC = () => {
                       <button
                         key={child.key}
                         onClick={() => setActiveTab(childTab, { sthanSection: 'calendar' })}
-                        className={`btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
-                        style={{
-                          justifyContent: 'flex-start',
-                          padding: '8px 14px',
-                          fontSize: '0.84rem',
-                          background: isActive ? '' : 'transparent',
-                          border: 'none',
-                          color: isActive ? '#fff' : 'var(--text-secondary-dark)',
-                        }}
+                        className={`sidebar-nav-item${isActive ? ' is-active' : ''}`}
+                        
                         title={child.label}
                       >
                         {child.icon ?? '📍'} {child.label}
@@ -1465,16 +1402,8 @@ export const AdminDashboardPage: React.FC = () => {
           {showGatewaySection && (
             <div>
               <button
-                className={`btn ${isGatewayTabActive ? 'btn-primary' : 'btn-secondary'}`}
-                style={{
-                  justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
-                  padding: '10px 16px',
-                  fontSize: '0.9rem',
-                  background: isGatewayTabActive ? '' : 'transparent',
-                  border: 'none',
-                  color: isGatewayTabActive ? '#fff' : 'var(--text-secondary-dark)',
-                  width: '100%',
-                }}
+                className={`sidebar-nav-item${isGatewayTabActive ? ' is-active' : ''}`}
+                style={{ justifyContent: isSidebarCollapsed ? 'center' : 'space-between', width: '100%' }}
                 title="Helpdesk"
                 onClick={() => {
                   if (isSidebarCollapsed) {
@@ -1506,15 +1435,7 @@ export const AdminDashboardPage: React.FC = () => {
                   {showHelpdeskTicketsTab && (
                     <button
                       onClick={() => setActiveTab('helpdesk-tickets')}
-                      className={`btn ${activeTab === 'helpdesk-tickets' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{
-                        justifyContent: 'flex-start',
-                        padding: '8px 14px',
-                        fontSize: '0.84rem',
-                        background: activeTab === 'helpdesk-tickets' ? '' : 'transparent',
-                        border: 'none',
-                        color: activeTab === 'helpdesk-tickets' ? '#fff' : 'var(--text-secondary-dark)'
-                      }}
+                      className={`sidebar-nav-item${activeTab === 'helpdesk-tickets' ? ' is-active' : ''}`}
                     >
                       🎫 Helpdesk Tickets
                     </button>
@@ -1523,15 +1444,7 @@ export const AdminDashboardPage: React.FC = () => {
                   {showJobPostingsTab && (
                     <button
                       onClick={() => setActiveTab('job-postings')}
-                      className={`btn ${activeTab === 'job-postings' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{
-                        justifyContent: 'flex-start',
-                        padding: '8px 14px',
-                        fontSize: '0.84rem',
-                        background: activeTab === 'job-postings' ? '' : 'transparent',
-                        border: 'none',
-                        color: activeTab === 'job-postings' ? '#fff' : 'var(--text-secondary-dark)'
-                      }}
+                      className={`sidebar-nav-item${activeTab === 'job-postings' ? ' is-active' : ''}`}
                     >
                       📋 Job Postings
                     </button>
@@ -1540,15 +1453,7 @@ export const AdminDashboardPage: React.FC = () => {
                   {showJobApplicationsTab && (
                     <button
                       onClick={() => setActiveTab('job-applications')}
-                      className={`btn ${activeTab === 'job-applications' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{
-                        justifyContent: 'flex-start',
-                        padding: '8px 14px',
-                        fontSize: '0.84rem',
-                        background: activeTab === 'job-applications' ? '' : 'transparent',
-                        border: 'none',
-                        color: activeTab === 'job-applications' ? '#fff' : 'var(--text-secondary-dark)'
-                      }}
+                      className={`sidebar-nav-item${activeTab === 'job-applications' ? ' is-active' : ''}`}
                     >
                       📄 Job Applications
                     </button>
@@ -1560,15 +1465,8 @@ export const AdminDashboardPage: React.FC = () => {
 
           <button
             onClick={() => setIsSettingsOpen((prev) => !prev)}
-            className={`btn ${isSettingsTabActive ? 'btn-primary' : 'btn-secondary'}`}
-            style={{
-              justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
-              padding: '10px 16px',
-              fontSize: '0.9rem',
-              background: isSettingsTabActive ? '' : 'transparent',
-              border: 'none',
-              color: isSettingsTabActive ? '#fff' : 'var(--text-secondary-dark)'
-            }}
+            className={`sidebar-nav-item${isSettingsTabActive ? ' is-active' : ''}`}
+            style={{ justifyContent: isSidebarCollapsed ? 'center' : 'space-between' }}
             title="Settings"
           >
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
@@ -1581,90 +1479,48 @@ export const AdminDashboardPage: React.FC = () => {
             <div style={{ display: 'grid', gap: '4px', paddingLeft: '14px' }}>
               <button
                 onClick={() => setActiveTab('settings-roles-definition')}
-                className={`btn ${activeTab === 'settings-roles-definition' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{
-                  justifyContent: 'flex-start',
-                  padding: '8px 14px',
-                  fontSize: '0.84rem',
-                  background: activeTab === 'settings-roles-definition' ? '' : 'transparent',
-                  border: 'none',
-                  color: activeTab === 'settings-roles-definition' ? '#fff' : 'var(--text-secondary-dark)'
-                }}
+                className={`sidebar-nav-item${activeTab === 'settings-roles-definition' ? ' is-active' : ''}`}
+                
               >
                 🎭 Roles Definition
               </button>
 
               <button
                 onClick={() => setActiveTab('settings-location-definition')}
-                className={`btn ${activeTab === 'settings-location-definition' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{
-                  justifyContent: 'flex-start',
-                  padding: '8px 14px',
-                  fontSize: '0.84rem',
-                  background: activeTab === 'settings-location-definition' ? '' : 'transparent',
-                  border: 'none',
-                  color: activeTab === 'settings-location-definition' ? '#fff' : 'var(--text-secondary-dark)'
-                }}
+                className={`sidebar-nav-item${activeTab === 'settings-location-definition' ? ' is-active' : ''}`}
+                
               >
                 📍 Location Definition
               </button>
 
               <button
                 onClick={() => setActiveTab('settings-sreni-definition')}
-                className={`btn ${activeTab === 'settings-sreni-definition' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{
-                  justifyContent: 'flex-start',
-                  padding: '8px 14px',
-                  fontSize: '0.84rem',
-                  background: activeTab === 'settings-sreni-definition' ? '' : 'transparent',
-                  border: 'none',
-                  color: activeTab === 'settings-sreni-definition' ? '#fff' : 'var(--text-secondary-dark)'
-                }}
+                className={`sidebar-nav-item${activeTab === 'settings-sreni-definition' ? ' is-active' : ''}`}
+                
               >
                 🏘️ Sreni Definition
               </button>
 
               <button
                 onClick={() => setActiveTab('settings-permissions')}
-                className={`btn ${activeTab === 'settings-permissions' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{
-                  justifyContent: 'flex-start',
-                  padding: '8px 14px',
-                  fontSize: '0.84rem',
-                  background: activeTab === 'settings-permissions' ? '' : 'transparent',
-                  border: 'none',
-                  color: activeTab === 'settings-permissions' ? '#fff' : 'var(--text-secondary-dark)'
-                }}
+                className={`sidebar-nav-item${activeTab === 'settings-permissions' ? ' is-active' : ''}`}
+                
               >
                 🔒 Permissions
               </button>
 
               <button
                 onClick={() => setActiveTab('settings-permission-sets')}
-                className={`btn ${activeTab === 'settings-permission-sets' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{
-                  justifyContent: 'flex-start',
-                  padding: '8px 14px',
-                  fontSize: '0.84rem',
-                  background: activeTab === 'settings-permission-sets' ? '' : 'transparent',
-                  border: 'none',
-                  color: activeTab === 'settings-permission-sets' ? '#fff' : 'var(--text-secondary-dark)'
-                }}
+                className={`sidebar-nav-item${activeTab === 'settings-permission-sets' ? ' is-active' : ''}`}
+                
               >
                 🗂️ Permission Sets
               </button>
 
               <button
                 onClick={() => setActiveTab('settings-enum-values')}
-                className={`btn ${activeTab === 'settings-enum-values' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{
-                  justifyContent: 'flex-start',
-                  padding: '8px 14px',
-                  fontSize: '0.84rem',
-                  background: activeTab === 'settings-enum-values' ? '' : 'transparent',
-                  border: 'none',
-                  color: activeTab === 'settings-enum-values' ? '#fff' : 'var(--text-secondary-dark)'
-                }}
+                className={`sidebar-nav-item${activeTab === 'settings-enum-values' ? ' is-active' : ''}`}
+                
               >
                 🏷️ Reference Data
               </button>
@@ -1672,15 +1528,8 @@ export const AdminDashboardPage: React.FC = () => {
               {showAdminsTab && (
                 <button
                   onClick={() => setActiveTab('settings-admins')}
-                  className={`btn ${activeTab === 'settings-admins' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{
-                    justifyContent: 'flex-start',
-                    padding: '8px 14px',
-                    fontSize: '0.84rem',
-                    background: activeTab === 'settings-admins' ? '' : 'transparent',
-                    border: 'none',
-                    color: activeTab === 'settings-admins' ? '#fff' : 'var(--text-secondary-dark)'
-                  }}
+                  className={`sidebar-nav-item${activeTab === 'settings-admins' ? ' is-active' : ''}`}
+                  
                 >
                   👤 Admin Management
                 </button>
@@ -1688,60 +1537,32 @@ export const AdminDashboardPage: React.FC = () => {
 
               <button
                 onClick={() => setActiveTab('settings-approval-workflows')}
-                className={`btn ${activeTab === 'settings-approval-workflows' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{
-                  justifyContent: 'flex-start',
-                  padding: '8px 14px',
-                  fontSize: '0.84rem',
-                  background: activeTab === 'settings-approval-workflows' ? '' : 'transparent',
-                  border: 'none',
-                  color: activeTab === 'settings-approval-workflows' ? '#fff' : 'var(--text-secondary-dark)'
-                }}
+                className={`sidebar-nav-item${activeTab === 'settings-approval-workflows' ? ' is-active' : ''}`}
+                
               >
                 ✅ Approval Workflows
               </button>
 
               <button
                 onClick={() => setActiveTab('settings-users')}
-                className={`btn ${activeTab === 'settings-users' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{
-                  justifyContent: 'flex-start',
-                  padding: '8px 14px',
-                  fontSize: '0.84rem',
-                  background: activeTab === 'settings-users' ? '' : 'transparent',
-                  border: 'none',
-                  color: activeTab === 'settings-users' ? '#fff' : 'var(--text-secondary-dark)'
-                }}
+                className={`sidebar-nav-item${activeTab === 'settings-users' ? ' is-active' : ''}`}
+                
               >
                 👥 Users
               </button>
 
               <button
                 onClick={() => setActiveTab('settings-attendance-metrics')}
-                className={`btn ${activeTab === 'settings-attendance-metrics' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{
-                  justifyContent: 'flex-start',
-                  padding: '8px 14px',
-                  fontSize: '0.84rem',
-                  background: activeTab === 'settings-attendance-metrics' ? '' : 'transparent',
-                  border: 'none',
-                  color: activeTab === 'settings-attendance-metrics' ? '#fff' : 'var(--text-secondary-dark)'
-                }}
+                className={`sidebar-nav-item${activeTab === 'settings-attendance-metrics' ? ' is-active' : ''}`}
+                
               >
                 📏 Attendance Metrics
               </button>
 
               <button
                 onClick={() => setActiveTab('settings-report-config')}
-                className={`btn ${activeTab === 'settings-report-config' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{
-                  justifyContent: 'flex-start',
-                  padding: '8px 14px',
-                  fontSize: '0.84rem',
-                  background: activeTab === 'settings-report-config' ? '' : 'transparent',
-                  border: 'none',
-                  color: activeTab === 'settings-report-config' ? '#fff' : 'var(--text-secondary-dark)'
-                }}
+                className={`sidebar-nav-item${activeTab === 'settings-report-config' ? ' is-active' : ''}`}
+                
               >
                 📊 Report Config
               </button>
@@ -1749,15 +1570,8 @@ export const AdminDashboardPage: React.FC = () => {
               {showAdminsTab && (
                 <button
                   onClick={() => setActiveTab('settings-google-integration')}
-                  className={`btn ${activeTab === 'settings-google-integration' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{
-                    justifyContent: 'flex-start',
-                    padding: '8px 14px',
-                    fontSize: '0.84rem',
-                    background: activeTab === 'settings-google-integration' ? '' : 'transparent',
-                    border: 'none',
-                    color: activeTab === 'settings-google-integration' ? '#fff' : 'var(--text-secondary-dark)'
-                  }}
+                  className={`sidebar-nav-item${activeTab === 'settings-google-integration' ? ' is-active' : ''}`}
+                  
                 >
                   🔐 Google Integration
                 </button>
@@ -1766,15 +1580,8 @@ export const AdminDashboardPage: React.FC = () => {
               {showAdminsTab && (
                 <button
                   onClick={() => setActiveTab('settings-smtp-integration')}
-                  className={`btn ${activeTab === 'settings-smtp-integration' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{
-                    justifyContent: 'flex-start',
-                    padding: '8px 14px',
-                    fontSize: '0.84rem',
-                    background: activeTab === 'settings-smtp-integration' ? '' : 'transparent',
-                    border: 'none',
-                    color: activeTab === 'settings-smtp-integration' ? '#fff' : 'var(--text-secondary-dark)'
-                  }}
+                  className={`sidebar-nav-item${activeTab === 'settings-smtp-integration' ? ' is-active' : ''}`}
+                  
                 >
                   📧 Email Integration
                 </button>
@@ -1788,14 +1595,10 @@ export const AdminDashboardPage: React.FC = () => {
         <div style={{ padding: '0 12px' }}>
           <button 
             onClick={logout}
-            className="btn btn-secondary"
+            className="btn btn-danger-ghost btn-sm"
             style={{ 
               width: '100%', 
-              justifyContent: isSidebarCollapsed ? 'center' : 'flex-start', 
-              padding: '10px 16px', 
-              fontSize: '0.9rem',
-              borderColor: 'rgba(239, 68, 68, 0.2)',
-              color: '#f87171'
+              justifyContent: isSidebarCollapsed ? 'center' : 'flex-start',
             }}
             title="Log Out"
           >
@@ -1861,7 +1664,7 @@ export const AdminDashboardPage: React.FC = () => {
                           <span style={{ color: priority.tone, fontWeight: 800 }}>{priority.value}</span>
                         </div>
                         <p style={{ margin: '6px 0 10px', fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>{priority.note}</p>
-                        <button type="button" className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '5px 12px' }} onClick={() => setActiveTab(priority.targetTab)}>
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setActiveTab(priority.targetTab)}>
                           Open
                         </button>
                       </div>

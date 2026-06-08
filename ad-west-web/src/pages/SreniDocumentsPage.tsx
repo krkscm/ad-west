@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { backendApi, DocumentFileApi } from '../utils/backendApi';
 import { useToast } from '../components/common/Toast';
+import { useConfirm } from '../components/common/ConfirmDialog';
+import { PageHeader } from '../components/common/PageHeader';
+import { TableRowActionsMenu } from '../components/common/TableRowActionsMenu';
 import { useAuth } from '../context/auth-context';
 
 interface Props {
@@ -23,13 +26,13 @@ function formatDate(iso: string): string {
 export const SreniDocumentsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
   const { token } = useAuth();
   const { addToast } = useToast();
+  const confirm = useConfirm();
 
   const [docs, setDocs] = useState<DocumentFileApi[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [description, setDescription] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -80,8 +83,17 @@ export const SreniDocumentsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
       addToast(err instanceof Error ? err.message : 'Delete failed.', 'error');
     } finally {
       setDeletingId(null);
-      setConfirmDeleteId(null);
     }
+  };
+
+  const handleDeletePrompt = async (doc: DocumentFileApi) => {
+    const ok = await confirm({
+      title: 'Delete Document',
+      message: `Delete "${doc.fileName}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (ok) void handleDelete(doc.id);
   };
 
   const handleDownload = async (doc: DocumentFileApi) => {
@@ -104,62 +116,41 @@ export const SreniDocumentsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
 
   return (
     <div className="animate-slide-up">
-      {/* Page header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>📁 {sreniName} — Documents</h2>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginTop: '4px', marginBottom: 0 }}>
-            Store and manage documents for this sreni. Max 2 MB per file.
-          </p>
-          <div style={{ marginTop: '12px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <span className="badge badge-info" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid currentColor', background: 'transparent', fontSize: '0.8rem', fontWeight: 600 }}>
-              <span style={{ fontSize: '0.95rem', fontWeight: 800 }}>{docs.length}</span>
-              {docs.length === 1 ? 'Document' : 'Documents'}
-            </span>
-          </div>
-        </div>
-
-        {/* Upload controls */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <input
-            type="text"
-            className="form-input"
-            placeholder="Description (optional)"
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            style={{ width: '220px', fontSize: '0.875rem' }}
-          />
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{ fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-          >
-            {uploading ? (
-              <>
-                <span style={{ display: 'inline-block', width: '14px', height: '14px', border: '2px solid #fff4', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                Uploading…
-              </>
-            ) : (
-              <>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="16 16 12 12 8 16" /><line x1="12" y1="12" x2="12" y2="21" />
-                  <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
-                </svg>
-                Upload Document
-              </>
-            )}
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            style={{ display: 'none' }}
-            onChange={handleUpload}
-            disabled={uploading}
-          />
-        </div>
-      </div>
+      <PageHeader
+        icon="📁"
+        title={`${sreniName} — Documents`}
+        subtitle="Store and manage documents for this sreni. Max 2 MB per file."
+        stats={[
+          { label: docs.length === 1 ? 'Document' : 'Documents', value: docs.length, variant: 'info' },
+        ]}
+        actions={
+          <>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="Description (optional)"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              style={{ width: '220px' }}
+            />
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? 'Uploading…' : 'Upload Document'}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              style={{ display: 'none' }}
+              onChange={handleUpload}
+              disabled={uploading}
+            />
+          </>
+        }
+      />
 
       {/* Empty state */}
       {!isLoading && docs.length === 0 && (
@@ -172,7 +163,7 @@ export const SreniDocumentsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
           </p>
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn btn-primary btn-sm"
             onClick={() => fileInputRef.current?.click()}
           >
             Upload First Document
@@ -215,47 +206,14 @@ export const SreniDocumentsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
                   <td style={{ color: 'var(--text-secondary-dark)', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
                     {formatDate(doc.createdAt)}
                   </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', whiteSpace: 'nowrap' }}>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ padding: '6px 14px', fontSize: '0.82rem' }}
-                        onClick={() => void handleDownload(doc)}
-                      >
-                        ↓ Download
-                      </button>
-                      {confirmDeleteId === doc.id ? (
-                        <>
-                          <button
-                            type="button"
-                            className="btn btn-danger"
-                            style={{ padding: '6px 14px', fontSize: '0.82rem' }}
-                            onClick={() => void handleDelete(doc.id)}
-                            disabled={deletingId === doc.id}
-                          >
-                            {deletingId === doc.id ? 'Deleting…' : 'Confirm Delete'}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            style={{ padding: '6px 10px', fontSize: '0.82rem' }}
-                            onClick={() => setConfirmDeleteId(null)}
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          className="btn btn-danger"
-                          style={{ padding: '6px 12px', fontSize: '0.82rem' }}
-                          onClick={() => setConfirmDeleteId(doc.id)}
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </div>
+                  <td style={{ textAlign: 'right', verticalAlign: 'middle', width: '56px' }}>
+                    <TableRowActionsMenu
+                      ariaLabel={`Actions for ${doc.fileName}`}
+                      actions={[
+                        { label: 'Download', onClick: () => void handleDownload(doc) },
+                        { label: deletingId === doc.id ? 'Deleting…' : 'Delete', tone: 'danger', onClick: () => void handleDeletePrompt(doc), disabled: deletingId === doc.id },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}

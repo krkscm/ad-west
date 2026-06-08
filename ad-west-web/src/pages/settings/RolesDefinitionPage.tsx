@@ -3,6 +3,8 @@ import { useToast } from '../../components/common/Toast';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import { PageHeader } from '../../components/common/PageHeader';
 import { EmptyState } from '../../components/common/EmptyState';
+import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
+import { PaginationBar } from '../../components/common/PaginationBar';
 import { backendApi, RoleDefinitionApi } from '../../utils/backendApi';
 
 type RoleLevel = RoleDefinitionApi['level'];
@@ -171,15 +173,6 @@ export const RolesDefinitionPage: React.FC = () => {
     }
   };
 
-  const pageNumbers = useMemo(() => {
-    const pages: number[] = [];
-    const delta = 2;
-    for (let i = Math.max(1, page - delta); i <= Math.min(totalPages, page + delta); i++) {
-      pages.push(i);
-    }
-    return pages;
-  }, [page, totalPages]);
-
   const hasTable = !isLoading && sortedRoles.length > 0;
 
   return (
@@ -192,8 +185,7 @@ export const RolesDefinitionPage: React.FC = () => {
         actions={
           <button
             type="button"
-            className="btn btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '16px', paddingRight: '16px' }}
+            className={`btn ${formOpen && !editingRoleId ? 'btn-secondary' : 'btn-primary'}`}
             onClick={() => {
               if (formOpen && !editingRoleId) {
                 setFormOpen(false);
@@ -287,10 +279,10 @@ export const RolesDefinitionPage: React.FC = () => {
               </div>
 
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="button" className="btn btn-secondary" onClick={resetForm} style={{ flex: 1, fontSize: '0.875rem' }}>
+                <button type="button" className="btn btn-secondary btn-md" onClick={resetForm} style={{ flex: 1 }}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ flex: 2, fontSize: '0.875rem' }}>
+                <button type="submit" className="btn btn-primary btn-md" disabled={isSaving} style={{ flex: 2 }}>
                   {isSaving ? 'Saving…' : editingRoleId ? 'Save Changes' : 'Create Role'}
                 </button>
               </div>
@@ -434,177 +426,28 @@ export const RolesDefinitionPage: React.FC = () => {
                   </td>
 
                   {/* Actions */}
-                  <td style={{ padding: '10px 20px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                    <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                        onClick={() => startEdit(role)}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-                        Edit
-                      </button>
-
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ 
-                          padding: '6px 12px', 
-                          fontSize: '0.8rem', 
-                          color: role.active ? 'var(--error)' : 'var(--success)',
-                          borderColor: role.active ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-                          background: role.active ? 'rgba(239, 68, 68, 0.02)' : 'rgba(16, 185, 129, 0.02)',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                        onClick={() => void handleToggleActive(role)}
-                      >
-                        {role.active ? (
-                          <>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                            Deactivate
-                          </>
-                        ) : (
-                          <>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
-                            Activate
-                          </>
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{
-                          padding: '6px 10px',
-                          color: 'var(--error)',
-                          borderColor: 'rgba(239, 68, 68, 0.2)',
-                          background: 'rgba(239, 68, 68, 0.02)',
-                        }}
-                        onClick={() => void handleDelete(role)}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                      </button>
-                    </div>
+                  <td style={{ padding: '10px 20px', textAlign: 'right', verticalAlign: 'middle', width: '56px' }}>
+                    <TableRowActionsMenu
+                      ariaLabel={`Actions for ${role.name}`}
+                      actions={[
+                        { label: 'Edit', onClick: () => startEdit(role) },
+                        { label: role.active ? 'Deactivate' : 'Activate', tone: role.active ? 'warning' : 'success', onClick: () => void handleToggleActive(role) },
+                        { label: 'Delete', tone: 'danger', onClick: () => void handleDelete(role) },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}
           </tbody>
         </table>
+        <PaginationBar
+          page={page}
+          totalPages={totalPages}
+          totalItems={total}
+          pageSize={pageSize}
+          onPageChange={setPage}
+        />
       </div>
-      )}
-
-      {/* Pagination */}
-      {hasTable && totalPages > 0 && (
-        <div
-          style={{
-            marginTop: '14px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: '8px',
-            flexWrap: 'wrap',
-          }}
-        >
-          <span style={{ color: 'var(--text-secondary-dark)', fontSize: '0.82rem' }}>
-            Showing {((page - 1) * pageSize) + 1}–{Math.min(page * pageSize, total)} of {total} {total === 1 ? 'role' : 'roles'}
-          </span>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <button
-              type="button"
-              onClick={() => setPage(1)}
-              disabled={page <= 1}
-              style={{
-                background: 'transparent',
-                border: '1px solid var(--border-dark)',
-                color: page <= 1 ? 'var(--text-secondary-dark)' : 'var(--text-primary-dark)',
-                padding: '5px 10px',
-                borderRadius: '6px',
-                fontSize: '0.8rem',
-                cursor: page <= 1 ? 'not-allowed' : 'pointer',
-                opacity: page <= 1 ? 0.4 : 1,
-              }}
-            >
-              «
-            </button>
-            <button
-              type="button"
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              disabled={page <= 1}
-              style={{
-                background: 'transparent',
-                border: '1px solid var(--border-dark)',
-                color: page <= 1 ? 'var(--text-secondary-dark)' : 'var(--text-primary-dark)',
-                padding: '5px 12px',
-                borderRadius: '6px',
-                fontSize: '0.8rem',
-                cursor: page <= 1 ? 'not-allowed' : 'pointer',
-                opacity: page <= 1 ? 0.4 : 1,
-              }}
-            >
-              ‹ Prev
-            </button>
-
-            {pageNumbers.map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPage(p)}
-                style={{
-                  background: p === page ? 'var(--primary)' : 'transparent',
-                  border: `1px solid ${p === page ? 'var(--primary)' : 'var(--border-dark)'}`,
-                  color: p === page ? '#fff' : 'var(--text-primary-dark)',
-                  padding: '5px 11px',
-                  borderRadius: '6px',
-                  fontSize: '0.82rem',
-                  fontWeight: p === page ? 700 : 400,
-                  cursor: 'pointer',
-                  minWidth: '34px',
-                }}
-              >
-                {p}
-              </button>
-            ))}
-
-            <button
-              type="button"
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-              disabled={page >= totalPages}
-              style={{
-                background: 'transparent',
-                border: '1px solid var(--border-dark)',
-                color: page >= totalPages ? 'var(--text-secondary-dark)' : 'var(--text-primary-dark)',
-                padding: '5px 12px',
-                borderRadius: '6px',
-                fontSize: '0.8rem',
-                cursor: page >= totalPages ? 'not-allowed' : 'pointer',
-                opacity: page >= totalPages ? 0.4 : 1,
-              }}
-            >
-              Next ›
-            </button>
-            <button
-              type="button"
-              onClick={() => setPage(totalPages)}
-              disabled={page >= totalPages}
-              style={{
-                background: 'transparent',
-                border: '1px solid var(--border-dark)',
-                color: page >= totalPages ? 'var(--text-secondary-dark)' : 'var(--text-primary-dark)',
-                padding: '5px 10px',
-                borderRadius: '6px',
-                fontSize: '0.8rem',
-                cursor: page >= totalPages ? 'not-allowed' : 'pointer',
-                opacity: page >= totalPages ? 0.4 : 1,
-              }}
-            >
-              »
-            </button>
-          </div>
-        </div>
       )}
     </div>
   );

@@ -73,8 +73,7 @@ export const ExportMenu: React.FC<Props> = ({
     <div ref={rootRef} style={{ position: 'relative' }}>
       <button
         type="button"
-        className="btn btn-secondary"
-        style={{ fontSize: '0.84rem', padding: '7px 16px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+        className="btn btn-secondary btn-sm"
         disabled={disabled || enabledOptions.length === 0}
         onClick={() => setOpen((prev) => !prev)}
         aria-haspopup="menu"
@@ -126,15 +125,7 @@ export const ExportMenu: React.FC<Props> = ({
                   key={option.label}
                   type="button"
                   role="menuitem"
-                  className="btn btn-secondary"
-                  style={{
-                    width: '100%',
-                    justifyContent: 'flex-start',
-                    padding: '10px 12px',
-                    fontSize: '0.84rem',
-                    border: 'none',
-                    background: 'transparent',
-                  }}
+                  className="dropdown-menu__item"
                   onClick={() => {
                     option.onClick();
                     setOpen(false);
@@ -149,15 +140,7 @@ export const ExportMenu: React.FC<Props> = ({
               key={option.label}
               type="button"
               role="menuitem"
-              className="btn btn-secondary"
-              style={{
-                width: '100%',
-                justifyContent: 'flex-start',
-                padding: '10px 12px',
-                fontSize: '0.84rem',
-                border: 'none',
-                background: 'transparent',
-              }}
+              className="dropdown-menu__item"
               onClick={() => {
                 option.onClick();
                 setOpen(false);
@@ -197,8 +180,7 @@ export const RowExportButton: React.FC<RowExportProps> = ({ title, disabled = fa
     <div ref={rootRef} style={{ position: 'relative' }}>
       <button
         type="button"
-        className="btn btn-secondary"
-        style={{ padding: '6px 10px', fontSize: '0.82rem' }}
+        className="btn btn-secondary btn-sm"
         title={title}
         disabled={disabled}
         onClick={() => setOpen((prev) => !prev)}
@@ -222,15 +204,7 @@ export const RowExportButton: React.FC<RowExportProps> = ({ title, disabled = fa
             <button
               key={format}
               type="button"
-              className="btn btn-secondary"
-              style={{
-                width: '100%',
-                justifyContent: 'flex-start',
-                padding: '8px 10px',
-                fontSize: '0.8rem',
-                border: 'none',
-                background: 'transparent',
-              }}
+              className="dropdown-menu__item"
               onClick={() => {
                 onExport(format);
                 setOpen(false);

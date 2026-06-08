@@ -311,6 +311,54 @@ export class SthanRuntimeService {
     return { inserted: parsedRows.length, locationId };
   }
 
+  async updateSthanContact(
+    locationId: string,
+    contactId: string,
+    data: Record<string, string | number | boolean | null>,
+  ): Promise<SthanContactRecord> {
+    if (this.ctx.runtimeMode !== 'db' || !this.ctx.dataSource) {
+      throw new NotFoundException('Contact not found');
+    }
+
+    const existingRows = await this.ctx.dataSource.query(
+      `SELECT data FROM adwest.sreni_contacts WHERE id = $1::uuid AND location_id = $2::uuid`,
+      [contactId, locationId],
+    ) as Array<{ data: Record<string, string | number | boolean | null> }>;
+    if (!existingRows[0]) throw new NotFoundException('Contact not found');
+
+    const merged = { ...(existingRows[0].data ?? {}), ...data };
+    const rows = await this.ctx.dataSource.query(
+      `UPDATE adwest.sreni_contacts
+       SET data = $1::jsonb, updated_at = now()
+       WHERE id = $2::uuid AND location_id = $3::uuid
+       RETURNING id::text, location_id::text, row_index, data,
+                 zone_location_id::text, sthan_location_id::text, division_location_id::text,
+                 source_file, uploaded_by, created_at, updated_at`,
+      [JSON.stringify(merged), contactId, locationId],
+    ) as Array<{
+      id: string; location_id: string; row_index: number;
+      data: Record<string, unknown>;
+      zone_location_id: string | null; sthan_location_id: string | null; division_location_id: string | null;
+      source_file: string | null; uploaded_by: string | null;
+      created_at: string | Date; updated_at: string | Date;
+    }>;
+    if (!rows[0]) throw new NotFoundException('Contact not found');
+    const r = rows[0];
+    return {
+      id: r.id,
+      locationId: r.location_id,
+      rowIndex: r.row_index,
+      data: r.data as Record<string, string | number | boolean | null>,
+      zoneLocationId: r.zone_location_id ?? undefined,
+      sthanLocationId: r.sthan_location_id ?? undefined,
+      divisionLocationId: r.division_location_id ?? undefined,
+      sourceFile: r.source_file ?? undefined,
+      uploadedBy: r.uploaded_by ?? undefined,
+      createdAt: this.ctx.toIsoTimestamp(r.created_at),
+      updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+    };
+  }
+
   async clearSthanContacts(locationId: string): Promise<{ deleted: number }> {
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
       const result = await this.ctx.dataSource.query(

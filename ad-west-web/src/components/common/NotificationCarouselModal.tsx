@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AppNotificationApi, backendApi } from '../../utils/backendApi'
+import { CloseIcon, IconButton } from './IconButton'
 
 interface Props {
   userType: 'admin' | 'member'
@@ -48,17 +49,11 @@ export function NotificationCarouselModal({ userType }: Props) {
         }}
       >
         {/* Close */}
-        <button
-          onClick={() => setDismissed(true)}
-          style={{
-            position: 'absolute', top: '14px', right: '16px',
-            background: 'none', border: 'none', fontSize: '1.3rem',
-            cursor: 'pointer', color: 'var(--text-secondary-dark)', lineHeight: 1,
-          }}
-          aria-label="Close"
-        >
-          ×
-        </button>
+        <div style={{ position: 'absolute', top: '10px', right: '12px' }}>
+          <IconButton label="Close" variant="ghost" onClick={() => setDismissed(true)}>
+            <CloseIcon />
+          </IconButton>
+        </div>
 
         {/* Bell icon */}
         <div style={{ fontSize: '2.5rem', marginBottom: '12px', textAlign: 'center' }}>🔔</div>
@@ -100,11 +95,11 @@ export function NotificationCarouselModal({ userType }: Props) {
         <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
           {total > 1 && (
             <>
-              <button className="btn btn-secondary" style={{ fontSize: '0.85rem', padding: '7px 16px' }} onClick={prev}>← Prev</button>
-              <button className="btn btn-secondary" style={{ fontSize: '0.85rem', padding: '7px 16px' }} onClick={next}>Next →</button>
+              <button className="btn btn-secondary btn-sm page-nav-btn" onClick={prev}>← Prev</button>
+              <button className="btn btn-secondary btn-sm page-nav-btn" onClick={next}>Next →</button>
             </>
           )}
-          <button className="btn btn-primary" style={{ fontSize: '0.85rem', padding: '7px 20px' }} onClick={() => setDismissed(true)}>
+          <button className="btn btn-secondary" onClick={() => setDismissed(true)}>
             {total > 1 ? 'Close All' : 'Got it'}
           </button>
         </div>

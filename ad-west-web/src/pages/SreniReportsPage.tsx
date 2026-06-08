@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { backendApi, SreniReportApi, SreniReportParameterApi } from '../utils/backendApi';
 import { useToast } from '../components/common/Toast';
-import { ExportMenu, formatExportSections, RowExportButton } from '../components/common/ExportMenu';
+import { PageHeader } from '../components/common/PageHeader';
+import { EXPORT_FORMATS, ExportMenu, formatExportSections } from '../components/common/ExportMenu';
+import { TableRowActionsMenu } from '../components/common/TableRowActionsMenu';
+import { formatLabels } from '../utils/tableExport';
 import { useAuth } from '../context/auth-context';
 import { useEnumOptions } from '../hooks/useEnumOptions';
 import { exportSreniReports } from '../utils/reportExport';
@@ -173,46 +176,27 @@ export const SreniReportsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
 
   return (
     <div className="animate-slide-up">
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
-        <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>📊 {sreniName} — Reports</h2>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginTop: '4px', marginBottom: 0 }}>
-            Submit and review activity reports.
-          </p>
-          <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <span className="badge badge-info" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid currentColor', background: 'transparent', fontSize: '0.8rem', fontWeight: 600 }}>
-              <span style={{ fontWeight: 800 }}>{allReports.length}</span>
-              {allReports.length === 1 ? 'Report' : 'Reports'} submitted
-            </span>
-            {enabledTypes.length === 0 && (
-              <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', border: '1px solid currentColor', background: 'transparent', fontSize: '0.8rem', fontWeight: 600 }}>
-                No parameters configured — set up in Report Config
-              </span>
-            )}
-          </div>
-        </div>
-        {!isFormOpen && typeParams.length > 0 && (
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <ExportMenu
-              disabled={isLoading}
-              sections={reportExportSections}
-            />
+      <PageHeader
+        icon="📊"
+        title={`${sreniName} — Reports`}
+        subtitle="Submit and review activity reports."
+        stats={[
+          { label: allReports.length === 1 ? 'Report submitted' : 'Reports submitted', value: allReports.length, variant: 'info' },
+          ...(enabledTypes.length === 0 ? [{ label: 'No parameters configured', value: '—', variant: 'warning' as const }] : []),
+        ]}
+        actions={!isFormOpen && typeParams.length > 0 ? (
+          <>
+            <ExportMenu disabled={isLoading} sections={reportExportSections} />
             <button
               type="button"
-              className="btn btn-primary"
-              style={{ fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+              className="btn btn-primary btn-sm"
               onClick={() => { const def = typeReports.find((r) => r.periodYear === formYear && r.periodValue === formValue); openForm(formYear, formValue, def); }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="16 16 12 12 8 16" /><line x1="12" y1="12" x2="12" y2="21" />
-                <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
-              </svg>
               Submit Report
             </button>
-          </div>
-        )}
-      </div>
+          </>
+        ) : undefined}
+      />
 
       {/* Type tabs */}
       {enabledTypes.length > 0 && (
@@ -252,7 +236,7 @@ export const SreniReportsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
             <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>
               {TYPE_ICONS[activeType] ?? '📋'} Submit {submissionTypeLabel(activeType)} Report — {periodLabel(activeType, formYear, formValue)}
             </h4>
-            <button type="button" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.82rem' }} onClick={() => setIsFormOpen(false)}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIsFormOpen(false)}>
               Cancel
             </button>
           </div>
@@ -375,16 +359,17 @@ export const SreniReportsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
                   {typeParams.slice(0, 4).map((p) => (
                     <td key={p.id} style={{ fontSize: '0.85rem' }}>{report.entries[p.id] ?? '—'}</td>
                   ))}
-                  <td>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
-                      <RowExportButton
-                        title={`Export ${periodLabel(activeType, report.periodYear, report.periodValue)}`}
-                        onExport={(format) => exportSingleReport(report, format)}
-                      />
-                      <button type="button" className="btn btn-secondary" style={{ padding: '6px 14px', fontSize: '0.82rem', whiteSpace: 'nowrap' }} onClick={() => openForm(report.periodYear, report.periodValue, report)}>
-                        ✏️ Edit
-                      </button>
-                    </div>
+                  <td style={{ textAlign: 'right', verticalAlign: 'middle', width: '56px' }}>
+                    <TableRowActionsMenu
+                      ariaLabel={`Actions for ${periodLabel(activeType, report.periodYear, report.periodValue)}`}
+                      actions={[
+                        ...EXPORT_FORMATS.map((format) => ({
+                          label: `Export ${formatLabels[format]}`,
+                          onClick: () => exportSingleReport(report, format),
+                        })),
+                        { label: 'Edit', onClick: () => openForm(report.periodYear, report.periodValue, report) },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}

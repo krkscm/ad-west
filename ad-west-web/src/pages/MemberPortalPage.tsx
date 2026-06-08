@@ -49,10 +49,10 @@ export const MemberPortalPage: React.FC<MemberPortalPageProps> = ({ onBack }) =>
 
         <div className="member-portal-actions" style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           <ThemeToggle iconOnly placement="header" />
-          <button className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '0.85rem' }} onClick={onBack}>
+          <button className="btn btn-secondary btn-md" onClick={onBack}>
             Back
           </button>
-          <button className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '0.85rem' }} onClick={logout}>
+          <button className="btn btn-danger-outline" onClick={logout}>
             Log Out
           </button>
         </div>

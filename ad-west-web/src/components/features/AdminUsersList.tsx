@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useToast } from '../common/Toast'
 import { useConfirm } from '../common/ConfirmDialog'
 import { backendApi, AdminUserApi, RoleDefinitionApi } from '../../utils/backendApi'
+import { TableRowActionsMenu } from '../common/TableRowActionsMenu'
 
 const toUiError = (e: unknown, fallback: string): string => {
   if (!(e instanceof Error)) return fallback
@@ -123,7 +124,7 @@ export const AdminUsersList: React.FC<Props> = ({ onAdd, onEdit }) => {
             {total} administrator{total !== 1 ? 's' : ''} · page {page} of {totalPages}
           </p>
         </div>
-        <button className="btn btn-primary" onClick={onAdd} style={{ fontSize: '0.875rem' }}>
+        <button className="btn btn-primary" onClick={onAdd}>
           + Add Administrator
         </button>
       </div>
@@ -173,39 +174,15 @@ export const AdminUsersList: React.FC<Props> = ({ onAdd, onEdit }) => {
                       {admin.active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                      <button
-                        className="btn btn-secondary"
-                        style={{ padding: '5px 14px', fontSize: '0.8rem' }}
-                        onClick={() => onEdit(admin.id)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="btn btn-secondary"
-                        style={{
-                          padding: '5px 14px', fontSize: '0.8rem',
-                          color: admin.active ? 'var(--error)' : 'var(--success)',
-                          borderColor: admin.active ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.3)',
-                        }}
-                        onClick={() => void handleToggleActive(admin)}
-                      >
-                        {admin.active ? 'Deactivate' : 'Activate'}
-                      </button>
-                      <button
-                        className="btn btn-secondary"
-                        style={{
-                          padding: '5px 10px', fontSize: '0.8rem',
-                          color: 'var(--error)',
-                          borderColor: 'rgba(239,68,68,0.3)',
-                        }}
-                        onClick={() => void handleDelete(admin)}
-                        title="Delete administrator"
-                      >
-                        🗑
-                      </button>
-                    </div>
+                  <td style={{ textAlign: 'right', verticalAlign: 'middle', width: '56px' }}>
+                    <TableRowActionsMenu
+                      ariaLabel={`Actions for ${admin.name}`}
+                      actions={[
+                        { label: 'Edit', onClick: () => onEdit(admin.id) },
+                        { label: admin.active ? 'Deactivate' : 'Activate', tone: admin.active ? 'warning' : 'success', onClick: () => void handleToggleActive(admin) },
+                        { label: 'Delete', tone: 'danger', onClick: () => void handleDelete(admin) },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}

@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../../components/common/Toast';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import { PageHeader } from '../../components/common/PageHeader';
+import { PaginationBar } from '../../components/common/PaginationBar';
 import { EmptyState } from '../../components/common/EmptyState';
+import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
 import {
   ApprovalWorkflowDefinitionApi,
   RoleDefinitionApi,
@@ -42,6 +44,7 @@ export const ApprovalWorkflowPage: React.FC<ApprovalWorkflowPageProps> = ({
   const confirm = useConfirm();
 
   const [items, setItems] = useState<ApprovalWorkflowDefinitionApi[]>([]);
+  const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -56,6 +59,7 @@ export const ApprovalWorkflowPage: React.FC<ApprovalWorkflowPageProps> = ({
       .listApprovalWorkflowDefinitions({ page: p, pageSize: ps, search: q })
       .then((res) => {
         setItems(res.items);
+        setTotal(res.total);
         setTotalPages(res.totalPages);
       })
       .catch((err) => addToast(toUiError(err, 'Failed to load workflows.'), 'error'))
@@ -130,13 +134,6 @@ export const ApprovalWorkflowPage: React.FC<ApprovalWorkflowPageProps> = ({
     }
   };
 
-  const pageNums = (() => {
-    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
-    if (page <= 4) return [1, 2, 3, 4, 5, '…', totalPages];
-    if (page >= totalPages - 3) return [1, '…', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-    return [1, '…', page - 1, page, page + 1, '…', totalPages];
-  })();
-
   const hasTable = !isLoading && items.length > 0;
 
   return (
@@ -146,12 +143,7 @@ export const ApprovalWorkflowPage: React.FC<ApprovalWorkflowPageProps> = ({
         title="Approval Workflows"
         subtitle="Define named approval chains with organization-chart style permission-set mapping."
         actions={
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '16px', paddingRight: '16px' }}
-            onClick={onAdd}
-          >
+          <button type="button" className="btn btn-primary btn-sm" onClick={onAdd}>
             New Workflow
           </button>
         }
@@ -162,7 +154,7 @@ export const ApprovalWorkflowPage: React.FC<ApprovalWorkflowPageProps> = ({
           <input className="form-input" placeholder="Search code or name..." value={search} onChange={(e) => handleSearchChange(e.target.value)} />
         </div>
         {search && (
-          <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.82rem' }} onClick={() => { setSearch(''); loadWorkflows(1, pageSize, ''); }}>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setSearch(''); loadWorkflows(1, pageSize, ''); }}>
             Clear
           </button>
         )}
@@ -237,44 +229,30 @@ export const ApprovalWorkflowPage: React.FC<ApprovalWorkflowPageProps> = ({
                         {w.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td style={{ padding: '10px 20px', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <button type="button" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => onEdit(w)}>
-                          {isBeingEdited ? 'Editing...' : 'Edit'}
-                        </button>
-                        <button type="button" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', color: w.isActive ? 'var(--error)' : 'var(--success)' }} onClick={() => void handleToggleActive(w)}>
-                          {w.isActive ? 'Deactivate' : 'Activate'}
-                        </button>
-                        <button type="button" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => void handleEvaluateCoverage(w)}>
-                          Coverage
-                        </button>
-                        <button type="button" className="btn btn-secondary" style={{ padding: '6px 10px', color: 'var(--error)' }} onClick={() => void handleDeleteWorkflow(w)}>
-                          Delete
-                        </button>
-                      </div>
+                    <td style={{ padding: '10px 20px', textAlign: 'right', verticalAlign: 'middle', width: '56px' }}>
+                      <TableRowActionsMenu
+                        ariaLabel={`Actions for ${w.name}`}
+                        actions={[
+                          { label: isBeingEdited ? 'Editing…' : 'Edit', onClick: () => onEdit(w), disabled: isBeingEdited },
+                          { label: w.isActive ? 'Deactivate' : 'Activate', tone: w.isActive ? 'warning' : 'success', onClick: () => void handleToggleActive(w) },
+                          { label: 'Coverage', onClick: () => void handleEvaluateCoverage(w) },
+                          { label: 'Delete', tone: 'danger', onClick: () => void handleDeleteWorkflow(w) },
+                        ]}
+                      />
                     </td>
                   </tr>
                 );
               })}
           </tbody>
         </table>
+        <PaginationBar
+          page={page}
+          totalPages={totalPages}
+          totalItems={total}
+          pageSize={pageSize}
+          onPageChange={setPage}
+        />
       </div>
-      )}
-
-      {hasTable && totalPages > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '14px 18px', borderTop: '1px solid var(--border-dark)' }}>
-          <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid var(--border-dark)', background: 'transparent', color: page === 1 ? 'var(--text-secondary-dark)' : 'var(--text-primary-dark)', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1, fontSize: '0.82rem' }}>
-            Prev
-          </button>
-          {pageNums.map((n, i) => (
-            <button key={i} type="button" onClick={() => typeof n === 'number' && setPage(n)} disabled={n === '…'} style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid', minWidth: '34px', borderColor: n === page ? 'var(--primary)' : 'var(--border-dark)', background: n === page ? 'var(--primary)' : 'transparent', color: n === page ? '#fff' : 'var(--text-primary-dark)', fontWeight: n === page ? 700 : 400, cursor: n === '…' ? 'default' : 'pointer', fontSize: '0.82rem' }}>
-              {n}
-            </button>
-          ))}
-          <button type="button" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid var(--border-dark)', background: 'transparent', color: page === totalPages ? 'var(--text-secondary-dark)' : 'var(--text-primary-dark)', cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.4 : 1, fontSize: '0.82rem' }}>
-            Next
-          </button>
-        </div>
       )}
     </div>
   );

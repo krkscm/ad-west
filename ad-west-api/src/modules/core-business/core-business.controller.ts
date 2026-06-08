@@ -81,6 +81,7 @@ import {
   CreateHouseholdMemberDto,
   SetContactActiveDto,
   SetContactSreniTagsDto,
+  UpdateContactDataDto,
   UpdateHouseholdMemberDto,
 } from './dto/core-business.dto';
 import { CoreBusinessService } from './core-business.service';
@@ -821,6 +822,16 @@ export class CoreBusinessController {
     return this.service.uploadGlobalContacts(file.buffer, file.originalname, actor?.email ?? actor?.userId);
   }
 
+  @Patch('org/sreni-definitions/:sreniId/contacts/:contactId')
+  @UseGuards(CoreAdminAuthGuard)
+  updateContactData(
+    @Param('sreniId') sreniId: string,
+    @Param('contactId') contactId: string,
+    @Body() dto: UpdateContactDataDto,
+  ) {
+    return this.service.updateContactData(sreniId, contactId, dto.data);
+  }
+
   @Patch('org/sreni-definitions/:sreniId/contacts/:contactId/division')
   @UseGuards(CoreAdminAuthGuard)
   async assignContactDivision(
@@ -1204,6 +1215,16 @@ export class CoreBusinessController {
   @UseGuards(CoreAdminAuthGuard)
   clearSthanContacts(@Param('locationId') locationId: string) {
     return this.service.clearSthanContacts(locationId);
+  }
+
+  @Patch('org/locations/:locationId/contacts/:contactId')
+  @UseGuards(CoreAdminAuthGuard)
+  updateSthanContact(
+    @Param('locationId') locationId: string,
+    @Param('contactId') contactId: string,
+    @Body() dto: UpdateContactDataDto,
+  ) {
+    return this.service.updateSthanContact(locationId, contactId, dto.data);
   }
 
   // ── Sthan Calendar ────────────────────────────────────────────────────────

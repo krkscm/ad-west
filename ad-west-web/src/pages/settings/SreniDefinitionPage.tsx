@@ -7,6 +7,7 @@ import { FormActions } from '../../components/common/FormActions';
 import { EmptyState } from '../../components/common/EmptyState';
 import { PaginationBar } from '../../components/common/PaginationBar';
 import { backendApi, EnumValueApi, SreniDefinitionApi } from '../../utils/backendApi';
+import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
@@ -201,7 +202,7 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
         subtitle="Define and manage srenies — the organisational units of your association."
         stats={[{ label: 'Total', value: total, variant: 'info' }]}
         actions={
-          <button type="button" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={toggleFormOpen}>
+          <button type="button" className={`btn ${formOpen && !editingId ? 'btn-secondary' : 'btn-primary'}`} onClick={toggleFormOpen}>
             {formOpen && !editingId ? (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             ) : (
@@ -400,55 +401,16 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
                   <td style={{ padding: '14px 20px', color: 'var(--text-secondary-dark)', fontSize: '0.8rem' }}>
                     {sreni.createdBy ?? <span style={{ opacity: 0.45 }}>—</span>}
                   </td>
-                  <td style={{ padding: '10px 20px', whiteSpace: 'nowrap' }}>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <button type="button" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }} onClick={() => startEdit(sreni)}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-                        Edit
-                      </button>
-                      <button type="button" className="btn btn-secondary" style={{
-                        padding: '6px 12px',
-                        fontSize: '0.8rem',
-                        color: sreni.joinUsVisible ? 'var(--error)' : 'var(--success)',
-                        borderColor: sreni.joinUsVisible ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-                        background: sreni.joinUsVisible ? 'rgba(239, 68, 68, 0.02)' : 'rgba(16, 185, 129, 0.02)',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }} onClick={() => void handleToggleJoinUsVisibility(sreni)}>
-                        {sreni.joinUsVisible ? 'Hide from Join Us' : 'Show in Join Us'}
-                      </button>
-                      <button type="button" className="btn btn-secondary" style={{ 
-                        padding: '6px 12px', 
-                        fontSize: '0.8rem', 
-                        color: sreni.active ? 'var(--error)' : 'var(--success)',
-                        borderColor: sreni.active ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-                        background: sreni.active ? 'rgba(239, 68, 68, 0.02)' : 'rgba(16, 185, 129, 0.02)',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }} onClick={() => void handleToggleActive(sreni)}>
-                        {sreni.active ? (
-                          <>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                            Deactivate
-                          </>
-                        ) : (
-                          <>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
-                            Activate
-                          </>
-                        )}
-                      </button>
-                      <button type="button" className="btn btn-secondary" style={{
-                        padding: '6px 10px',
-                        color: 'var(--error)',
-                        borderColor: 'rgba(239, 68, 68, 0.2)',
-                        background: 'rgba(239, 68, 68, 0.02)',
-                      }} onClick={() => void handleDelete(sreni)}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                      </button>
-                    </div>
+                  <td style={{ padding: '10px 20px', textAlign: 'right', verticalAlign: 'middle', width: '56px' }}>
+                    <TableRowActionsMenu
+                      ariaLabel={`Actions for ${sreni.name}`}
+                      actions={[
+                        { label: 'Edit', onClick: () => startEdit(sreni) },
+                        { label: sreni.joinUsVisible ? 'Hide from Join Us' : 'Show in Join Us', tone: sreni.joinUsVisible ? 'warning' : 'success', onClick: () => void handleToggleJoinUsVisibility(sreni) },
+                        { label: sreni.active ? 'Deactivate' : 'Activate', tone: sreni.active ? 'warning' : 'success', onClick: () => void handleToggleActive(sreni) },
+                        { label: 'Delete', tone: 'danger', onClick: () => void handleDelete(sreni) },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}

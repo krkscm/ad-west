@@ -19,6 +19,7 @@ export const GoogleIntegrationSettingsPage: React.FC = () => {
   const [webAppOrigin, setWebAppOrigin] = useState('');
   const [enabled, setEnabled] = useState(true);
   const [clearClientSecret, setClearClientSecret] = useState(false);
+  const [showClientSecret, setShowClientSecret] = useState(false);
 
   useEffect(() => {
     setIsLoading(true);
@@ -93,13 +94,28 @@ export const GoogleIntegrationSettingsPage: React.FC = () => {
 
             <div className="form-group">
               <label className="form-label">Google Client Secret</label>
-              <input
-                className="form-input"
-                type="password"
-                placeholder={config?.hasClientSecret ? 'Stored in DB — leave empty to keep current' : 'Enter client secret'}
-                value={clientSecret}
-                onChange={(e) => setClientSecret(e.target.value)}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  className="form-input"
+                  type={showClientSecret ? 'text' : 'password'}
+                  placeholder={config?.hasClientSecret ? 'Stored in DB — leave empty to keep current' : 'Enter client secret'}
+                  value={clientSecret}
+                  onChange={(e) => setClientSecret(e.target.value)}
+                  style={{ paddingRight: '48px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowClientSecret(p => !p)}
+                  style={{
+                    position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                    background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
+                    color: 'var(--text-secondary-dark)', fontSize: '1rem', lineHeight: 1,
+                  }}
+                  aria-label={showClientSecret ? 'Hide secret' : 'Show secret'}
+                >
+                  {showClientSecret ? '🙈' : '👁️'}
+                </button>
+              </div>
               <SwitchToggle
                 checked={clearClientSecret}
                 onChange={setClearClientSecret}

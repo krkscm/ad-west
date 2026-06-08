@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { CloseIcon } from './IconButton';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -47,8 +48,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               </span>
               <p style={{ fontSize: '0.9rem', fontWeight: 500, lineHeight: 1.4 }}>{t.message}</p>
             </div>
-            <button className="toast-close" onClick={() => removeToast(t.id)}>
-              &times;
+            <button type="button" className="toast-close" onClick={() => removeToast(t.id)} aria-label="Dismiss">
+              <CloseIcon />
             </button>
           </div>
         ))}

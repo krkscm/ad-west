@@ -1265,6 +1265,10 @@ export class SetContactActiveDto {
   active!: boolean;
 }
 
+export class UpdateContactDataDto {
+  data!: Record<string, string | number | boolean | null>;
+}
+
 export class ContactSreniTagItemDto {
   @IsString()
   sreniId!: string;
