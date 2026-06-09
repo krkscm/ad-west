@@ -4,7 +4,6 @@ import { DateField, validateBirthDate } from '../../components/common/DateFields
 import { PublicFormSection } from '../../components/common/PublicFormSection'
 import { SwitchToggle } from '../../components/common/SwitchToggle'
 import { PublicPageShell } from './PublicPageShell'
-import { GoogleMapLocationPicker } from '../../components/public/GoogleMapLocationPicker'
 
 const EMAIL_FORMAT_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE_PERMISSIVE_REGEX = /^\+?[\d\s()\-]{7,20}$/
@@ -100,8 +99,6 @@ export function PublicContactRegistrationPage() {
   const [bloodGroups, setBloodGroups] = useState<EnumOption[]>(FALLBACK_BLOOD_GROUPS.map((v) => ({ value: v, label: v })))
   const [livingTypes, setLivingTypes] = useState<EnumOption[]>(FALLBACK_LIVING_TYPES.map((v) => ({ value: v, label: v })))
   const [childGrades, setChildGrades] = useState<EnumOption[]>([])
-  const [mapsApiKey, setMapsApiKey] = useState<string | undefined>()
-
   const [sreniId, setSreniId] = useState('')
   const [form, setForm] = useState<JoinUsFormState>(emptyFormState)
   const [includeSpouse, setIncludeSpouse] = useState(false)
@@ -136,7 +133,6 @@ export function PublicContactRegistrationPage() {
           if (formOpts.bloodGroups.length) setBloodGroups(formOpts.bloodGroups)
           if (formOpts.livingTypes.length) setLivingTypes(formOpts.livingTypes)
           setChildGrades(formOpts.childGrades)
-          setMapsApiKey(formOpts.mapsApiKey)
         }
       })
       .catch(() => setError('Unable to load available sreni options. Please try again shortly.'))
@@ -556,12 +552,6 @@ export function PublicContactRegistrationPage() {
                   <label style={fieldLabelStyle}>Address in UAE</label>
                   <input className="form-input" value={form.addressInUae} onChange={(e) => setField('addressInUae', e.target.value)} />
                 </div>
-                <GoogleMapLocationPicker
-                  apiKey={mapsApiKey}
-                  value={form.googleMapLink}
-                  onChange={(link) => setField('googleMapLink', link)}
-                  labelStyle={fieldLabelStyle}
-                />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div className="form-group">
                     <label style={fieldLabelStyle}>Land Line No</label>
