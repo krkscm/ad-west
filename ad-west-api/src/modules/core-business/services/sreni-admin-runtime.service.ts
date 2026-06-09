@@ -7,64 +7,14 @@ import type {
   HouseholdMemberRecord,
   SreniParticipantRecord,
 } from '../core-business.types';
-import type { ContactSreniTagRecord, GlobalContactUploadDuplicate, ReportMetricDefinitionRecord, SreniContactRecord, SreniDivisionRecord, SreniMonthlyReportRecord, SreniReportParameterRecord, SrenyRecord } from '../core-business.service';
-import { assertContactUploadRowLimit, CONTACT_UPLOAD_BATCH_SIZE } from './contact-upload.constants';
+import type { ContactSreniTagRecord, ReportMetricDefinitionRecord, SreniContactRecord, SreniDivisionRecord, SreniMonthlyReportRecord, SreniReportParameterRecord, SrenyRecord } from '../core-business.service';
 import { HouseholdMemberService } from './household-member.service';
+import { MemberContactPersistenceService } from './member-contact-persistence.service';
 import { HouseholdParticipantResolverService } from './household-participant-resolver.service';
 import { HouseholdEnumConfigService, type HouseholdResolverKey } from './household-enum-config.service';
-
-type SreniContactCellValue = string | number | boolean | null;
-
-const MASTER_SRENI_CONTACT_FIELDS: Array<{
-  key: string;
-  header: string;
-  occurrence?: number;
-}> = [
-  { key: 'name', header: 'name' },
-  { key: 'personalNumber', header: 'personal number' },
-  { key: 'updatesAsPerAug2024', header: 'updates as per aug2024' },
-  { key: 'ss', header: 'ss' },
-  { key: 'companyMobileNo2', header: 'company mobile no 2' },
-  { key: 'bhag', header: 'bhag' },
-  { key: 'samithi', header: 'samithi' },
-  { key: 'samithiStatus', header: 'samithi status' },
-  { key: 'balabarathi', header: 'balabarathi' },
-  { key: 'bbStatus', header: 'bb status' },
-  { key: 'yoga', header: 'yoga', occurrence: 1 },
-  { key: 'familyOrBachelor', header: 'family / bachelor' },
-  { key: 'family', header: 'family' },
-  { key: 'bachelor', header: 'bachelor' },
-  { key: 'addressInUae', header: 'address in uae' },
-  { key: 'company', header: 'company' },
-  { key: 'profession', header: 'profession' },
-  { key: 'wifeName', header: 'wifename' },
-  { key: 'mobileNo4', header: 'mobileno4' },
-  { key: 'landLine', header: 'land line' },
-  { key: 'zoneOrLandmark', header: 'zone / land mark' },
-  { key: 'district', header: 'district' },
-  { key: 'company8', header: 'company8' },
-  { key: 'profession7', header: 'profession7' },
-  { key: 'yogaSecondary', header: 'yoga', occurrence: 2 },
-];
-
-const normalizeContactTemplateHeader = (value: unknown): string =>
-  String(value ?? '')
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .replace(/[^a-z0-9 /]/g, '')
-    .trim();
-
-const normalizeSreniContactCell = (value: unknown): SreniContactCellValue => {
-  if (value === null || value === undefined) return null;
-  if (typeof value === 'number' || typeof value === 'boolean') return value;
-  const text = String(value).trim();
-  if (!text.length) return null;
-  if (/^-?\d+(\.\d+)?$/.test(text)) {
-    const parsed = Number(text);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return text;
-};
+import { ContactAccessScope, ContactAccessScopeService } from './contact-access-scope.service';
+import { GadaAssignmentService, type GadaListQueryOptions } from './gada-assignment.service';
+import { MemberSreniRef, SevaSamithiContactService } from './seva-samithi-contact.service';
 
 export interface SreniAdminRuntimeContext {
   srenies: Map<string, SrenyRecord>;
@@ -85,54 +35,10 @@ export interface SreniAdminRuntimeContext {
 export class SreniAdminRuntimeService {
   constructor(private readonly ctx: SreniAdminRuntimeContext) {}
 
+  private readonly contactScopeHelper = new ContactAccessScopeService();
+
   private householdMemberService: HouseholdMemberService | null = null;
   private participantResolverService: HouseholdParticipantResolverService | null = null;
-
-  private async batchInsertSreniContactsDb(
-    rows: Array<{
-      sreniId: string | null;
-      rowIndex: number;
-      data: Record<string, SreniContactCellValue>;
-      sourceFile: string;
-      uploadedBy?: string | null;
-      includeActiveTimestamps?: boolean;
-    }>,
-  ): Promise<Array<{ id: string; data: Record<string, SreniContactCellValue> }>> {
-    if (!this.ctx.dataSource || rows.length === 0) return [];
-
-    const inserted: Array<{ id: string; data: Record<string, SreniContactCellValue> }> = [];
-    for (let offset = 0; offset < rows.length; offset += CONTACT_UPLOAD_BATCH_SIZE) {
-      const batch = rows.slice(offset, offset + CONTACT_UPLOAD_BATCH_SIZE);
-      const sreniIds = batch.map((row) => row.sreniId);
-      const rowIndexes = batch.map((row) => row.rowIndex);
-      const dataValues = batch.map((row) => JSON.stringify(row.data));
-      const sourceFiles = batch.map((row) => row.sourceFile);
-      const uploadedBys = batch.map((row) => row.uploadedBy ?? null);
-
-      const result = batch[0]?.includeActiveTimestamps
-        ? await this.ctx.dataSource.query(
-          `INSERT INTO adwest.sreni_contacts (sreni_id, row_index, data, active, source_file, uploaded_by, created_at, updated_at)
-           SELECT sreni_id, row_index, data::jsonb, true, source_file, uploaded_by, $6::timestamptz, $6::timestamptz
-           FROM UNNEST($1::text[], $2::int[], $3::text[], $4::text[], $5::text[])
-             AS t(sreni_id, row_index, data, source_file, uploaded_by)
-           RETURNING id::text AS id, data`,
-          [sreniIds, rowIndexes, dataValues, sourceFiles, uploadedBys, new Date().toISOString()],
-        )
-        : await this.ctx.dataSource.query(
-          `INSERT INTO adwest.sreni_contacts (sreni_id, row_index, data, source_file, uploaded_by)
-           SELECT sreni_id, row_index, data::jsonb, source_file, uploaded_by
-           FROM UNNEST($1::text[], $2::int[], $3::text[], $4::text[], $5::text[])
-             AS t(sreni_id, row_index, data, source_file, uploaded_by)
-           RETURNING id::text AS id, data`,
-          [sreniIds, rowIndexes, dataValues, sourceFiles, uploadedBys],
-        );
-
-      for (const row of result as Array<{ id: string; data: Record<string, SreniContactCellValue> }>) {
-        inserted.push({ id: row.id, data: row.data ?? {} });
-      }
-    }
-    return inserted;
-  }
 
   private getHouseholdMembers(): HouseholdMemberService {
     if (!this.householdMemberService) {
@@ -263,13 +169,41 @@ export class SreniAdminRuntimeService {
     }
   }
 
+  private householdSreniScopeSql(contactIdParam: string, sreniIdParam: string, isSevaSamithi: boolean): string {
+    if (isSevaSamithi) {
+      return `EXISTS (SELECT 1 FROM adwest.seva_samithi_contacts ssc WHERE ssc.contact_id = ${contactIdParam}::uuid)`;
+    }
+    return `(
+      sreni_id = ${sreniIdParam}
+      OR (
+        sreni_id IS NULL
+        AND EXISTS (
+          SELECT 1 FROM adwest.contact_sreni_tags cst
+          WHERE cst.contact_id = ${contactIdParam}::uuid AND cst.sreni_id = ${sreniIdParam}
+        )
+      )
+    )`;
+  }
+
   async assignContactDivision(sreniId: string, contactId: string, dto: AssignContactDivisionDto): Promise<SreniContactRecord> {
     const divisionId = dto.divisionId ?? undefined;
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const isSevaSamithi = await SevaSamithiContactService.isSevaSamithiSreni(this.ctx.dataSource, sreniId);
+      const scopeSql = this.householdSreniScopeSql('$2', '$3', isSevaSamithi);
+
+      await this.ctx.dataSource.query(
+        `UPDATE adwest.contact_sreni_tags
+         SET division_id = $1, updated_at = now()
+         WHERE contact_id = $2::uuid AND sreni_id = $3`,
+        [divisionId ?? null, contactId, sreniId],
+      );
+
       const rows = await this.ctx.dataSource.query(
         `UPDATE adwest.sreni_contacts
          SET division_id = $1, updated_at = now()
-         WHERE id = $2 AND sreni_id = $3
+         WHERE id = $2::uuid
+           AND contact_kind = 'household'
+           AND sreni_id = $3
          RETURNING id, sreni_id, row_index, data, zone_location_id, sthan_location_id, division_location_id, division_id, COALESCE(active, true) AS active, source_file, uploaded_by, created_at, updated_at`,
         [divisionId ?? null, contactId, sreniId],
       ) as Array<{
@@ -279,25 +213,65 @@ export class SreniAdminRuntimeService {
         division_id: string | null; active: boolean; source_file: string | null;
         uploaded_by: string | null; created_at: string | Date; updated_at: string | Date;
       }>;
-      if (!rows[0]) throw new NotFoundException('Contact not found');
-      const r = rows[0];
-      const updated: SreniContactRecord = {
-        id: r.id,
-        sreniId: r.sreni_id,
-        rowIndex: r.row_index,
-        data: r.data ?? {},
-        zoneLocationId: r.zone_location_id ?? undefined,
-        sthanLocationId: r.sthan_location_id ?? undefined,
-        divisionLocationId: r.division_location_id ?? undefined,
-        divisionId: r.division_id ?? undefined,
-        active: r.active ?? true,
-        sourceFile: r.source_file ?? undefined,
-        uploadedBy: r.uploaded_by ?? undefined,
-        createdAt: this.ctx.toIsoTimestamp(r.created_at),
-        updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+      if (rows[0]) {
+        const r = rows[0];
+        const updated: SreniContactRecord = {
+          id: r.id,
+          sreniId: isSevaSamithi ? sreniId : r.sreni_id,
+          rowIndex: r.row_index,
+          data: r.data ?? {},
+          zoneLocationId: r.zone_location_id ?? undefined,
+          sthanLocationId: r.sthan_location_id ?? undefined,
+          divisionLocationId: r.division_location_id ?? undefined,
+          divisionId: r.division_id ?? undefined,
+          active: r.active ?? true,
+          sourceFile: r.source_file ?? undefined,
+          uploadedBy: r.uploaded_by ?? undefined,
+          createdAt: this.ctx.toIsoTimestamp(r.created_at),
+          updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+        };
+        this.ctx.sreniContacts.set(`${sreniId}:${contactId}`, updated);
+        return updated;
+      }
+
+      const tagOnlyRows = await this.ctx.dataSource.query(
+        `SELECT c.id, c.sreni_id, c.row_index, c.data, c.zone_location_id, c.sthan_location_id,
+                c.division_location_id, c.division_id, c.sthan_id, COALESCE(c.active, true) AS active,
+                c.source_file, c.uploaded_by, c.created_at, c.updated_at
+         FROM adwest.sreni_contacts c
+         WHERE c.id = $1::uuid
+           AND c.contact_kind = 'household'
+           AND ${scopeSql}
+         LIMIT 1`,
+        isSevaSamithi ? [contactId] : [contactId, sreniId],
+      ) as Array<{
+        id: string; sreni_id: string | null; row_index: number;
+        data: Record<string, string | number | boolean | null>;
+        zone_location_id: string | null; sthan_location_id: string | null; division_location_id: string | null;
+        division_id: string | null; sthan_id: string | null; active: boolean;
+        source_file: string | null; uploaded_by: string | null;
+        created_at: string | Date; updated_at: string | Date;
+      }>;
+      if (!tagOnlyRows[0]) throw new NotFoundException('Contact not found');
+      const tagRow = tagOnlyRows[0];
+      const tagUpdated: SreniContactRecord = {
+        id: tagRow.id,
+        sreniId: tagRow.sreni_id,
+        rowIndex: tagRow.row_index,
+        data: tagRow.data ?? {},
+        zoneLocationId: tagRow.zone_location_id ?? undefined,
+        sthanLocationId: tagRow.sthan_location_id ?? undefined,
+        divisionLocationId: tagRow.division_location_id ?? undefined,
+        divisionId: divisionId,
+        sthanId: tagRow.sthan_id ?? undefined,
+        active: tagRow.active ?? true,
+        sourceFile: tagRow.source_file ?? undefined,
+        uploadedBy: tagRow.uploaded_by ?? undefined,
+        createdAt: this.ctx.toIsoTimestamp(tagRow.created_at),
+        updatedAt: new Date().toISOString(),
       };
-      this.ctx.sreniContacts.set(`${sreniId}:${contactId}`, updated);
-      return updated;
+      this.ctx.sreniContacts.set(`${sreniId}:${contactId}`, tagUpdated);
+      return tagUpdated;
     }
     const existing = this.ctx.sreniContacts.get(`${sreniId}:${contactId}`);
     if (!existing) throw new NotFoundException('Contact not found');
@@ -309,12 +283,38 @@ export class SreniAdminRuntimeService {
   async assignContactSthan(sreniId: string, contactId: string, dto: AssignContactSthanDto): Promise<SreniContactRecord> {
     const sthanId = dto.sthanId ?? undefined;
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const isSevaSamithi = await SevaSamithiContactService.isSevaSamithiSreni(this.ctx.dataSource, sreniId);
+      const scopeSql = this.householdSreniScopeSql('$2', '$3', isSevaSamithi);
+      let sthanName: string | null = null;
+      let zoneLocationId: string | null = null;
+      if (sthanId) {
+        const locRows = await this.ctx.dataSource.query(
+          `SELECT name, parent_id::text AS parent_id
+           FROM adwest.locations WHERE id::text = $1 AND level = 'sthan' LIMIT 1`,
+          [sthanId],
+        ) as Array<{ name: string; parent_id: string | null }>;
+        sthanName = locRows[0]?.name ?? null;
+        zoneLocationId = locRows[0]?.parent_id ?? null;
+      }
+
       const rows = await this.ctx.dataSource.query(
         `UPDATE adwest.sreni_contacts
-         SET sthan_id = $1, updated_at = now()
-         WHERE id = $2 AND sreni_id = $3
+         SET sthan_id = $1,
+             sthan_location_id = CASE WHEN $1 IS NULL THEN NULL ELSE $1::uuid END,
+             location_id = CASE WHEN $1 IS NULL THEN NULL ELSE $1::uuid END,
+             zone_location_id = CASE WHEN $4::uuid IS NULL THEN zone_location_id ELSE $4::uuid END,
+             data = CASE
+               WHEN $5::text IS NULL THEN data
+               ELSE jsonb_set(COALESCE(data, '{}'::jsonb), '{sthan}', to_jsonb($5::text), true)
+             END,
+             updated_at = now()
+         WHERE id = $2::uuid
+           AND contact_kind = 'household'
+           AND ${scopeSql}
          RETURNING id, sreni_id, row_index, data, zone_location_id, sthan_location_id, division_location_id, division_id, sthan_id, COALESCE(active, true) AS active, source_file, uploaded_by, created_at, updated_at`,
-        [sthanId ?? null, contactId, sreniId],
+        isSevaSamithi
+          ? [sthanId ?? null, contactId, sreniId, zoneLocationId, sthanName]
+          : [sthanId ?? null, contactId, sreniId, zoneLocationId, sthanName],
       ) as Array<{
         id: string; sreni_id: string; row_index: number;
         data: Record<string, string | number | boolean | null>;
@@ -326,7 +326,7 @@ export class SreniAdminRuntimeService {
       if (!rows[0]) throw new NotFoundException('Contact not found');
       const r = rows[0];
       const updated: SreniContactRecord = {
-        id: r.id, sreniId: r.sreni_id, rowIndex: r.row_index,
+        id: r.id, sreniId: isSevaSamithi ? sreniId : r.sreni_id, rowIndex: r.row_index,
         data: r.data ?? {},
         zoneLocationId: r.zone_location_id ?? undefined,
         sthanLocationId: r.sthan_location_id ?? undefined,
@@ -350,6 +350,8 @@ export class SreniAdminRuntimeService {
     sreniId: string,
     page = 1,
     pageSize = 50,
+    scope?: ContactAccessScope,
+    gadaOptions?: GadaListQueryOptions,
   ): Promise<{
     items: (SreniContactRecord & { sreniName: string; isTagged: boolean })[];
     total: number;
@@ -360,7 +362,16 @@ export class SreniAdminRuntimeService {
     primaryContactStrategy: string;
     resolverKey: HouseholdResolverKey;
     participantTotal: number;
+    gadaAssignmentEnabled: boolean;
+    canManageGadaAssignments: boolean;
   }> {
+    const gadaService = new GadaAssignmentService(this.ctx.dataSource);
+    const gadaEnabled = this.ctx.dataSource && scope
+      ? await gadaService.isGadaEnabled(sreniId)
+      : false;
+    const canManageGadaAssignments = Boolean(scope && gadaEnabled && gadaService.isAssignmentCoordinator(scope));
+    const gadaJoins: string[] = [];
+
     const enrollmentScope = await this.getHouseholdMembers().getSreniEnrollmentScope(sreniId);
     const participantStats = await this.getParticipantResolver().getSreniParticipantStats(sreniId);
     const primaryContactStrategy = participantStats.strategy;
@@ -368,30 +379,169 @@ export class SreniAdminRuntimeService {
     const participantTotal = participantStats.participantCount;
 
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      if (await SevaSamithiContactService.isSevaSamithiSreni(this.ctx.dataSource, sreniId)) {
+        return this.listSevaSamithiContacts(
+          sreniId,
+          page,
+          pageSize,
+          scope,
+          enrollmentScope,
+          primaryContactStrategy,
+          resolverKey,
+          participantTotal,
+        );
+      }
+
       const offset = (page - 1) * pageSize;
+
+      if (primaryContactStrategy === 'ENROLLED_CHILDREN') {
+        const childConditions = [
+          `c.sreni_id = $1`,
+          `c.contact_kind = 'child'`,
+          `COALESCE(c.active, true) = true`,
+        ];
+        const childParams: unknown[] = [sreniId];
+        let childParamIdx = 2;
+        if (scope) {
+          childParamIdx = this.contactScopeHelper.appendStahanSql('c', scope, childConditions, childParams, childParamIdx);
+        }
+        if (gadaEnabled && scope) {
+          gadaService.appendGadaJoin(sreniId, 'c', gadaJoins);
+          childParamIdx = gadaService.appendGadaListFilter(
+            sreniId, scope, gadaEnabled, gadaOptions, childConditions, childParams, childParamIdx,
+          );
+        }
+        const childJoinSql = gadaJoins.length ? ` ${gadaJoins.join(' ')}` : '';
+        const childWhere = `WHERE ${childConditions.join(' AND ')}`;
+        const childLimitIdx = childParamIdx;
+        const childOffsetIdx = childParamIdx + 1;
+
+        const [countRows, rows] = await Promise.all([
+          this.ctx.dataSource.query(
+            `SELECT COUNT(*)::int AS total FROM adwest.sreni_contacts c${childJoinSql} ${childWhere}`,
+            childParams,
+          ) as Promise<Array<{ total: number }>>,
+          this.ctx.dataSource.query(
+            `SELECT c.id, c.sreni_id, c.row_index, c.data,
+                    c.zone_location_id, c.sthan_location_id, c.division_location_id,
+                    c.division_id, c.sthan_id, c.parent_contact_id,
+                    COALESCE(c.active, true) AS active,
+                    c.source_file, c.uploaded_by, c.created_at, c.updated_at,
+                    COALESCE(s.name, c.sreni_id) AS sreni_name,
+                    false AS is_tagged,
+                    0 AS child_count,
+                    NULL::text AS children_division_summary,
+                    0 AS participant_count,
+                    cga.gadanayak_user_id::text AS gadanayak_user_id,
+                    gadanayak_u.name AS gadanayak_user_name
+             FROM adwest.sreni_contacts c
+             LEFT JOIN adwest.srenies s ON s.id::text = c.sreni_id
+             ${childJoinSql}
+             ${childWhere}
+             ORDER BY c.row_index ASC
+             LIMIT $${childLimitIdx} OFFSET $${childOffsetIdx}`,
+            [...childParams, pageSize, offset],
+          ) as Promise<Array<{
+            id: string; sreni_id: string; row_index: number;
+            data: Record<string, string | number | boolean | null>;
+            zone_location_id: string | null; sthan_location_id: string | null; division_location_id: string | null;
+            division_id: string | null; sthan_id: string | null; parent_contact_id: string | null; active: boolean;
+            source_file: string | null; uploaded_by: string | null;
+            created_at: string | Date; updated_at: string | Date;
+            sreni_name: string; is_tagged: boolean;
+            child_count: number; children_division_summary: string | null;
+            participant_count: number;
+            gadanayak_user_id: string | null;
+            gadanayak_user_name: string | null;
+          }>>,
+        ]);
+        const total = countRows[0]?.total ?? 0;
+        const totalPages = Math.max(1, Math.ceil(total / pageSize));
+        const items = rows.map((r) => ({
+          id: r.id,
+          sreniId: r.sreni_id,
+          sreniName: r.sreni_name,
+          rowIndex: r.row_index,
+          data: r.data ?? {},
+          contactKind: 'child' as const,
+          parentContactId: r.parent_contact_id ?? undefined,
+          zoneLocationId: r.zone_location_id ?? undefined,
+          sthanLocationId: r.sthan_location_id ?? undefined,
+          divisionLocationId: r.division_location_id ?? undefined,
+          divisionId: r.division_id ?? undefined,
+          sthanId: r.sthan_id ?? undefined,
+          gadanayakUserId: r.gadanayak_user_id ?? undefined,
+          gadanayakUserName: r.gadanayak_user_name ?? undefined,
+          active: r.active ?? true,
+          sourceFile: r.source_file ?? undefined,
+          uploadedBy: r.uploaded_by ?? undefined,
+          childCount: 0,
+          childrenDivisionSummary: undefined,
+          participantCount: 0,
+          isTagged: false,
+          createdAt: this.ctx.toIsoTimestamp(r.created_at),
+          updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+        }));
+        return {
+          items,
+          total,
+          page,
+          pageSize,
+          totalPages,
+          enrollmentScope,
+          primaryContactStrategy,
+          resolverKey,
+          participantTotal,
+          gadaAssignmentEnabled: gadaEnabled,
+          canManageGadaAssignments,
+        };
+      }
+
       const femaleGenders = resolverKey === 'female_participants'
         ? await this.ctx.enumConfig.getFemaleGenderMatches()
         : null;
+      const householdConditions = [
+        `c.contact_kind = 'household'`,
+        `COALESCE(c.active, true) = true`,
+        `(c.sreni_id = $1 OR cst.id IS NOT NULL)`,
+      ];
+      const householdParams: unknown[] = [sreniId];
+      let householdParamIdx = 2;
+      if (scope) {
+        householdParamIdx = this.contactScopeHelper.appendStahanSql('c', scope, householdConditions, householdParams, householdParamIdx);
+      }
+      if (gadaEnabled && scope) {
+        gadaService.appendGadaJoin(sreniId, 'c', gadaJoins);
+        householdParamIdx = gadaService.appendGadaListFilter(
+          sreniId, scope, gadaEnabled, gadaOptions, householdConditions, householdParams, householdParamIdx,
+        );
+      }
+      const householdJoinSql = gadaJoins.length ? ` ${gadaJoins.join(' ')}` : '';
+      const femaleGendersParamIdx = householdParamIdx;
       const participantCountSelect = femaleGenders
         ? `(SELECT COUNT(*)::int
             FROM adwest.household_members hm
             WHERE hm.contact_id = c.id AND hm.active = true
               AND (
-                LOWER(COALESCE(hm.gender, '')) = ANY($4::text[])
+                LOWER(COALESCE(hm.gender, '')) = ANY($${femaleGendersParamIdx}::text[])
                 OR (hm.role = 'spouse' AND hm.source = 'import')
               )) AS participant_count`
         : '0 AS participant_count';
-      const listParams: Array<string | number | string[]> = femaleGenders
-        ? [sreniId, pageSize, offset, femaleGenders]
-        : [sreniId, pageSize, offset];
+      const householdWhere = `WHERE ${householdConditions.join(' AND ')}`;
+      const householdLimitIdx = femaleGenders ? femaleGendersParamIdx + 1 : householdParamIdx;
+      const householdOffsetIdx = femaleGenders ? femaleGendersParamIdx + 2 : householdParamIdx + 1;
+      const householdListParams: Array<string | number | string[]> = femaleGenders
+        ? [...householdParams, femaleGenders, pageSize, offset] as Array<string | number | string[]>
+        : [...householdParams, pageSize, offset] as Array<string | number | string[]>;
 
       const [countRows, rows] = await Promise.all([
         this.ctx.dataSource.query(
           `SELECT COUNT(DISTINCT c.id)::int AS total
            FROM adwest.sreni_contacts c
            LEFT JOIN adwest.contact_sreni_tags cst ON cst.contact_id = c.id AND cst.sreni_id = $1
-           WHERE c.sreni_id = $1 OR cst.id IS NOT NULL`,
-          [sreniId],
+           ${householdJoinSql}
+           ${householdWhere}`,
+          householdParams,
         ) as Promise<Array<{ total: number }>>,
         this.ctx.dataSource.query(
           `SELECT c.id, c.sreni_id, c.row_index, c.data,
@@ -401,6 +551,8 @@ export class SreniAdminRuntimeService {
                   c.source_file, c.uploaded_by, c.created_at, c.updated_at,
                   COALESCE(s.name, c.sreni_id) AS sreni_name,
                   (c.sreni_id != $1) AS is_tagged,
+                  cga.gadanayak_user_id::text AS gadanayak_user_id,
+                  gadanayak_u.name AS gadanayak_user_name,
                   (SELECT COUNT(*)::int
                    FROM adwest.household_members hm
                    INNER JOIN adwest.household_member_sreni_enrollments e
@@ -421,10 +573,11 @@ export class SreniAdminRuntimeService {
            FROM adwest.sreni_contacts c
            LEFT JOIN adwest.contact_sreni_tags cst ON cst.contact_id = c.id AND cst.sreni_id = $1
            LEFT JOIN adwest.srenies s ON s.id::text = c.sreni_id
-           WHERE c.sreni_id = $1 OR cst.id IS NOT NULL
+           ${householdJoinSql}
+           ${householdWhere}
            ORDER BY (c.sreni_id = $1) DESC, c.row_index ASC
-           LIMIT $2 OFFSET $3`,
-          listParams,
+           LIMIT $${householdLimitIdx} OFFSET $${householdOffsetIdx}`,
+          householdListParams,
         ) as Promise<Array<{
           id: string; sreni_id: string; row_index: number;
           data: Record<string, string | number | boolean | null>;
@@ -435,6 +588,8 @@ export class SreniAdminRuntimeService {
           sreni_name: string; is_tagged: boolean;
           child_count: number; children_division_summary: string | null;
           participant_count: number;
+          gadanayak_user_id: string | null;
+          gadanayak_user_name: string | null;
         }>>,
       ]);
       const total = countRows[0]?.total ?? 0;
@@ -449,6 +604,8 @@ export class SreniAdminRuntimeService {
         divisionLocationId: r.division_location_id ?? undefined,
         divisionId: r.division_id ?? undefined,
         sthanId: r.sthan_id ?? undefined,
+        gadanayakUserId: r.gadanayak_user_id ?? undefined,
+        gadanayakUserName: r.gadanayak_user_name ?? undefined,
         active: r.active ?? true,
         sourceFile: r.source_file ?? undefined,
         uploadedBy: r.uploaded_by ?? undefined,
@@ -460,7 +617,11 @@ export class SreniAdminRuntimeService {
         sreniName: r.sreni_name,
         isTagged: r.is_tagged ?? false,
       }));
-      return { items, total, page, pageSize, totalPages, enrollmentScope, primaryContactStrategy, resolverKey, participantTotal };
+      return {
+        items, total, page, pageSize, totalPages, enrollmentScope, primaryContactStrategy, resolverKey, participantTotal,
+        gadaAssignmentEnabled: gadaEnabled,
+        canManageGadaAssignments,
+      };
     }
     // In-memory: direct contacts + tagged contacts
     const taggedIds = new Set(
@@ -470,6 +631,11 @@ export class SreniAdminRuntimeService {
     );
     const all = Array.from(this.ctx.sreniContacts.values())
       .filter((c) => c.sreniId === sreniId || taggedIds.has(c.id))
+      .filter((c) => !scope || this.contactScopeHelper.matchesScopeInMemory(scope, {
+        sreniId: c.sreniId,
+        sthanLocationId: c.sthanLocationId,
+        sthanId: c.sthanId,
+      }, sreniId))
       .sort((a, b) => {
         if (a.sreniId === sreniId && b.sreniId !== sreniId) return -1;
         if (a.sreniId !== sreniId && b.sreniId === sreniId) return 1;
@@ -493,127 +659,176 @@ export class SreniAdminRuntimeService {
       primaryContactStrategy,
       resolverKey,
       participantTotal,
+      gadaAssignmentEnabled: false,
+      canManageGadaAssignments: false,
     };
   }
 
-  async uploadSreniContacts(
+  private async listSevaSamithiContacts(
     sreniId: string,
-    fileBuffer: Buffer,
-    originalName: string,
-    uploadedBy?: string,
-  ): Promise<{ inserted: number; sreniId: string }> {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const XLSX = require('xlsx') as typeof import('xlsx');
-
-    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    if (!sheetName) throw new BadRequestException('Excel file has no sheets');
-    const sheet = workbook.Sheets[sheetName];
-
-    const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-      header: 1,
-      defval: null,
-      blankrows: false,
-      raw: false,
-    }) as unknown[][];
-
-    if (grid.length <= 1) {
-      return { inserted: 0, sreniId };
-    }
-
-    const headerRow = grid[0] ?? [];
-    const normalizedHeaders = headerRow.map((cell) => normalizeContactTemplateHeader(cell));
-    const normalizedHeaderSet = new Set(normalizedHeaders.filter((h) => h.length > 0));
-
-    const missingHeaders = Array.from(new Set(MASTER_SRENI_CONTACT_FIELDS.map((f) => f.header)))
-      .filter((header) => !normalizedHeaderSet.has(header));
-
-    if (missingHeaders.length > 0) {
-      throw new BadRequestException(
-        'Uploaded file does not match the master contact template headers. '
-        + `Missing header(s): ${missingHeaders.join(', ')}`,
-      );
-    }
-
-    const headerBuckets = new Map<string, number[]>();
-    normalizedHeaders.forEach((header, index) => {
-      if (!header) return;
-      const bucket = headerBuckets.get(header) ?? [];
-      bucket.push(index);
-      headerBuckets.set(header, bucket);
-    });
-
-    const parsedRows = grid.slice(1).map((rawRow) => {
-      const data: Record<string, SreniContactCellValue> = {};
-      for (const field of MASTER_SRENI_CONTACT_FIELDS) {
-        const occurrence = (field.occurrence ?? 1) - 1;
-        const sourceIndexes = headerBuckets.get(field.header) ?? [];
-        const sourceIndex = sourceIndexes[occurrence];
-        data[field.key] = sourceIndex === undefined
-          ? null
-          : normalizeSreniContactCell(rawRow[sourceIndex]);
-      }
-      return data;
-    }).filter((row) => Object.values(row).some((value) => value !== null));
-
-    if (parsedRows.length === 0) {
-      return { inserted: 0, sreniId };
-    }
-    assertContactUploadRowLimit(parsedRows.length);
-
-    const now = new Date().toISOString();
-
-    for (const [key, c] of this.ctx.sreniContacts) {
-      if (c.sreniId === sreniId) this.ctx.sreniContacts.delete(key);
-    }
-
-    const records: SreniContactRecord[] = parsedRows.map((row, idx) => {
-      const id = this.ctx.newId('sc');
+    page: number,
+    pageSize: number,
+    scope: ContactAccessScope | undefined,
+    enrollmentScope: string,
+    primaryContactStrategy: string,
+    resolverKey: HouseholdResolverKey,
+    participantTotal: number,
+  ): Promise<{
+    items: (SreniContactRecord & { sreniName: string; isTagged: boolean; memberSrenis?: MemberSreniRef[] })[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    enrollmentScope: string;
+    primaryContactStrategy: string;
+    resolverKey: HouseholdResolverKey;
+    participantTotal: number;
+    gadaAssignmentEnabled: boolean;
+    canManageGadaAssignments: boolean;
+  }> {
+    if (!this.ctx.dataSource) {
       return {
-        id,
-        sreniId,
-        rowIndex: idx + 1,
-        data: row,
-        active: true,
-        sourceFile: originalName,
-        uploadedBy,
-        createdAt: now,
-        updatedAt: now,
+        items: [],
+        total: 0,
+        page,
+        pageSize,
+        totalPages: 1,
+        enrollmentScope,
+        primaryContactStrategy,
+        resolverKey,
+        participantTotal,
+        gadaAssignmentEnabled: false,
+        canManageGadaAssignments: false,
       };
-    });
-
-    for (const r of records) {
-      this.ctx.sreniContacts.set(`${sreniId}:${r.id}`, r);
     }
 
-    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
-      await this.ctx.dataSource.query(
-        `DELETE FROM adwest.sreni_contacts WHERE sreni_id = $1`,
-        [sreniId],
-      );
-      const insertedContacts = await this.batchInsertSreniContactsDb(
-        records.map((record) => ({
-          sreniId,
-          rowIndex: record.rowIndex,
-          data: record.data,
-          sourceFile: record.sourceFile ?? originalName,
-          uploadedBy: record.uploadedBy ?? uploadedBy ?? null,
-        })),
-      );
-      await this.getHouseholdMembers().syncMembersFromContactDataBulkInsertOnly(
-        insertedContacts.map((row) => ({ contactId: row.id, data: row.data })),
-      );
-    } else {
-      const memberSync = this.getHouseholdMembers();
-      await memberSync.syncMembersFromContactDataBulkInsertOnly(
-        records.map((record) => ({ contactId: record.id, data: record.data })),
-      );
+    const offset = (page - 1) * pageSize;
+    const conditions = [
+      `c.contact_kind = 'household'`,
+      `COALESCE(c.active, true) = true`,
+    ];
+    const params: unknown[] = [];
+    let paramIdx = 1;
+    if (scope) {
+      paramIdx = this.contactScopeHelper.appendStahanSql('c', scope, conditions, params, paramIdx);
     }
+    const whereClause = `WHERE ${conditions.join(' AND ')}`;
+    const limitIdx = paramIdx;
+    const offsetIdx = paramIdx + 1;
+    const sreniName = this.ctx.srenies.get(sreniId)?.name ?? sreniId;
 
-    return { inserted: records.length, sreniId };
+    const [countRows, rows] = await Promise.all([
+      this.ctx.dataSource.query(
+        `SELECT COUNT(*)::int AS total
+         FROM adwest.seva_samithi_contacts ssc
+         INNER JOIN adwest.sreni_contacts c ON c.id = ssc.contact_id
+         ${whereClause}`,
+        params,
+      ) as Promise<Array<{ total: number }>>,
+      this.ctx.dataSource.query(
+        `SELECT c.id, c.sreni_id, c.row_index, c.data, c.sr_no,
+                c.zone_location_id, c.sthan_location_id, c.division_location_id,
+                c.division_id, c.sthan_id, COALESCE(c.active, true) AS active,
+                c.source_file, c.uploaded_by, c.created_at, c.updated_at,
+                COALESCE((
+                  SELECT json_agg(json_build_object('sreniId', tag_s.id::text, 'sreniName', tag_s.name) ORDER BY tag_s.name)
+                  FROM adwest.contact_sreni_tags cst_inner
+                  INNER JOIN adwest.srenies tag_s ON tag_s.id::text = cst_inner.sreni_id
+                  WHERE cst_inner.contact_id = c.id
+                ), '[]'::json) AS member_srenis
+         FROM adwest.seva_samithi_contacts ssc
+         INNER JOIN adwest.sreni_contacts c ON c.id = ssc.contact_id
+         ${whereClause}
+         ORDER BY c.sr_no ASC NULLS LAST, c.row_index ASC
+         LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+        [...params, pageSize, offset],
+      ) as Promise<Array<{
+        id: string; sreni_id: string | null; row_index: number;
+        data: Record<string, string | number | boolean | null>;
+        sr_no: number | null;
+        zone_location_id: string | null; sthan_location_id: string | null; division_location_id: string | null;
+        division_id: string | null; sthan_id: string | null; active: boolean;
+        source_file: string | null; uploaded_by: string | null;
+        created_at: string | Date; updated_at: string | Date;
+        member_srenis: unknown;
+      }>>,
+    ]);
+
+    const sevaService = new SevaSamithiContactService(this.ctx.dataSource);
+    const total = countRows[0]?.total ?? 0;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const items = rows.map((r) => ({
+      id: r.id,
+      sreniId: sreniId,
+      rowIndex: r.row_index,
+      data: r.data ?? {},
+      contactKind: 'household' as const,
+      srNo: r.sr_no ?? undefined,
+      zoneLocationId: r.zone_location_id ?? undefined,
+      sthanLocationId: r.sthan_location_id ?? undefined,
+      divisionLocationId: r.division_location_id ?? undefined,
+      divisionId: r.division_id ?? undefined,
+      sthanId: r.sthan_id ?? undefined,
+      active: r.active ?? true,
+      sourceFile: r.source_file ?? undefined,
+      uploadedBy: r.uploaded_by ?? undefined,
+      createdAt: this.ctx.toIsoTimestamp(r.created_at),
+      updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+      sreniName,
+      isTagged: false,
+      memberSrenis: sevaService.parseMemberSrenis(r.member_srenis),
+    }));
+
+    return {
+      items,
+      total,
+      page,
+      pageSize,
+      totalPages,
+      enrollmentScope,
+      primaryContactStrategy,
+      resolverKey,
+      participantTotal: total,
+      gadaAssignmentEnabled: false,
+      canManageGadaAssignments: false,
+    };
   }
 
   async clearSreniContacts(sreniId: string): Promise<{ deleted: number; sreniId: string }> {
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      if (await SevaSamithiContactService.isSevaSamithiSreni(this.ctx.dataSource, sreniId)) {
+        const sevaService = new SevaSamithiContactService(this.ctx.dataSource);
+        const deleted = await sevaService.clearRegistry();
+        return { deleted, sreniId };
+      }
+
+      const strategyRows = await this.ctx.dataSource.query(
+        `SELECT primary_contact_strategy FROM adwest.srenies WHERE id = $1`,
+        [sreniId],
+      ) as Array<{ primary_contact_strategy: string | null }>;
+      const strategy = strategyRows[0]?.primary_contact_strategy ?? 'HOUSEHOLD_HEAD';
+
+      if (strategy === 'ENROLLED_CHILDREN') {
+        const result = await this.ctx.dataSource.query(
+          `DELETE FROM adwest.sreni_contacts
+           WHERE sreni_id = $1 AND contact_kind = 'child'`,
+          [sreniId],
+        );
+        return { deleted: result[1] ?? 0, sreniId };
+      }
+
+      await this.ctx.dataSource.query(
+        `DELETE FROM adwest.contact_sreni_tags WHERE sreni_id = $1`,
+        [sreniId],
+      );
+      const tagClear = await this.ctx.dataSource.query(
+        `UPDATE adwest.sreni_contacts SET sreni_id = NULL, updated_at = now()
+         WHERE sreni_id = $1 AND contact_kind = 'household'`,
+        [sreniId],
+      );
+      return { deleted: tagClear[1] ?? 0, sreniId };
+    }
+
     let deleted = 0;
     for (const [key, c] of this.ctx.sreniContacts) {
       if (c.sreniId === sreniId) {
@@ -621,130 +836,24 @@ export class SreniAdminRuntimeService {
         deleted++;
       }
     }
-    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
-      await this.ctx.dataSource.query(
-        `DELETE FROM adwest.sreni_contacts WHERE sreni_id = $1`,
-        [sreniId],
-      );
-    }
     return { deleted, sreniId };
-  }
-
-  async uploadGlobalContacts(
-    fileBuffer: Buffer,
-    originalName: string,
-    uploadedBy?: string,
-  ): Promise<{ inserted: number; duplicates: GlobalContactUploadDuplicate[] }> {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const XLSX = require('xlsx') as typeof import('xlsx');
-    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    if (!sheetName) throw new Error('Excel file has no sheets');
-    const sheet = workbook.Sheets[sheetName];
-    const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, blankrows: false, raw: false }) as unknown[][];
-    if (grid.length <= 1) return { inserted: 0, duplicates: [] };
-
-    const headerRow = grid[0] ?? [];
-    const normalizedHeaders = headerRow.map((cell) => normalizeContactTemplateHeader(cell));
-    const parsedRows: Array<{ data: Record<string, SreniContactCellValue>; rowIndex: number }> = [];
-
-    for (let i = 1; i < grid.length; i++) {
-      const row = grid[i] ?? [];
-      const data: Record<string, SreniContactCellValue> = {};
-      let hasValue = false;
-      for (let j = 0; j < normalizedHeaders.length; j++) {
-        const header = normalizedHeaders[j];
-        if (!header) continue;
-        const field = MASTER_SRENI_CONTACT_FIELDS.find((f) => f.header === header);
-        const key = field?.key ?? header.replace(/\s+/g, '_');
-        const val = normalizeSreniContactCell(row[j]);
-        if (val !== null) { data[key] = val; hasValue = true; }
-      }
-      if (hasValue) parsedRows.push({ data, rowIndex: i });
-    }
-
-    if (parsedRows.length === 0) return { inserted: 0, duplicates: [] };
-    assertContactUploadRowLimit(parsedRows.length);
-
-    const duplicates: GlobalContactUploadDuplicate[] = [];
-    const toInsert: Array<{ data: Record<string, SreniContactCellValue>; rowIndex: number }> = [];
-
-    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
-      // Collect personal numbers from incoming rows for bulk duplicate check
-      const incomingPNs = parsedRows
-        .map((r) => r.data['personalNumber'])
-        .filter((v): v is string => typeof v === 'string' && v.length > 0);
-
-      const existingRows: Array<{ personal_number: string; sreni_id: string | null }> =
-        incomingPNs.length > 0
-          ? (await this.ctx.dataSource.query(
-              `SELECT data->>'personalNumber' AS personal_number, sreni_id
-               FROM adwest.sreni_contacts
-               WHERE data->>'personalNumber' = ANY($1)`,
-              [incomingPNs],
-            ) as Array<{ personal_number: string; sreni_id: string | null }>)
-          : [];
-
-      const existingPNSet = new Map(existingRows.map((r) => [r.personal_number, r.sreni_id]));
-
-      for (const row of parsedRows) {
-        const pn = typeof row.data['personalNumber'] === 'string' ? row.data['personalNumber'] : null;
-        if (pn && existingPNSet.has(pn)) {
-          duplicates.push({
-            rowIndex: row.rowIndex,
-            name: typeof row.data['name'] === 'string' ? row.data['name'] : null,
-            personalNumber: pn,
-            existingSreniId: existingPNSet.get(pn) ?? null,
-          });
-        } else {
-          toInsert.push(row);
-        }
-      }
-
-      const insertedContacts = await this.batchInsertSreniContactsDb(
-        toInsert.map((row) => ({
-          sreniId: null,
-          rowIndex: row.rowIndex,
-          data: row.data,
-          sourceFile: originalName,
-          uploadedBy: uploadedBy ?? null,
-          includeActiveTimestamps: true,
-        })),
-      );
-      await this.getHouseholdMembers().syncMembersFromContactDataBulk(
-        insertedContacts.map((row) => ({ contactId: row.id, data: row.data })),
-      );
-      return { inserted: toInsert.length, duplicates };
-    }
-
-    // In-memory fallback — no duplicate detection
-    const now = new Date().toISOString();
-    const memberSync = this.getHouseholdMembers();
-    const memoryRows: Array<{ contactId: string; data: Record<string, SreniContactCellValue> }> = [];
-    for (const row of parsedRows) {
-      const id = this.ctx.newId('sc');
-      const record: SreniContactRecord = {
-        id, sreniId: null, rowIndex: row.rowIndex,
-        data: row.data, active: true,
-        sourceFile: originalName, uploadedBy,
-        createdAt: now, updatedAt: now,
-      };
-      this.ctx.sreniContacts.set(`global:${id}`, record);
-      memoryRows.push({ contactId: id, data: row.data });
-    }
-    await memberSync.syncMembersFromContactDataBulk(memoryRows);
-    return { inserted: parsedRows.length, duplicates: [] };
   }
 
   async listAllContacts(
     page = 1,
     pageSize = 50,
     filters?: { sreniId?: string; sthanId?: string; search?: string },
+    scope?: ContactAccessScope,
   ): Promise<{ items: (SreniContactRecord & { sreniName: string })[]; total: number; page: number; pageSize: number; totalPages: number }> {
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
-      const conditions: string[] = [];
+      const conditions: string[] = [`c.contact_kind = 'household'`];
       const params: unknown[] = [];
       let paramIdx = 1;
+
+      if (scope) {
+        paramIdx = this.contactScopeHelper.appendAllowedSreniSql('c', scope, conditions, params, paramIdx);
+        paramIdx = this.contactScopeHelper.appendStahanSql('c', scope, conditions, params, paramIdx);
+      }
 
       if (filters?.sreniId) {
         conditions.push(
@@ -757,17 +866,20 @@ export class SreniAdminRuntimeService {
         paramIdx += 1;
       }
       if (filters?.sthanId) {
-        conditions.push(`c.sthan_id = $${paramIdx}`);
+        conditions.push(`(c.sthan_location_id::text = $${paramIdx} OR c.location_id::text = $${paramIdx})`);
         params.push(filters.sthanId);
         paramIdx += 1;
       }
       if (filters?.search?.trim()) {
-        conditions.push(`COALESCE(c.data->>'name', '') ILIKE $${paramIdx}`);
+        conditions.push(
+          `(COALESCE(c.data->>'name', '') ILIKE $${paramIdx}
+            OR COALESCE(c.data->>'mobileNo', '') ILIKE $${paramIdx})`,
+        );
         params.push(`%${filters.search.trim()}%`);
         paramIdx += 1;
       }
 
-      const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+      const whereClause = `WHERE ${conditions.join(' AND ')}`;
 
       const countRows = await this.ctx.dataSource.query(
         `SELECT COUNT(*)::int AS total FROM adwest.sreni_contacts c ${whereClause}`,
@@ -779,7 +891,7 @@ export class SreniAdminRuntimeService {
       const limitIdx = paramIdx;
       const offsetIdx = paramIdx + 1;
       const rows = await this.ctx.dataSource.query(
-        `SELECT c.id, c.sreni_id, c.row_index, c.data,
+        `SELECT c.id, c.sreni_id, c.row_index, c.data, c.sr_no, c.contact_kind,
           c.zone_location_id, c.sthan_location_id, c.division_location_id,
           c.division_id, c.sthan_id,
                 COALESCE(c.active, true) AS active,
@@ -788,7 +900,7 @@ export class SreniAdminRuntimeService {
          FROM adwest.sreni_contacts c
          LEFT JOIN adwest.srenies s ON s.id::text = c.sreni_id
          ${whereClause}
-         ORDER BY s.name ASC NULLS LAST, c.row_index ASC
+         ORDER BY c.sr_no ASC NULLS LAST, c.row_index ASC
          LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
         [...params, pageSize, offset],
       ) as Array<{
@@ -805,6 +917,8 @@ export class SreniAdminRuntimeService {
         sreniName: r.sreni_name,
         rowIndex: r.row_index,
         data: r.data ?? {},
+        contactKind: (r as { contact_kind?: string }).contact_kind as 'household' | 'child' | undefined,
+        srNo: (r as { sr_no?: number | null }).sr_no ?? undefined,
         zoneLocationId: r.zone_location_id ?? undefined,
         sthanLocationId: r.sthan_location_id ?? undefined,
         divisionLocationId: r.division_location_id ?? undefined,
@@ -820,6 +934,12 @@ export class SreniAdminRuntimeService {
     }
 
     let all = Array.from(this.ctx.sreniContacts.values())
+      .filter((c) => !c.contactKind || c.contactKind === 'household')
+      .filter((c) => !scope || this.contactScopeHelper.matchesScopeInMemory(scope, {
+        sreniId: c.sreniId,
+        sthanLocationId: c.sthanLocationId,
+        sthanId: c.sthanId,
+      }))
       .map((c) => ({
         ...c,
         sreniName: (c.sreniId ? (this.ctx.srenies.get(c.sreniId)?.name ?? c.sreniId) : '') as string,
@@ -1197,12 +1317,83 @@ export class SreniAdminRuntimeService {
     return { success: true };
   }
 
+  async updateHouseholdContact(
+    contactId: string,
+    data: Record<string, string | number | boolean | null>,
+  ): Promise<SreniContactRecord> {
+    const persistence = new MemberContactPersistenceService();
+    await persistence.updateHouseholdContact(this.ctx, contactId, data);
+
+    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const rows = await this.ctx.dataSource.query(
+        `SELECT c.id, c.sreni_id, c.row_index, c.data,
+                c.zone_location_id, c.sthan_location_id, c.division_location_id,
+                c.division_id, c.sthan_id, COALESCE(c.active, true) AS active,
+                c.contact_kind, c.sr_no, c.source_file, c.uploaded_by, c.created_at, c.updated_at,
+                COALESCE(s.name, '') AS sreni_name
+         FROM adwest.sreni_contacts c
+         LEFT JOIN adwest.srenies s ON s.id::text = c.sreni_id
+         WHERE c.id = $1::uuid AND c.contact_kind = 'household'
+         LIMIT 1`,
+        [contactId],
+      ) as Array<{
+        id: string; sreni_id: string | null; row_index: number;
+        data: Record<string, string | number | boolean | null>;
+        zone_location_id: string | null; sthan_location_id: string | null; division_location_id: string | null;
+        division_id: string | null; sthan_id: string | null; active: boolean;
+        contact_kind: string; sr_no: number | null;
+        source_file: string | null; uploaded_by: string | null;
+        created_at: string | Date; updated_at: string | Date; sreni_name: string;
+      }>;
+      if (!rows[0]) throw new NotFoundException('Contact not found');
+      const r = rows[0];
+      return {
+        id: r.id,
+        sreniId: r.sreni_id,
+        rowIndex: r.row_index,
+        data: r.data ?? {},
+        contactKind: 'household',
+        srNo: r.sr_no ?? undefined,
+        zoneLocationId: r.zone_location_id ?? undefined,
+        sthanLocationId: r.sthan_location_id ?? undefined,
+        divisionLocationId: r.division_location_id ?? undefined,
+        divisionId: r.division_id ?? undefined,
+        sthanId: r.sthan_id ?? undefined,
+        active: r.active,
+        sourceFile: r.source_file ?? undefined,
+        uploadedBy: r.uploaded_by ?? undefined,
+        createdAt: this.ctx.toIsoTimestamp(r.created_at),
+        updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+      };
+    }
+
+    const existing = Array.from(this.ctx.sreniContacts.values()).find((c) => c.id === contactId);
+    if (!existing) throw new NotFoundException('Contact not found');
+    const updated: SreniContactRecord = {
+      ...existing,
+      data: { ...existing.data, ...data },
+      updatedAt: new Date().toISOString(),
+    };
+    const key = existing.sreniId ? `${existing.sreniId}:${contactId}` : `global:${contactId}`;
+    this.ctx.sreniContacts.set(key, updated);
+    return updated;
+  }
+
   async updateContactData(
     sreniId: string,
     contactId: string,
     data: Record<string, string | number | boolean | null>,
   ): Promise<SreniContactRecord> {
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const kindRows = await this.ctx.dataSource.query(
+        `SELECT contact_kind, sreni_id FROM adwest.sreni_contacts WHERE id = $1::uuid LIMIT 1`,
+        [contactId],
+      ) as Array<{ contact_kind: string; sreni_id: string | null }>;
+      if (!kindRows[0]) throw new NotFoundException('Contact not found');
+      if (kindRows[0].contact_kind === 'household') {
+        return this.updateHouseholdContact(contactId, data);
+      }
+
       const existingRows = await this.ctx.dataSource.query(
         `SELECT data FROM adwest.sreni_contacts WHERE id = $1 AND sreni_id = $2`,
         [contactId, sreniId],
@@ -1254,12 +1445,17 @@ export class SreniAdminRuntimeService {
 
   async toggleContactActive(sreniId: string, contactId: string, active: boolean): Promise<SreniContactRecord> {
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      const isSevaSamithi = await SevaSamithiContactService.isSevaSamithiSreni(this.ctx.dataSource, sreniId);
       const rows = await this.ctx.dataSource.query(
         `UPDATE adwest.sreni_contacts
          SET active = $1, updated_at = now()
-         WHERE id = $2 AND sreni_id = $3
+         WHERE id = $2::uuid
+           AND contact_kind = 'household'
+           AND ${isSevaSamithi
+    ? `EXISTS (SELECT 1 FROM adwest.seva_samithi_contacts ssc WHERE ssc.contact_id = $2::uuid)`
+    : 'sreni_id = $3'}
          RETURNING id, sreni_id, row_index, data, zone_location_id, sthan_location_id, division_location_id, division_id, sthan_id, active, source_file, uploaded_by, created_at, updated_at`,
-        [active, contactId, sreniId],
+        isSevaSamithi ? [active, contactId] : [active, contactId, sreniId],
       ) as Array<{
         id: string; sreni_id: string; row_index: number;
         data: Record<string, string | number | boolean | null>;
@@ -1271,7 +1467,7 @@ export class SreniAdminRuntimeService {
       if (!rows[0]) throw new NotFoundException('Contact not found');
       const r = rows[0];
       return {
-        id: r.id, sreniId: r.sreni_id, rowIndex: r.row_index,
+        id: r.id, sreniId: isSevaSamithi ? sreniId : r.sreni_id, rowIndex: r.row_index,
         data: r.data ?? {},
         zoneLocationId: r.zone_location_id ?? undefined,
         sthanLocationId: r.sthan_location_id ?? undefined,
@@ -1291,6 +1487,12 @@ export class SreniAdminRuntimeService {
 
   async deleteContact(sreniId: string, contactId: string): Promise<{ deleted: boolean }> {
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
+      if (await SevaSamithiContactService.isSevaSamithiSreni(this.ctx.dataSource, sreniId)) {
+        const sevaService = new SevaSamithiContactService(this.ctx.dataSource);
+        const deleted = await sevaService.removeRegistryEntry(contactId);
+        return { deleted };
+      }
+
       await this.ctx.dataSource.query(
         `DELETE FROM adwest.contact_sreni_tags WHERE contact_id = $1`,
         [contactId],
@@ -1307,27 +1509,42 @@ export class SreniAdminRuntimeService {
   }
 
   async listContactSreniTags(contactId: string): Promise<ContactSreniTagRecord[]> {
+    const byContactId = await this.listContactSreniTagsBatch([contactId]);
+    return byContactId[contactId] ?? [];
+  }
+
+  async listContactSreniTagsBatch(contactIds: string[]): Promise<Record<string, ContactSreniTagRecord[]>> {
+    const uniqueIds = [...new Set(contactIds.map((id) => id.trim()).filter(Boolean))];
+    const result: Record<string, ContactSreniTagRecord[]> = Object.fromEntries(
+      uniqueIds.map((id) => [id, []]),
+    );
+    if (!uniqueIds.length) return result;
+
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
       const rows = await this.ctx.dataSource.query(
         `SELECT id, contact_id, sreni_id, division_id, created_at, updated_at
          FROM adwest.contact_sreni_tags
-         WHERE contact_id = $1
-         ORDER BY created_at ASC`,
-        [contactId],
+         WHERE contact_id = ANY($1::uuid[])
+         ORDER BY contact_id ASC, created_at ASC`,
+        [uniqueIds],
       ) as Array<{
         id: string; contact_id: string; sreni_id: string;
         division_id: string | null; created_at: string | Date; updated_at: string | Date;
       }>;
-      return rows.map((r) => ({
-        id: r.id,
-        contactId: r.contact_id,
-        sreniId: r.sreni_id,
-        divisionId: r.division_id ?? undefined,
-        createdAt: this.ctx.toIsoTimestamp(r.created_at),
-        updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
-      }));
+      for (const r of rows) {
+        const list = result[r.contact_id] ?? [];
+        list.push({
+          id: r.id,
+          contactId: r.contact_id,
+          sreniId: r.sreni_id,
+          divisionId: r.division_id ?? undefined,
+          createdAt: this.ctx.toIsoTimestamp(r.created_at),
+          updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
+        });
+        result[r.contact_id] = list;
+      }
     }
-    return [];
+    return result;
   }
 
   async setContactSreniTags(contactId: string, dto: SetContactSreniTagsDto): Promise<ContactSreniTagRecord[]> {

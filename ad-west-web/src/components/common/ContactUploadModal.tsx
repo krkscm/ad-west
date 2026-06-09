@@ -1,27 +1,24 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal } from './Modal';
 import { useToast } from './Toast';
-import type { GlobalContactUploadDuplicateApi } from '../../utils/backendApi';
-
-export const MASTER_CONTACT_TEMPLATE_URL = '/templates/master-sreni-contact-template.xlsx';
+import { backendApi } from '../../utils/backendApi';
+import { ContactUploadReviewModal, type ContactUploadReviewState } from './ContactUploadReviewModal';
 
 export const GLOBAL_CONTACT_UPLOAD_DESCRIPTION = (
   <>
-    Upload an Excel file (.xlsx / .xls). Contacts with a matching <strong>Personal Number</strong> already in the system will be flagged as duplicates and skipped — new contacts will be added to the global list.
+    Upload the <strong>Member Data</strong> Excel template. This updates member data org-wide; Yes/No Sreni columns
+    determine membership. You will review duplicates before importing.
   </>
 );
 
 export const SRENI_CONTACT_UPLOAD_DESCRIPTION = (
   <>
-    Upload an Excel file (.xlsx / .xls) using the master contact template. Uploading a new file <strong>replaces</strong> the existing contact list for this sreni.
+    Upload the <strong>Member Data</strong> Excel template. This processes the full file org-wide (Option B); Yes/No
+    columns determine which Srenis each family belongs to. Review duplicates before importing.
   </>
 );
 
-export const STHAN_CONTACT_UPLOAD_DESCRIPTION = (
-  <>
-    Upload an Excel file (.xlsx / .xls) using the master contact template. Uploading a new file <strong>replaces</strong> the existing contact list for this sthan.
-  </>
-);
+export const STHAN_CONTACT_UPLOAD_DESCRIPTION = SRENI_CONTACT_UPLOAD_DESCRIPTION;
 
 const toUiError = (error: unknown, fallback: string): string => {
   if (!(error instanceof Error)) return fallback;
@@ -31,83 +28,116 @@ const toUiError = (error: unknown, fallback: string): string => {
 
 export interface ContactUploadResult {
   inserted: number;
-  duplicates?: GlobalContactUploadDuplicateApi[];
+  updated?: number;
+  skipped?: number;
 }
 
 interface ContactUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUploaded: (result: ContactUploadResult) => void;
-  onUpload: (file: File) => Promise<ContactUploadResult>;
+  previewUpload: (file: File) => ReturnType<typeof backendApi.previewMemberContactUpload>;
   description: React.ReactNode;
   title?: string;
-  duplicateSreniById?: Map<string, string>;
-  autoCloseOnSuccess?: boolean;
 }
 
 export const ContactUploadModal: React.FC<ContactUploadModalProps> = ({
   isOpen,
   onClose,
   onUploaded,
-  onUpload,
+  previewUpload,
   description,
   title = 'Upload Contacts',
-  duplicateSreniById,
-  autoCloseOnSuccess = true,
 }) => {
   const { addToast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isCommitting, setIsCommitting] = useState(false);
   const [fileName, setFileName] = useState('');
-  const [duplicates, setDuplicates] = useState<GlobalContactUploadDuplicateApi[]>([]);
-  const [uploadDone, setUploadDone] = useState(false);
-  const [insertedCount, setInsertedCount] = useState(0);
+  const [review, setReview] = useState<ContactUploadReviewState | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
       setFileName('');
-      setDuplicates([]);
-      setUploadDone(false);
-      setInsertedCount(0);
+      setReview(null);
+      setReviewOpen(false);
     }
   }, [isOpen]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFileName(e.target.files?.[0]?.name ?? '');
-    setDuplicates([]);
-    setUploadDone(false);
+    setReview(null);
+    setReviewOpen(false);
   };
 
-  const handleUpload = async () => {
+  const handlePreview = async () => {
     const file = fileRef.current?.files?.[0];
     if (!file) return;
     setIsUploading(true);
     try {
-      const result = await onUpload(file);
-      setInsertedCount(result.inserted);
-      setDuplicates(result.duplicates ?? []);
-      setUploadDone(true);
-      onUploaded(result);
-      if (result.duplicates?.length) {
-        addToast(
-          `Uploaded ${result.inserted} contact${result.inserted !== 1 ? 's' : ''}; ${result.duplicates.length} duplicate${result.duplicates.length !== 1 ? 's' : ''} skipped.`,
-          'success',
-        );
-      } else {
-        addToast(`Uploaded ${result.inserted} contact${result.inserted !== 1 ? 's' : ''}.`, 'success');
-        if (autoCloseOnSuccess) onClose();
-      }
+      const preview = await previewUpload(file);
+      setReview({
+        rows: preview.rows,
+        duplicates: preview.duplicates,
+        withinFileDuplicates: preview.withinFileDuplicates,
+        sourceFile: file.name,
+      });
+      setReviewOpen(true);
+      onClose();
     } catch (err) {
-      addToast(toUiError(err, 'Upload failed.'), 'error');
+      addToast(toUiError(err, 'Preview failed.'), 'error');
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    setDownloadingTemplate(true);
+    try {
+      const blob = await backendApi.downloadMemberContactTemplate();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'Member_Data_Upload_Template.xlsx';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      addToast(toUiError(err, 'Template download failed.'), 'error');
+    } finally {
+      setDownloadingTemplate(false);
+    }
+  };
+
+  const handleCommit = async (decisions: Parameters<typeof backendApi.commitMemberContactUpload>[0]) => {
+    if (!review) return;
+    setIsCommitting(true);
+    try {
+      const result = await backendApi.commitMemberContactUpload(decisions, review.sourceFile);
+      addToast(
+        `Imported ${result.inserted} new, updated ${result.updated}, skipped ${result.skipped}.`,
+        'success',
+      );
+      onUploaded({
+        inserted: result.inserted + result.updated,
+        updated: result.updated,
+        skipped: result.skipped,
+      });
+      setReviewOpen(false);
+      setReview(null);
       if (fileRef.current) fileRef.current.value = '';
+      setFileName('');
+    } catch (err) {
+      addToast(toUiError(err, 'Import failed.'), 'error');
+    } finally {
+      setIsCommitting(false);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={title} maxWidth="500px">
-      {!uploadDone ? (
+    <>
+      <Modal isOpen={isOpen} onClose={onClose} title={title} maxWidth="500px">
         <div className="contact-upload-modal">
           <p className="contact-upload-modal__description">{description}</p>
 
@@ -131,85 +161,38 @@ export const ContactUploadModal: React.FC<ContactUploadModalProps> = ({
 
           <div className="contact-upload-modal__actions">
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isUploading}>Cancel</button>
-            <a href={MASTER_CONTACT_TEMPLATE_URL} download className="btn btn-template btn-sm contact-upload-modal__template-link">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              Template
-            </a>
+            <button
+              type="button"
+              className="btn btn-template btn-sm contact-upload-modal__template-link"
+              disabled={downloadingTemplate}
+              onClick={() => void handleDownloadTemplate()}
+            >
+              {downloadingTemplate ? 'Downloading…' : 'Template'}
+            </button>
             <button
               type="button"
               className="btn btn-primary contact-upload-modal__upload-btn"
               disabled={!fileName || isUploading}
-              onClick={() => void handleUpload()}
+              onClick={() => void handlePreview()}
             >
               {isUploading ? (
                 <>
                   <span className="contact-upload-modal__spinner" />
-                  Uploading…
+                  Parsing…
                 </>
-              ) : 'Upload'}
+              ) : 'Upload & Review'}
             </button>
           </div>
         </div>
-      ) : (
-        <div className="contact-upload-modal">
-          <div className="contact-upload-modal__summary">
-            <span className="badge badge-success contact-upload-modal__badge">
-              {insertedCount} inserted
-            </span>
-            {duplicates.length > 0 && (
-              <span className="badge badge-warning contact-upload-modal__badge">
-                {duplicates.length} duplicate{duplicates.length !== 1 ? 's' : ''} skipped
-              </span>
-            )}
-          </div>
+      </Modal>
 
-          {duplicates.length > 0 && (
-            <>
-              <p className="contact-upload-modal__description">
-                The following rows were skipped because a contact with the same Personal Number already exists:
-              </p>
-              <div className="contact-upload-modal__duplicate-table-wrap">
-                <table className="custom-table contact-upload-modal__duplicate-table">
-                  <thead>
-                    <tr>
-                      <th style={{ width: '48px' }}>Row</th>
-                      <th>Name</th>
-                      <th>Personal No.</th>
-                      <th>Existing Sreni</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {duplicates.map((d) => (
-                      <tr key={`${d.rowIndex}-${d.personalNumber}`}>
-                        <td style={{ textAlign: 'center', color: 'var(--text-secondary-dark)' }}>{d.rowIndex}</td>
-                        <td>{d.name ?? <span style={{ opacity: 0.4 }}>—</span>}</td>
-                        <td style={{ fontFamily: 'monospace' }}>{d.personalNumber ?? <span style={{ opacity: 0.4 }}>—</span>}</td>
-                        <td>
-                          {d.existingSreniId ? (
-                            <span className="contact-upload-modal__sreni-tag">
-                              {duplicateSreniById?.get(d.existingSreniId) ?? d.existingSreniId}
-                            </span>
-                          ) : (
-                            <span style={{ opacity: 0.4 }}>—</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-
-          <div className="contact-upload-modal__actions contact-upload-modal__actions--end">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Done</button>
-          </div>
-        </div>
-      )}
-    </Modal>
+      <ContactUploadReviewModal
+        isOpen={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        review={review}
+        committing={isCommitting}
+        onCommit={handleCommit}
+      />
+    </>
   );
 };

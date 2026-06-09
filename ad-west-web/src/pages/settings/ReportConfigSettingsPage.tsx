@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useAdminDefinitions } from '../../context/admin-definitions-context';
 import { backendApi, ReportMetricDefinitionApi, SreniDefinitionApi } from '../../utils/backendApi';
 import { SreniReportConfigPage } from '../SreniReportConfigPage';
 import { useToast } from '../../components/common/Toast';
@@ -190,22 +191,20 @@ const LocationReportMetricsPanel: React.FC = () => {
 };
 
 export const ReportConfigSettingsPage: React.FC = () => {
+  const { sreniDefinitions } = useAdminDefinitions();
   const [srenies, setSrenies] = useState<SreniDefinitionApi[]>([]);
   const [selectedSreniId, setSelectedSreniId] = useState<string>('');
   const [mode, setMode] = useState<ConfigMode>('sreni');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setIsLoading(true);
-    backendApi.listSreniDefinitions()
-      .then(list => {
-        const active = list.filter(s => s.active);
-        setSrenies(active);
-        if (active.length > 0) setSelectedSreniId(active[0].id);
-      })
-      .catch(() => {})
-      .finally(() => setIsLoading(false));
-  }, []);
+    const active = sreniDefinitions.filter((s) => s.active);
+    setSrenies(active);
+    if (active.length > 0) {
+      setSelectedSreniId((prev) => prev || active[0].id);
+    }
+    setIsLoading(false);
+  }, [sreniDefinitions]);
 
   const selectedSreni = srenies.find(s => s.id === selectedSreniId);
 

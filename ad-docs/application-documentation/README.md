@@ -1,37 +1,47 @@
 # ADWest Application Documentation
 
-This directory is the architecture and runtime reference for the live ADWest implementation.
+Architecture and runtime reference for the live ADWest implementation.
 
-Prepared on: 2026-06-04
+**Last aligned with codebase:** 2026-06-10 (migrations through `078`)
 
-## Document Index
+## Document index
 
-1. [01-system-overview.md](./01-system-overview.md)
-2. [02-backend-architecture.md](./02-backend-architecture.md)
-3. [03-frontend-architecture.md](./03-frontend-architecture.md)
-4. [04-auth-and-google-integration.md](./04-auth-and-google-integration.md)
-5. [05-public-gateway-and-member-services.md](./05-public-gateway-and-member-services.md)
-6. [06-data-and-migrations.md](./06-data-and-migrations.md)
-7. [07-runtime-and-deployment.md](./07-runtime-and-deployment.md)
-8. [08-performance-and-security-baselines.md](./08-performance-and-security-baselines.md)
-9. [diagrams/adwest-architecture.svg](./diagrams/adwest-architecture.svg)
-10. [diagrams/backend-contact-location-hierarchy.md](./diagrams/backend-contact-location-hierarchy.md)
-11. [diagrams/frontend-governance-contacts-flow.md](./diagrams/frontend-governance-contacts-flow.md)
+| # | Document | Topics |
+|---|----------|--------|
+| 01 | [system-overview](./01-system-overview.md) | Stack, user domains, functional areas |
+| 02 | [backend-architecture](./02-backend-architecture.md) | NestJS modules, services, API surface |
+| 03 | [frontend-architecture](./03-frontend-architecture.md) | Routes, pages, API wrappers, UI patterns |
+| 04 | [auth-and-google-integration](./04-auth-and-google-integration.md) | Login, sessions, access layers, integrations |
+| 05 | [public-gateway-and-member-services](./05-public-gateway-and-member-services.md) | Public intake, member services, join-us |
+| 06 | [data-and-migrations](./06-data-and-migrations.md) | Tables, migration chain, bootstrap vs SQL |
+| 07 | [runtime-and-deployment](./07-runtime-and-deployment.md) | Local dev, env vars, operational checklist |
+| 08 | [performance-and-security-baselines](./08-performance-and-security-baselines.md) | Throttling, validation, headers |
 
-## Source Inputs
+### Diagrams
 
-- API implementation: `ad-west-api`
-- Web implementation: `ad-west-web`
-- Database migrations: `ad-docs/database-script`
+- [adwest-architecture.svg](./diagrams/adwest-architecture.svg)
+- [backend-contact-location-hierarchy.md](./diagrams/backend-contact-location-hierarchy.md)
+- [frontend-governance-contacts-flow.md](./diagrams/frontend-governance-contacts-flow.md)
 
-## Documentation Intent
+## Source inputs
 
-- Describe current architecture and runtime behavior, not planned ideas.
-- Keep module boundaries explicit and maintain anti-monolith service composition.
-- Preserve parity with code and migrations.
+- API: `ad-west-api/`
+- Web: `ad-west-web/`
+- Migrations: `ad-docs/database-script/`
 
-## Source-of-Truth Policy
+## Source-of-truth policy
 
-- Runtime behavior is owned by code in `ad-west-api` and `ad-west-web`.
-- Data model behavior is owned by ordered SQL scripts in `ad-docs/database-script`.
-- If code and docs diverge, update docs from code immediately.
+1. **Runtime behavior** is owned by application code.
+2. **Persistent schema** is owned by ordered SQL scripts (plus documented bootstrap DDL in `core-business-db-bootstrap.service.ts` for idempotent dev startup).
+3. If code and docs diverge, update docs from code immediately.
+
+## Recent feature areas (2026)
+
+These are fully covered in chapters 02–06:
+
+- Member data Excel upload (household + child rows, preview/commit)
+- Contact access scope (permission sets, ZONE/STHAN role levels)
+- Seva Samithi contact registry and seva activity tracking
+- Gada (Gadanayak) assignment per Sreni
+- Join Us public intake and admin review queue
+- Household members, enrollments, and participant strategies (Balabarathi / ladies)

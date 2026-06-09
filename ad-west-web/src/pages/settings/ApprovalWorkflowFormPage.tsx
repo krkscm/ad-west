@@ -651,7 +651,7 @@ export const ApprovalWorkflowFormPage: React.FC<ApprovalWorkflowFormPageProps> =
 
           <div style={{ marginBottom: '16px' }}>
             <label className="form-label">Approval Mode <span style={{ color: 'var(--error)' }}>*</span></label>
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {(approvalModes.length ? approvalModes : [
                 { id: 'fb-seq', enumType: 'approval_mode', value: 'sequential', label: 'Sequential', sortOrder: 10, active: true, createdAt: '', updatedAt: '' },
                 { id: 'fb-par', enumType: 'approval_mode', value: 'parallel', label: 'Parallel', sortOrder: 20, active: true, createdAt: '', updatedAt: '' },
@@ -660,16 +660,21 @@ export const ApprovalWorkflowFormPage: React.FC<ApprovalWorkflowFormPageProps> =
                 const meta = MODE_META[mode] ?? { label: modeOption.label, description: 'Configured via enum values.', color: '#0ea5e9' };
                 const selected = fMode === mode;
                 return (
-                  <label key={mode} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 16px', borderRadius: '8px', border: `2px solid ${selected ? 'var(--primary)' : 'var(--border-dark)'}`, background: selected ? 'rgba(99,102,241,0.06)' : 'transparent', cursor: 'pointer', flex: '1 1 200px', maxWidth: '300px' }}>
-                    <input type="radio" name="approvalMode" value={mode} checked={selected} onChange={() => setFMode(mode)} style={{ marginTop: '2px', accentColor: 'var(--primary)' }} />
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.875rem', color: selected ? 'var(--primary)' : 'var(--text-primary-dark)' }}>{meta.label}</div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)', marginTop: '2px' }}>{meta.description}</div>
-                    </div>
-                  </label>
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`page-size-pill${selected ? ' is-active' : ''}`}
+                    onClick={() => setFMode(mode)}
+                    aria-pressed={selected}
+                  >
+                    {meta.label}
+                  </button>
                 );
               })}
             </div>
+            <p style={{ margin: '8px 0 0', fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>
+              {modeMeta.description}
+            </p>
           </div>
 
           <div style={{ marginBottom: '20px' }}>

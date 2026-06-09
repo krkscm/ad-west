@@ -3,6 +3,7 @@ import { backendApi, JobPostingApi } from '../../utils/backendApi'
 import { FileUploadZone } from '../../components/common/FileUploadZone'
 import { PublicPageShell } from './PublicPageShell'
 import { useEnumOptions } from '../../hooks/useEnumOptions'
+import { useAppLocation, useNavigate } from '../../hooks/usePathname'
 
 type View = 'listings' | 'apply' | 'post'
 
@@ -83,6 +84,8 @@ function JobCard({ job, onApply, jobTypeLabel }: { job: JobPostingApi; onApply: 
 }
 
 export function PublicJobsPage() {
+  const { pathname, search } = useAppLocation()
+  const navigate = useNavigate()
   const { options: jobTypeOptions, labelByValue: jobTypeLabel } = useEnumOptions('job_posting_type')
   const [view, setView] = useState<View>('listings')
   const [selectedJob, setSelectedJob] = useState<JobPostingApi | null>(null)
@@ -160,16 +163,17 @@ export function PublicJobsPage() {
   }, [])
 
   useEffect(() => {
-    const pathname = window.location.pathname.replace(/\/+$/, '')
-
     if (pathname === '/jobs/post') {
       setView('post')
       return
     }
 
-    const jobId = new URLSearchParams(window.location.search).get('job')
+    const jobId = new URLSearchParams(search).get('job')
 
     if (pathname !== '/jobs/apply' || !jobId || jobs.length === 0) {
+      if (pathname === '/jobs') {
+        setView('listings')
+      }
       return
     }
 
@@ -183,11 +187,11 @@ export function PublicJobsPage() {
     setView('listings')
     setSelectedJob(null)
     setSubmitError('The selected job could not be found or is no longer active.')
-    window.history.replaceState({}, '', '/jobs')
-  }, [jobs])
+    navigate('/jobs', { replace: true })
+  }, [jobs, pathname, search, navigate])
 
   const handlePostJob = () => {
-    window.history.pushState({}, '', '/jobs/post')
+    navigate('/jobs/post')
     setView('post')
     setPostSubmitted(false)
     setPostError('')
@@ -227,7 +231,7 @@ export function PublicJobsPage() {
   }
 
   const handleApply = (job: JobPostingApi) => {
-    window.history.pushState({}, '', `/jobs/apply?job=${encodeURIComponent(job.id)}`)
+    navigate(`/jobs/apply?job=${encodeURIComponent(job.id)}`)
     setSelectedJob(job)
     setView('apply')
     setSubmitted(false)
@@ -342,7 +346,7 @@ export function PublicJobsPage() {
             className="btn btn-secondary public-jobs-back-btn"
             style={{ fontSize: '0.84rem' }}
             onClick={() => {
-              window.history.pushState({}, '', '/jobs')
+              navigate('/jobs')
               setView('listings')
               setSelectedJob(null)
               setSubmitError('')
@@ -411,7 +415,7 @@ export function PublicJobsPage() {
                     <button
                       className="btn btn-primary"
                       onClick={() => {
-                        window.history.pushState({}, '', '/jobs')
+                        navigate('/jobs')
                         setView('listings')
                         setSelectedJob(null)
                         setSubmitError('')
@@ -507,7 +511,7 @@ export function PublicJobsPage() {
                     <button
                       className="btn btn-primary"
                       onClick={() => {
-                        window.history.pushState({}, '', '/jobs')
+                        navigate('/jobs')
                         setView('listings')
                       }}
                     >

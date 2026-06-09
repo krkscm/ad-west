@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useAdminDefinitions } from '../../context/admin-definitions-context'
 import {
   backendApi,
   type ResponsibilityChartApi,
@@ -31,6 +32,7 @@ const toUiError = (error: unknown, fallback: string): string => {
 
 export const ResponsibilityChartPage: React.FC = () => {
   const { addToast } = useToast()
+  const { locationDefinitions } = useAdminDefinitions()
   const [chart, setChart] = useState<ResponsibilityChartApi | null>(null)
   const [roles, setRoles] = useState<RoleDefinitionApi[]>([])
   const [usersById, setUsersById] = useState<Map<string, UserApi>>(new Map())
@@ -87,12 +89,12 @@ export const ResponsibilityChartPage: React.FC = () => {
   const load = useCallback(async (year?: number) => {
     setIsLoading(true)
     try {
-      const [chartData, rolesData, usersData, locationsData] = await Promise.all([
+      const [chartData, rolesData, usersData] = await Promise.all([
         backendApi.getResponsibilityChart(year),
         backendApi.listRoleDefinitions({ page: 1, pageSize: 1000, active: true }),
         backendApi.listUsers({ page: 1, pageSize: 5000 }),
-        backendApi.listLocationDefinitions(),
       ])
+      const locationsData = locationDefinitions
 
       const usersMap = new Map<string, UserApi>()
       usersData.items.forEach((user) => usersMap.set(user.id, user))
@@ -110,7 +112,7 @@ export const ResponsibilityChartPage: React.FC = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [addToast])
+  }, [addToast, locationDefinitions])
 
   useEffect(() => {
     void load()

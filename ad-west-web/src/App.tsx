@@ -15,12 +15,26 @@ import { PublicEventRegistrationPage } from './pages/public/PublicEventRegistrat
 import { PublicContactRegistrationPage } from './pages/public/PublicContactRegistrationPage';
 import { PublicPortalPage } from './pages/public/PublicPortalPage';
 import { AppLoader } from './components/common/AppLoader';
+import { InternalLinkInterceptor } from './components/common/InternalLinkInterceptor';
+import { usePathname } from './hooks/usePathname';
 
-function PublicRouteContent() {
-  const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
+function isPublicOnlyPath(pathname: string): boolean {
+  return pathname === '/helpdesk'
+    || pathname === '/join-us'
+    || pathname === '/jobs'
+    || pathname === '/jobs/apply'
+    || pathname === '/jobs/post'
+    || pathname === '/forgot-password'
+    || pathname === '/reset-password'
+    || /^\/events\/[^/]+\/register$/.test(pathname);
+}
 
-  // Public portal landing page — shown at root for unauthenticated visitors
-  if (pathname === '/' || pathname === '/portal') {
+function isPortalPath(pathname: string): boolean {
+  return pathname === '/' || pathname === '/portal';
+}
+
+function PublicRouteContent({ pathname }: { pathname: string }) {
+  if (isPortalPath(pathname)) {
     return <PublicPortalPage />;
   }
 
@@ -52,30 +66,26 @@ function PublicRouteContent() {
 }
 
 function AppContent() {
-  const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
+  const pathname = usePathname();
+  const { adminUser, memberUser, mustResetPassword, isInitializing, token, memberToken } = useAuth();
 
-  // Authenticated users navigating to root or portal — skip public portal, go to dashboard
-  const { adminUser, memberUser, mustResetPassword, isInitializing } = useAuth();
+  const publicOnly = isPublicOnlyPath(pathname);
+  const portal = isPortalPath(pathname);
+  const hasStoredSession = Boolean(token || memberToken);
 
-  // Only show public routes if the user is not authenticated (or the path is a known public path)
-  const isPublicOnlyPath = pathname === '/helpdesk' || pathname === '/join-us' || pathname === '/jobs'
-    || pathname === '/jobs/apply' || pathname === '/jobs/post'
-    || pathname === '/forgot-password' || pathname === '/reset-password'
-    || /^\/events\/[^/]+\/register$/.test(pathname);
+  // Public routes render immediately — do not block on auth initialization.
+  if (publicOnly) {
+    return <PublicRouteContent pathname={pathname} />;
+  }
 
-  const isPortalPath = pathname === '/' || pathname === '/portal';
-
-  // Public-only paths always show their content regardless of auth
-  if (isPublicOnlyPath) {
-    const publicContent = PublicRouteContent();
-    if (publicContent) return publicContent;
+  if (portal && !adminUser && !memberUser && !hasStoredSession) {
+    return <PublicPortalPage />;
   }
 
   if (isInitializing) {
     return <AppLoader />;
   }
 
-  // Admin/member login path — render only after session initialization completes.
   if (pathname === '/login') {
     if (adminUser && mustResetPassword) return <ForcePasswordChangePage />;
     if (adminUser) return <AdminDashboardPage />;
@@ -83,25 +93,15 @@ function AppContent() {
     return <AdminLoginPage />;
   }
 
-  // Authenticated users — go to their workspace
-  if (!isInitializing) {
-    if (adminUser && mustResetPassword) return <ForcePasswordChangePage />;
-    if (adminUser) return <AdminDashboardPage />;
-    if (memberUser) return <MemberPortalPage onBack={() => undefined} />;
-  }
+  if (adminUser && mustResetPassword) return <ForcePasswordChangePage />;
+  if (adminUser) return <AdminDashboardPage />;
+  if (memberUser) return <MemberPortalPage onBack={() => undefined} />;
 
-  // Unauthenticated users at root or /portal — show public portal
-  if (isPortalPath && !isInitializing) {
+  if (portal) {
     return <PublicPortalPage />;
   }
 
-  // Still initialising or unrecognised path — show portal as fallback for unauthenticated
-  if (!isInitializing) {
-    return <PublicPortalPage />;
-  }
-
-  // Loading while auth initialises
-  return <AppLoader />;
+  return <PublicPortalPage />;
 }
 
 function App() {
@@ -110,6 +110,7 @@ function App() {
       <ConfirmDialogProvider>
         <ThemeProvider>
           <AuthProvider>
+            <InternalLinkInterceptor />
             <AppContent />
           </AuthProvider>
         </ThemeProvider>

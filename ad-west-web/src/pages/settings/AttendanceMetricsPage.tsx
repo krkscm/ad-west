@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import { useToast } from '../../components/common/Toast';
 import { PageHeader } from '../../components/common/PageHeader';
+import { useAdminDefinitions } from '../../context/admin-definitions-context';
 import { AttendanceMetricApi, backendApi, SreniDefinitionApi } from '../../utils/backendApi';
 import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
 
@@ -42,6 +43,7 @@ const toUiError = (error: unknown, fallback: string): string => {
 export const AttendanceMetricsPage: React.FC = () => {
   const confirm = useConfirm();
   const { addToast } = useToast();
+  const { sreniDefinitions } = useAdminDefinitions();
 
   const [metrics, setMetrics] = useState<AttendanceMetricApi[]>([]);
   const [srenies, setSrenies] = useState<SreniDefinitionApi[]>([]);
@@ -71,16 +73,13 @@ export const AttendanceMetricsPage: React.FC = () => {
   const loadSrenies = useCallback(async () => {
     setIsLoadingSrenies(true);
     try {
-      const response = await backendApi.listSreniDefinitionsPaginated({ page: 1, pageSize: 1000 });
-      const activeSrenies = response.items.filter((item) => item.active);
+      const activeSrenies = sreniDefinitions.filter((item) => item.active);
       setSrenies(activeSrenies);
       setSelectedSreniId((prev) => prev || activeSrenies[0]?.id || '');
-    } catch (error) {
-      addToast(toUiError(error, 'Failed to load Sreni definitions.'), 'error');
     } finally {
       setIsLoadingSrenies(false);
     }
-  }, [addToast]);
+  }, [sreniDefinitions]);
 
   const loadMetrics = useCallback(async () => {
     if (!selectedSreniId) {

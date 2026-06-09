@@ -18,8 +18,8 @@ import type {
   SthanExpenseStatus,
   SthanReportRecord,
 } from '../core-business.types';
-import { assertContactUploadRowLimit, CONTACT_UPLOAD_BATCH_SIZE } from './contact-upload.constants';
-
+import { MemberContactPersistenceService } from './member-contact-persistence.service';
+import type { SreniAdminRuntimeContext } from './sreni-admin-runtime.service';
 export interface SthanRuntimeContext {
   runtimeMode: 'in-memory' | 'db';
   dataSource?: DataSource;
@@ -35,50 +35,6 @@ export interface SthanRuntimeContext {
 
 export class SthanRuntimeService {
   constructor(private readonly ctx: SthanRuntimeContext) {}
-
-  private async resolveLocationHierarchy(locationId: string): Promise<{
-    zoneLocationId: string | null;
-    sthanLocationId: string | null;
-    divisionLocationId: string | null;
-  }> {
-    if (!(this.ctx.runtimeMode === 'db' && this.ctx.dataSource)) {
-      return { zoneLocationId: null, sthanLocationId: null, divisionLocationId: null };
-    }
-
-    const rows = await this.ctx.dataSource.query(
-      `SELECT
-          CASE
-            WHEN l.level = 'zone' THEN l.id::text
-            WHEN p1.level = 'zone' THEN p1.id::text
-            WHEN p2.level = 'zone' THEN p2.id::text
-            ELSE NULL
-          END AS zone_location_id,
-          CASE
-            WHEN l.level = 'sthan' THEN l.id::text
-            WHEN p1.level = 'sthan' THEN p1.id::text
-            WHEN p2.level = 'sthan' THEN p2.id::text
-            ELSE NULL
-          END AS sthan_location_id,
-          CASE
-            WHEN l.level = 'division' THEN l.id::text
-            WHEN p1.level = 'division' THEN p1.id::text
-            WHEN p2.level = 'division' THEN p2.id::text
-            ELSE NULL
-          END AS division_location_id
-       FROM adwest.locations l
-       LEFT JOIN adwest.locations p1 ON p1.id::text = l.parent_id
-       LEFT JOIN adwest.locations p2 ON p2.id::text = p1.parent_id
-       WHERE l.id = $1::uuid
-       LIMIT 1`,
-      [locationId],
-    ) as Array<{ zone_location_id: string | null; sthan_location_id: string | null; division_location_id: string | null }>;
-
-    return {
-      zoneLocationId: rows[0]?.zone_location_id ?? null,
-      sthanLocationId: rows[0]?.sthan_location_id ?? null,
-      divisionLocationId: rows[0]?.division_location_id ?? null,
-    };
-  }
 
   // ── Reports ─────────────────────────────────────────────────────────────────
 
@@ -221,14 +177,19 @@ export class SthanRuntimeService {
       const offset = (page - 1) * pageSize;
       const [countRows, dataRows] = await Promise.all([
         this.ctx.dataSource.query(
-          `SELECT COUNT(*)::int AS total FROM adwest.sreni_contacts WHERE location_id=$1::uuid`,
+          `SELECT COUNT(*)::int AS total FROM adwest.sreni_contacts
+           WHERE contact_kind = 'household'
+             AND (sthan_location_id = $1::uuid OR location_id = $1::uuid)`,
           [locationId],
         ),
         this.ctx.dataSource.query(
           `SELECT id::text, location_id::text, row_index, data,
                   zone_location_id::text, sthan_location_id::text, division_location_id::text,
                   source_file, uploaded_by, created_at, updated_at
-           FROM adwest.sreni_contacts WHERE location_id=$1::uuid ORDER BY row_index LIMIT $2 OFFSET $3`,
+           FROM adwest.sreni_contacts
+           WHERE contact_kind = 'household'
+             AND (sthan_location_id = $1::uuid OR location_id = $1::uuid)
+           ORDER BY row_index LIMIT $2 OFFSET $3`,
           [locationId, pageSize, offset],
         ),
       ]);
@@ -248,92 +209,6 @@ export class SthanRuntimeService {
     return { items: [], total: 0, totalPages: 1 };
   }
 
-  async uploadSthanContacts(locationId: string, fileBuffer: Buffer, originalName: string, uploadedBy?: string): Promise<{ inserted: number; locationId: string }> {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const XLSX = require('xlsx') as typeof import('xlsx');
-    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    if (!sheetName) throw new BadRequestException('Excel file has no sheets');
-    const sheet = workbook.Sheets[sheetName];
-    const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, blankrows: false, raw: false }) as unknown[][];
-    if (grid.length <= 1) return { inserted: 0, locationId };
-
-    const headerRow = grid[0] ?? [];
-    const headers = (headerRow as Array<unknown>).map((cell) => {
-      const raw = cell != null ? String(cell).replace(/\s+/g, ' ').trim() : '';
-      return raw.toLowerCase().replace(/\s+/g, '_');
-    });
-
-    const parsedRows = grid.slice(1).map((rawRow, idx) => {
-      const data: Record<string, string | number | boolean | null> = {};
-      headers.forEach((header, colIdx) => {
-        if (!header) return;
-        const val = (rawRow as Array<unknown>)[colIdx];
-        data[header] = val !== undefined && val !== '' ? (val as string | number | boolean | null) : null;
-      });
-      return { rowIndex: idx + 1, data };
-    }).filter((row) => Object.values(row.data).some((v) => v !== null));
-
-    if (parsedRows.length === 0) return { inserted: 0, locationId };
-    assertContactUploadRowLimit(parsedRows.length);
-
-    if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
-      const hierarchy = await this.resolveLocationHierarchy(locationId);
-      // Replace existing contacts for this location in the shared sreni_contacts table
-      await this.ctx.dataSource.query(
-        `DELETE FROM adwest.sreni_contacts WHERE location_id=$1::uuid`,
-        [locationId],
-      );
-      for (let offset = 0; offset < parsedRows.length; offset += CONTACT_UPLOAD_BATCH_SIZE) {
-        const batch = parsedRows.slice(offset, offset + CONTACT_UPLOAD_BATCH_SIZE);
-        await this.ctx.dataSource.query(
-          `INSERT INTO adwest.sreni_contacts (
-             location_id,
-             zone_location_id,
-             sthan_location_id,
-             division_location_id,
-             row_index,
-             data,
-             source_file,
-             uploaded_by
-           )
-           SELECT location_id, zone_location_id, sthan_location_id, division_location_id,
-                  row_index, data::jsonb, source_file, uploaded_by
-           FROM UNNEST(
-             $1::uuid[],
-             $2::uuid[],
-             $3::uuid[],
-             $4::uuid[],
-             $5::int[],
-             $6::text[],
-             $7::text[],
-             $8::text[]
-           ) AS t(
-             location_id,
-             zone_location_id,
-             sthan_location_id,
-             division_location_id,
-             row_index,
-             data,
-             source_file,
-             uploaded_by
-           )`,
-          [
-            batch.map(() => locationId),
-            batch.map(() => hierarchy.zoneLocationId),
-            batch.map(() => hierarchy.sthanLocationId),
-            batch.map(() => hierarchy.divisionLocationId),
-            batch.map((row) => row.rowIndex),
-            batch.map((row) => JSON.stringify(row.data)),
-            batch.map(() => originalName),
-            batch.map(() => uploadedBy ?? null),
-          ],
-        );
-      }
-    }
-    return { inserted: parsedRows.length, locationId };
-  }
-
   async updateSthanContact(
     locationId: string,
     contactId: string,
@@ -344,12 +219,18 @@ export class SthanRuntimeService {
     }
 
     const existingRows = await this.ctx.dataSource.query(
-      `SELECT data FROM adwest.sreni_contacts WHERE id = $1::uuid AND location_id = $2::uuid`,
+      `SELECT data, contact_kind FROM adwest.sreni_contacts WHERE id = $1::uuid AND location_id = $2::uuid`,
       [contactId, locationId],
-    ) as Array<{ data: Record<string, string | number | boolean | null> }>;
+    ) as Array<{ data: Record<string, string | number | boolean | null>; contact_kind: string }>;
     if (!existingRows[0]) throw new NotFoundException('Contact not found');
 
-    const merged = { ...(existingRows[0].data ?? {}), ...data };
+    let merged = { ...(existingRows[0].data ?? {}), ...data };
+    if (existingRows[0].contact_kind === 'household') {
+      const persistence = new MemberContactPersistenceService();
+      const adminCtx = this.ctx as unknown as SreniAdminRuntimeContext;
+      merged = await persistence.updateHouseholdContact(adminCtx, contactId, data);
+    }
+
     const rows = await this.ctx.dataSource.query(
       `UPDATE adwest.sreni_contacts
        SET data = $1::jsonb, updated_at = now()

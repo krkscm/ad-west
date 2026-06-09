@@ -34,6 +34,7 @@ const DEFAULT_MENUS: Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>[] = [
   { key: 'helpdesk-tickets',                 label: 'Helpdesk Tickets',      parentKey: 'helpdesk',          icon: null, sortOrder: 10, active: true },
   { key: 'job-postings',                     label: 'Job Postings',          parentKey: 'helpdesk',          icon: null, sortOrder: 20, active: true },
   { key: 'job-applications',                 label: 'Job Applications',      parentKey: 'helpdesk',          icon: null, sortOrder: 30, active: true },
+  { key: 'governance-join-us-review',        label: 'Join Us Review',        parentKey: 'governance',        icon: null, sortOrder: 25, active: true },
   { key: 'governance-contacts',              label: 'Contacts',              parentKey: 'governance',        icon: null, sortOrder: 30, active: true },
   { key: 'member-services-reimbursements',   label: 'Reimbursements',        parentKey: 'governance',        icon: null, sortOrder: 50, active: true },
   { key: 'member-services-events',           label: 'Special Events',        parentKey: 'governance',        icon: null, sortOrder: 60, active: true },

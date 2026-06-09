@@ -5,6 +5,7 @@ import { PublicPageShell } from './PublicPageShell'
 import { SwitchToggle } from '../../components/common/SwitchToggle'
 import { PublicFormSection } from '../../components/common/PublicFormSection'
 import { InlineAlert } from '../../components/common/InlineAlert'
+import { usePathname } from '../../hooks/usePathname'
 
 const fieldLabelStyle = {
   display: 'block',
@@ -14,8 +15,8 @@ const fieldLabelStyle = {
   marginBottom: '4px',
 } as const
 
-function getEventId(): string {
-  const parts = window.location.pathname.split('/')
+function getEventIdFromPath(pathname: string): string {
+  const parts = pathname.split('/')
   const idx = parts.indexOf('events')
   return idx >= 0 ? parts[idx + 1] ?? '' : ''
 }
@@ -103,7 +104,8 @@ function FormField({ field, value, onChange }: {
 }
 
 export function PublicEventRegistrationPage() {
-  const eventId = getEventId()
+  const pathname = usePathname()
+  const eventId = getEventIdFromPath(pathname)
   const [event, setEvent] = useState<SpecialEventApi | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -123,7 +125,7 @@ export function PublicEventRegistrationPage() {
       })
       .catch(() => setError('This event is not available or registration is closed.'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [eventId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

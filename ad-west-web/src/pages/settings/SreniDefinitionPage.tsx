@@ -42,6 +42,8 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [joinUsVisible, setJoinUsVisible] = useState(false);
+  const [showInUploadExcel, setShowInUploadExcel] = useState(false);
+  const [gadaAssignmentEnabled, setGadaAssignmentEnabled] = useState(true);
   const [enrollmentScope, setEnrollmentScope] = useState('');
   const [primaryContactStrategy, setPrimaryContactStrategy] = useState('');
   const [enrollmentScopeOptions, setEnrollmentScopeOptions] = useState<EnumValueApi[]>([]);
@@ -53,6 +55,8 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
     setName('');
     setDescription('');
     setJoinUsVisible(false);
+    setShowInUploadExcel(false);
+    setGadaAssignmentEnabled(true);
     setEnrollmentScope(enrollmentScopeOptions[0]?.value ?? '');
     setPrimaryContactStrategy(strategyOptions[0]?.value ?? '');
     setFormOpen(false);
@@ -99,6 +103,17 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
     }
   };
 
+  const handleToggleUploadExcel = async (sreni: SreniDefinitionApi) => {
+    try {
+      await backendApi.updateSreniDefinition(sreni.id, { showInUploadExcel: !sreni.showInUploadExcel });
+      addToast(`Upload Excel column ${sreni.showInUploadExcel ? 'disabled' : 'enabled'} for ${sreni.name}.`, 'success');
+      onSreniChange?.();
+      load(page, pageSize, search);
+    } catch (error) {
+      addToast(toUiError(error, 'Failed to update upload Excel setting.'), 'error');
+    }
+  };
+
   const handleToggleJoinUsVisibility = async (sreni: SreniDefinitionApi) => {
     try {
       await backendApi.updateSreniDefinition(sreni.id, { joinUsVisible: !sreni.joinUsVisible });
@@ -140,6 +155,8 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
           code: cleanCode,
           description: cleanDescription,
           joinUsVisible,
+          showInUploadExcel,
+          gadaAssignmentEnabled,
           enrollmentScope: enrollmentScope || undefined,
           primaryContactStrategy: primaryContactStrategy || undefined,
         });
@@ -150,6 +167,8 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
           code: cleanCode,
           description: cleanDescription,
           joinUsVisible,
+          showInUploadExcel,
+          gadaAssignmentEnabled,
           enrollmentScope: enrollmentScope || undefined,
           primaryContactStrategy: primaryContactStrategy || undefined,
         });
@@ -171,6 +190,8 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
     setName(sreni.name);
     setDescription(sreni.description ?? '');
     setJoinUsVisible(sreni.joinUsVisible);
+    setShowInUploadExcel(sreni.showInUploadExcel ?? false);
+    setGadaAssignmentEnabled(sreni.gadaAssignmentEnabled ?? true);
     setEnrollmentScope(sreni.enrollmentScope ?? enrollmentScopeOptions[0]?.value ?? '');
     setPrimaryContactStrategy(sreni.primaryContactStrategy ?? strategyOptions[0]?.value ?? '');
     setFormOpen(true);
@@ -228,25 +249,116 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div className="form-group">
-                <label className="form-label">Enrollment Scope</label>
+                <label className="form-label">Division assignment</label>
                 <select className="form-input" value={enrollmentScope} onChange={(e) => setEnrollmentScope(e.target.value)}>
                   {enrollmentScopeOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
+                <p style={{ margin: '6px 0 0', fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>
+                  Whether Sreni division is set on the family contact row or on each enrolled member.
+                </p>
               </div>
               <div className="form-group">
-                <label className="form-label">Participant Strategy</label>
+                <label className="form-label">Who appears in this Sreni</label>
                 <select className="form-input" value={primaryContactStrategy} onChange={(e) => setPrimaryContactStrategy(e.target.value)}>
                   {strategyOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
+                <p style={{ margin: '6px 0 0', fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>
+                  Controls whose names show in the contacts list, Excel upload, and participant counts.
+                </p>
               </div>
             </div>
             <div className="form-group">
               <label className="form-label">Description</label>
               <textarea className="form-input" style={{ minHeight: '80px', resize: 'vertical' }} placeholder="Brief description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Show in Upload Excel</label>
+              <button
+                type="button"
+                aria-pressed={showInUploadExcel}
+                onClick={() => setShowInUploadExcel((prev) => !prev)}
+                style={{
+                  width: '100%',
+                  height: '40px',
+                  borderRadius: '8px',
+                  padding: '0 12px',
+                  border: `1px solid ${showInUploadExcel ? 'rgba(59,130,246,0.35)' : 'var(--border-dark)'}`,
+                  background: showInUploadExcel ? 'rgba(59,130,246,0.08)' : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '10px',
+                  cursor: 'pointer',
+                  marginBottom: '12px',
+                }}
+              >
+                <span style={{ fontSize: '0.84rem', fontWeight: 600, color: showInUploadExcel ? '#3b82f6' : 'var(--text-secondary-dark)' }}>
+                  {showInUploadExcel ? 'Yes/No column in Member Data template' : 'Hidden from upload template'}
+                </span>
+                <span style={{
+                  position: 'relative', width: '36px', height: '20px', borderRadius: '999px', flexShrink: 0,
+                  background: showInUploadExcel ? '#3b82f6' : 'rgba(148,163,184,0.45)',
+                  transition: 'background 0.2s',
+                }}>
+                  <span style={{
+                    position: 'absolute', top: '2px', left: showInUploadExcel ? '16px' : '2px',
+                    width: '16px', height: '16px', borderRadius: '50%',
+                    background: '#fff', boxShadow: '0 1px 3px rgba(15,23,42,0.22)',
+                    transition: 'left 0.2s',
+                  }} />
+                </span>
+              </button>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Gada assignment</label>
+              <button
+                type="button"
+                aria-pressed={gadaAssignmentEnabled}
+                disabled={/seva\s*samithi/i.test(name) || code.toLowerCase() === 'seva_samithi' || code.toLowerCase() === 'sevasamithi'}
+                onClick={() => setGadaAssignmentEnabled((prev) => !prev)}
+                style={{
+                  width: '100%',
+                  height: '40px',
+                  borderRadius: '8px',
+                  padding: '0 12px',
+                  border: `1px solid ${gadaAssignmentEnabled ? 'rgba(168,85,247,0.35)' : 'var(--border-dark)'}`,
+                  background: gadaAssignmentEnabled ? 'rgba(168,85,247,0.08)' : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '10px',
+                  cursor: /seva\s*samithi/i.test(name) ? 'not-allowed' : 'pointer',
+                  marginBottom: '12px',
+                  opacity: /seva\s*samithi/i.test(name) ? 0.6 : 1,
+                }}
+              >
+                <span style={{ fontSize: '0.84rem', fontWeight: 600, color: gadaAssignmentEnabled ? '#a855f7' : 'var(--text-secondary-dark)' }}>
+                  {/seva\s*samithi/i.test(name)
+                    ? 'Not available for Seva Samithi'
+                    : gadaAssignmentEnabled
+                      ? 'Gadanayak assignment enabled'
+                      : 'Gada assignment disabled'}
+                </span>
+                <span style={{
+                  position: 'relative', width: '36px', height: '20px', borderRadius: '999px', flexShrink: 0,
+                  background: gadaAssignmentEnabled ? '#a855f7' : 'rgba(148,163,184,0.45)',
+                  transition: 'background 0.2s',
+                }}>
+                  <span style={{
+                    position: 'absolute', top: '2px', left: gadaAssignmentEnabled ? '16px' : '2px',
+                    width: '16px', height: '16px', borderRadius: '50%',
+                    background: '#fff', boxShadow: '0 1px 3px rgba(15,23,42,0.22)',
+                    transition: 'left 0.2s',
+                  }} />
+                </span>
+              </button>
+              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>
+                When enabled, coordinators can register gadanayaks and assign contacts to them per sthan.
+              </p>
             </div>
             <div className="form-group">
               <label className="form-label">Join Us Visibility</label>
@@ -406,6 +518,7 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
                       ariaLabel={`Actions for ${sreni.name}`}
                       actions={[
                         { label: 'Edit', onClick: () => startEdit(sreni) },
+                        { label: sreni.showInUploadExcel ? 'Hide from Upload Excel' : 'Show in Upload Excel', tone: sreni.showInUploadExcel ? 'warning' : 'success', onClick: () => void handleToggleUploadExcel(sreni) },
                         { label: sreni.joinUsVisible ? 'Hide from Join Us' : 'Show in Join Us', tone: sreni.joinUsVisible ? 'warning' : 'success', onClick: () => void handleToggleJoinUsVisibility(sreni) },
                         { label: sreni.active ? 'Deactivate' : 'Activate', tone: sreni.active ? 'warning' : 'success', onClick: () => void handleToggleActive(sreni) },
                         { label: 'Delete', tone: 'danger', onClick: () => void handleDelete(sreni) },

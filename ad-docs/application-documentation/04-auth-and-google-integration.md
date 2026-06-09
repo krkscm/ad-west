@@ -1,88 +1,103 @@
-# 04 - Authentication, Google Integration, and Email
+# 04 - Authentication, Access Control, and Integrations
 
-## Authentication Modes
+## Identity types
 
-### Admin Authentication
+ADWest uses **four distinct identity concepts**. They are related but not interchangeable.
 
-- Credential + captcha login path
-- Token/session validation on guarded endpoints
-- Account lock behavior on repeated failed attempts
-- Forgot-password and reset-password public endpoints with throttling
+| Identity | Table | Used for |
+|----------|-------|----------|
+| **Admin login account** | `adwest.auth_admin_users` | Sign-in, menu grants, legacy role assignments |
+| **Organizational user** | `adwest.users` | Permission sets, contact data scope, org chart, gada eligibility |
+| **Member account** | `adwest.auth_member_users` | Member portal |
+| **Super-admin user** | `adwest.users` where `is_super_admin = true` | Full data access + admin workspace login |
 
-### Member Authentication
+### Admin vs organizational user
 
-- Dedicated member login and member guard path
-- Workspace routing is resolved by authenticated user type in frontend app shell
+- **Admin account** controls **which menus** appear in the admin UI (`admin_menu_grants`).
+- **Organizational user** controls **which contact/Sreni data** API operations may touch (`ContactAccessScopeService`).
+- An admin JWT alone is **not** sufficient for scoped contact mutations unless the principal email matches a `users` row (or is super-admin).
 
-### Unified Credential Behavior
+## Login flow
 
-- Backend supports workspace-aware credential resolution so authenticated identity maps to admin/member surfaces.
+**Endpoint:** `POST /api/v1/auth/login` (captcha + rate limiting)
 
-## Session Model
+**Resolution order** (`auth.service.ts`):
 
-- Issued token carries identity/session claims.
-- Backend validates active session context for protected routes.
-- Role/menu-based access is enforced by guard + service checks.
+1. Application user — `users` with `is_super_admin` and valid password
+2. Member — `auth_member_users`
+3. Admin — `auth_admin_users` by code or email
 
-## Google OAuth Integration
+**Token types:** JWT bearer; `type: admin | member`; admin may carry `origin: user` for super-admin path.
 
-### Configuration Resolution
+**Workspace routing (frontend):** after login, `AuthContext` sends admin tokens to `/admin/*` and member tokens to member portal.
 
-Order of precedence:
-1. DB configuration (`adwest.integration_google_config`) when persistence is enabled
-2. Environment fallback (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `WEB_APP_ORIGIN`)
+### Current limitation
 
-### Endpoint Surface
+Non-super-admin rows in `adwest.users` are used for **data scope and org structure** but do **not** currently receive a successful login through the unified `/auth/login` path. Operational admins typically use `auth_admin_users` accounts; scope requires a matching `users` row linked by email.
 
-- `GET /api/v1/auth/google/start`
-- `GET /api/v1/auth/google/callback`
-- `GET /api/v1/settings/google-integration-config`
-- `PATCH /api/v1/settings/google-integration-config`
+## Contact access scope (data layer)
 
-### Authorization Gate
+Separate from menu grants. Resolved in `contact-access-scope.service.ts`:
 
-- OAuth-authenticated email must map to an active authorized admin identity.
-- Unauthorized or inactive identities are rejected.
+```
+JWT principal
+  → match adwest.users (id or email)
+  → permission_set_id → allowed sreni_ids
+  → role_id → ZONE | STHAN
+  → sthan_id (if STHAN)
+```
 
-## Email Integration (SMTP + IMAP)
+| Role level | Contact list behavior |
+|------------|----------------------|
+| **ZONE** | All contacts in allowed Srenis (location tags ignored for scope) |
+| **STHAN** | Allowed Srenis **and** contacts matching user's sthan |
+| **Super admin** | Unrestricted |
 
-### Runtime Model
+**Seva Samithi:** registry membership required; same sthan rules apply for STHAN role.
 
-- Outbound email: `MailService` (SMTP)
-- Inbox retrieval: `ImapService` (IMAP)
-- Settings store: `adwest.integration_smtp_config`
+## Admin roles (legacy assignments)
 
-### Endpoint Surface
+`auth_admin_users` may have role assignments: `SUPER_ADMIN`, `ZONE_ADMIN`, `SRENY_ADMIN` with scope type global/zone/sreny. These complement but do not replace permission-set data scope.
 
-- `POST /api/v1/gmail/send`
-- `GET /api/v1/gmail/inbox`
-- `GET /api/v1/settings/smtp-integration-config`
-- `PATCH /api/v1/settings/smtp-integration-config`
+## Session and security
 
-### Frontend Availability
+- Sessions stored in `auth_sessions`
+- Failed login lockout (5 attempts, 15-minute window)
+- Captcha on credential login
+- Global `ThrottlerGuard` + route-level limits on sensitive endpoints
+- `POST /auth/forgot-password`, `POST /auth/reset-password` — admin password reset via `admin_password_reset_tokens` (single-use, expiring)
 
-- Email workspace is available in admin navigation.
-- SMTP/IMAP runtime is configuration-driven and does not require Google OAuth at send/read operation time.
+## Google OAuth
 
-## Forgot Password Flow
+**Config precedence:** DB (`integration_google_config`) → environment variables
 
-### Runtime Flow
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /auth/google/start` | Begin OAuth |
+| `GET /auth/google/callback` | Complete OAuth |
+| `GET/PATCH /settings/google-integration-config` | Settings UI |
 
-1. User submits email on `/forgot-password`.
-2. Backend processes `POST /api/v1/auth/forgot-password` with response-shaping that avoids account disclosure.
-3. Time-limited reset token is stored in `adwest.admin_password_reset_tokens`.
-4. User opens `/reset-password?token=...`.
-5. Backend validates token and applies new password through `POST /api/v1/auth/reset-password`.
+OAuth email must map to an active authorized admin. Popup origin checks allow split-port local dev.
 
-### Security Properties
+## Email (SMTP + IMAP)
 
-- Single-use token lifecycle
-- Expiry enforcement
-- Endpoint throttling
-- Non-disclosing response semantics for unknown emails
+- Settings: `integration_smtp_config`
+- `POST /gmail/send`, `GET /gmail/inbox`
+- Independent of Google OAuth at send/read time
 
-## Runtime Notes
+## Permission sets (settings model)
 
-- OAuth popup message origin checks allow expected frontend/API origins for localhost split-port development.
-- Integration settings remain DB-first with env fallback behavior.
-- For Google config updates, `updated_by` FK is nullable to handle mixed principal types safely.
+Defined in migrations `022`, `023`, `024`:
+
+- **Permission** — `location_id` + `sreni_id` pair
+- **Permission set** — bundle of permissions
+- **User** — `role_id`, `sthan_id`, `permission_set_id`, `is_super_admin`
+
+Settings UI: Permission Definitions, Permission Sets, Users. Enforcement for contacts is in core-business guards, not in menu grants.
+
+## Forgot password flow
+
+1. `/forgot-password` → `POST /auth/forgot-password`
+2. Token in `admin_password_reset_tokens`
+3. `/reset-password?token=...` → `POST /auth/reset-password`
+4. Non-disclosing responses for unknown emails

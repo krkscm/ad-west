@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { MOBILE_LAYOUT_QUERY, useMediaQuery } from '../hooks/useMediaQuery';
 import { useAuth } from '../context/auth-context';
+import { AdminDefinitionsProvider } from '../context/admin-definitions-context';
 import { useToast } from '../components/common/Toast';
 import { ThemeToggle } from '../components/common/ThemeToggle';
 import { NotificationBell } from '../components/common/NotificationBell';
@@ -42,6 +43,7 @@ import { NotificationCarouselModal } from '../components/common/NotificationCaro
 import { GmailWorkspacePanel } from '../components/features/GmailWorkspacePanel';
 import { InsightsPage } from './InsightsPage';
 import { GlobalContactsPage } from './GlobalContactsPage';
+import { JoinUsReviewPage } from './JoinUsReviewPage';
 import {
   ApprovalWorkflowDefinitionApi,
   backendApi,
@@ -139,6 +141,7 @@ type ActiveTab =
   | 'member-services-notifications'
   | 'member-services-gmail'
   | 'governance-contacts'
+  | 'governance-join-us-review'
   | `sreni-calendar-${string}`
   | `sreni-contacts-${string}`
   | `sreni-attendance-${string}`
@@ -187,6 +190,7 @@ const TAB_METADATA: { [key: string]: { label: string; parent?: 'settings' | 'gov
   'member-services-notifications': { label: 'Notifications', parent: 'governance' },
   'member-services-gmail': { label: 'Gmail Workspace', parent: 'governance' },
   'governance-contacts': { label: 'Contacts', parent: 'governance' },
+  'governance-join-us-review': { label: 'Join Us Review', parent: 'governance' },
 };
 
 const SETTINGS_TABS: ActiveTab[] = Object.entries(TAB_METADATA)
@@ -450,6 +454,7 @@ export const AdminDashboardPage: React.FC = () => {
 
   // Metrics state
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+  const [pendingJoinUsCount, setPendingJoinUsCount] = useState(0);
   const [programs, setPrograms] = useState<UiProgram[]>([]);
   const [, setOpenTicketsCount] = useState(0);
   const [, setNewApplicationsCount] = useState(0);
@@ -474,14 +479,38 @@ export const AdminDashboardPage: React.FC = () => {
   const [sreniReportingTotal, setSreniReportingTotal] = useState(0);
   const [sthanReportingTotal, setSthanReportingTotal] = useState(0);
 
+  const refreshDefinitions = useCallback(async () => {
+    const [sreniesResult, locationsResult] = await Promise.allSettled([
+      backendApi.listSreniDefinitions(),
+      backendApi.listLocationDefinitions(),
+    ]);
+
+    const sreniItems = sreniesResult.status === 'fulfilled' ? sreniesResult.value : [];
+    const locationItems = locationsResult.status === 'fulfilled' ? locationsResult.value : [];
+
+    setSreniDefinitions(sreniItems);
+    setLocationDefinitions(locationItems);
+
+    if (sreniItems.length > 0) {
+      setSrenyId((prev) => prev || sreniItems[0]?.id || '');
+      setPrograms(
+        sreniItems.map((sreni) => ({
+          id: sreni.id,
+          title: sreni.name,
+          subtitle: sreni.code ?? '',
+        })),
+      );
+    } else {
+      setPrograms([]);
+    }
+  }, []);
+
   useEffect(() => {
     const loadCoreData = async () => {
       try {
-        const [pendingApprovalsResult, sreniesResult, locationsResult] = await Promise.allSettled([
+        const pendingApprovalsResult = await Promise.allSettled([
           backendApi.listMyApprovalActions('pending'),
-          backendApi.listSreniDefinitions(),
-          backendApi.listLocationDefinitions(),
-        ]);
+        ]).then((results) => results[0]);
 
         if (pendingApprovalsResult.status === 'fulfilled') {
           setPendingApprovalsCount(pendingApprovalsResult.value.length);
@@ -489,24 +518,16 @@ export const AdminDashboardPage: React.FC = () => {
           setPendingApprovalsCount(0);
         }
 
-        const sreniItems = sreniesResult.status === 'fulfilled' ? sreniesResult.value : [];
-        const locationItems = locationsResult.status === 'fulfilled' ? locationsResult.value : [];
-
-        setSreniDefinitions(sreniItems);
-        setLocationDefinitions(locationItems);
-
-        if (sreniItems.length > 0) {
-          setSrenyId((prev) => prev || sreniItems[0]?.id || '');
-          setPrograms(
-            sreniItems.map((sreni) => ({
-              id: sreni.id,
-              title: sreni.name,
-              subtitle: sreni.code ?? '',
-            })),
-          );
+        const joinUsResult = await Promise.allSettled([
+          backendApi.listJoinUsSubmissions({ page: 1, pageSize: 1, status: 'pending' }),
+        ]).then((results) => results[0]);
+        if (joinUsResult.status === 'fulfilled') {
+          setPendingJoinUsCount(joinUsResult.value.pendingCount);
         } else {
-          setPrograms([]);
+          setPendingJoinUsCount(0);
         }
+
+        await refreshDefinitions();
       } catch {
         setPendingApprovalsCount(0);
         setPrograms([]);
@@ -516,7 +537,7 @@ export const AdminDashboardPage: React.FC = () => {
     };
 
     void loadCoreData();
-  }, []);
+  }, [refreshDefinitions]);
 
   useEffect(() => {
     if (activeTab !== 'dashboard') {
@@ -700,6 +721,7 @@ export const AdminDashboardPage: React.FC = () => {
   const showNotificationsTab = isSuperAdmin || hasMenuKey('member-services-notifications');
   const showGmailTab = isSuperAdmin || hasMenuKey('member-services-gmail');
   const showContactsTab = isSuperAdmin || hasMenuKey('governance-contacts');
+  const showJoinUsReviewTab = isSuperAdmin || hasMenuKey('governance-join-us-review');
 
   const governanceMenu = sidebarMenuItems.find((item) => item.active && item.key === 'governance');
   const governanceLabel = governanceMenu?.label || 'General Services';
@@ -715,7 +737,8 @@ export const AdminDashboardPage: React.FC = () => {
     showEventsTab ||
     showNotificationsTab ||
     showGmailTab ||
-    showContactsTab;
+    showContactsTab ||
+    showJoinUsReviewTab;
 
   const showGatewaySection = isSuperAdmin || hasMenuKey('helpdesk') || hasMenuKey('helpdesk-tickets') || hasMenuKey('job-postings') || hasMenuKey('job-applications');
   const showHelpdeskTicketsTab = isSuperAdmin || hasMenuKey('helpdesk-tickets');
@@ -724,7 +747,7 @@ export const AdminDashboardPage: React.FC = () => {
   const isGatewayTabActive = activeTab === 'helpdesk-tickets' || activeTab === 'job-postings' || activeTab === 'job-applications';
   const isGatewaySectionOpen = isGatewayOpen || isGatewayTabActive;
 
-  const isGovernanceTabActive = activeTab === 'insights' || activeTab === 'my-approvals' || activeTab === 'settings-responsibility-chart' || activeTab === 'member-services-reimbursements' || activeTab === 'member-services-events' || activeTab === 'member-services-notifications' || activeTab === 'member-services-gmail' || activeTab === 'governance-contacts';
+  const isGovernanceTabActive = activeTab === 'insights' || activeTab === 'my-approvals' || activeTab === 'settings-responsibility-chart' || activeTab === 'member-services-reimbursements' || activeTab === 'member-services-events' || activeTab === 'member-services-notifications' || activeTab === 'member-services-gmail' || activeTab === 'governance-contacts' || activeTab === 'governance-join-us-review';
   const isGovernanceSectionOpen = isGovernanceOpen || isGovernanceTabActive;
 
   // Sreni sidebar menu structure — only items whose keys start with 'sreni-'
@@ -989,6 +1012,11 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   return (
+    <AdminDefinitionsProvider
+      sreniDefinitions={sreniDefinitions}
+      locationDefinitions={locationDefinitions}
+      onRefresh={refreshDefinitions}
+    >
     <div className="admin-theme admin-layout" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', height: '100vh', width: '100vw', overflow: 'hidden' }}>
       <NotificationCarouselModal userType="admin" />
       {isMobileLayout && isMobileNavOpen && (
@@ -1247,6 +1275,21 @@ export const AdminDashboardPage: React.FC = () => {
                       {pendingApprovalsCount > 0 && (
                         <span style={{ background: 'var(--warning)', color: '#fff', borderRadius: '10px', padding: '1px 7px', fontSize: '0.72rem', fontWeight: 700 }}>
                           {pendingApprovalsCount}
+                        </span>
+                      )}
+                    </button>
+                  )}
+
+                  {showJoinUsReviewTab && (
+                    <button
+                      onClick={() => setActiveTab('governance-join-us-review')}
+                      className={`sidebar-nav-item${activeTab === 'governance-join-us-review' ? ' is-active' : ''}`}
+                      style={{ justifyContent: 'space-between' }}
+                    >
+                      <span>📝 Join Us Review</span>
+                      {pendingJoinUsCount > 0 && (
+                        <span style={{ background: 'var(--warning)', color: '#fff', borderRadius: '10px', padding: '1px 7px', fontSize: '0.72rem', fontWeight: 700 }}>
+                          {pendingJoinUsCount}
                         </span>
                       )}
                     </button>
@@ -1861,6 +1904,7 @@ export const AdminDashboardPage: React.FC = () => {
 
           {activeTab === 'member-services-gmail' && showGmailTab && <GmailWorkspacePanel />}
 
+          {activeTab === 'governance-join-us-review' && showJoinUsReviewTab && <JoinUsReviewPage />}
           {activeTab === 'governance-contacts' && showContactsTab && <GlobalContactsPage />}
 
           {SHOW_APPROVAL_WORKFLOWS_TAB && activeTab === 'settings-approval-workflows' && (
@@ -1971,6 +2015,7 @@ export const AdminDashboardPage: React.FC = () => {
       </main>
       </div>
     </div>
+    </AdminDefinitionsProvider>
   );
 };
 

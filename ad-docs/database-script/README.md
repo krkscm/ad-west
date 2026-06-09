@@ -72,6 +72,27 @@ This folder contains executable PostgreSQL scripts for ADWest.
 63. 066_household_participant_strategy.sql (Optional — requires 065; ladies/BB participant strategy)
 64. 068_platform_config_enums.sql (Seeds platform-wide enum_values; drops CHECK constraints where tables exist)
 65. 069_postgres_enum_to_varchar.sql (**Upgrade only** — legacy PG ENUM → text if prod ran old 039/040)
+66. 070_sthan_calendar_events.sql (Sthan-scoped calendar events per location)
+67. 071_job_application_activities.sql (Job application activity timeline persistence)
+68. 072_job_application_activity_enum.sql (Seeds job_application_activity enum values)
+69. 073_user_gender.sql (Adds gender column on adwest.users)
+70. 074_member_data_upload.sql (**Destructive** — contact upload schema, enum seeds, wipes contact data; sets Seva Samithi show_in_upload_excel=false)
+71. 075_business_friendly_family_labels.sql (Updates enum display labels only — household/family wording)
+72. 076_gada_assignment.sql (Gadanayak registry, contact gada assignments, srenies.gada_assignment_enabled)
+73. 077_join_us_review.sql (Join-us review columns on sreni_contacts, review menu seed) — **run before next 077**
+74. 077_seva_samithi_contact_registry.sql (Seva Samithi contact registry table + household backfill)
+75. 078_seva_samithi_contributions.sql (Seva activity log and multi-document attachments per contact)
+
+### Duplicate script number 077
+
+Two scripts share prefix `077`. Always run in this order:
+
+1. `077_join_us_review.sql`
+2. `077_seva_samithi_contact_registry.sql`
+
+### ⚠️ Script 074 — production caution
+
+`074_member_data_upload.sql` deletes existing rows from contact-related tables before reseeding. Take a backup before running against any environment with live contact data.
 
 ## Supabase production (shortcut)
 
@@ -173,5 +194,16 @@ psql "$env:DATABASE_URL" -f "ad-docs/database-script/069_postgres_enum_to_varcha
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/070_sthan_calendar_events.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/071_job_application_activities.sql"
 psql "$env:DATABASE_URL" -f "ad-docs/database-script/072_job_application_activity_enum.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/073_user_gender.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/074_member_data_upload.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/075_business_friendly_family_labels.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/076_gada_assignment.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/077_join_us_review.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/077_seva_samithi_contact_registry.sql"
+psql "$env:DATABASE_URL" -f "ad-docs/database-script/078_seva_samithi_contributions.sql"
 ```
+
+### Run only pending scripts (upgrade)
+
+If the database already has migrations through a known number, run only the scripts after that point in the order above. The API bootstrap service (`core-business-db-bootstrap.service.ts`) may have already created some objects idempotently in dev — SQL scripts remain the canonical record for production.
 

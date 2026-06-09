@@ -30,3 +30,7 @@ Thumbs.db
 # Project-specific
 .env
 .env.*.local
+
+# Generated / duplicate artifacts (use ad-west-api/src/assets instead)
+_gen_compare.xlsx
+ad-west-api/assets/

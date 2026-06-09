@@ -160,6 +160,8 @@ export interface SreniDefinitionApi {
   description?: string
   active: boolean
   joinUsVisible: boolean
+  showInUploadExcel?: boolean
+  gadaAssignmentEnabled?: boolean
   enrollmentScope?: string
   primaryContactStrategy?: string
   createdBy?: string
@@ -184,6 +186,36 @@ export interface SreniDivisionApi {
   updatedAt: string
 }
 
+export type GadaContactListFilter = 'all' | 'unassigned' | 'mine'
+
+export interface JoinUsSubmissionApi {
+  id: string
+  name: string
+  mobileNo?: string
+  email?: string
+  familyOrBachelor?: string
+  interestedSreniId: string
+  interestedSreniName: string
+  reviewStatus: 'pending' | 'completed'
+  sthanId?: string
+  divisionId?: string
+  submittedAt: string
+  reviewedAt?: string
+  data: Record<string, string | number | boolean | null>
+}
+
+export interface SreniGadanayakApi {
+  id: string
+  sreniId: string
+  sthanId: string
+  sthanName?: string
+  userId: string
+  userName: string
+  userEmail?: string
+  active: boolean
+  createdAt: string
+}
+
 export interface SreniContactRowApi {
   id: string
   sreniId: string
@@ -195,12 +227,15 @@ export interface SreniContactRowApi {
   divisionLocationId?: string
   divisionId?: string
   sthanId?: string
+  gadanayakUserId?: string
+  gadanayakUserName?: string
   active: boolean
   /** True when this contact belongs to another Sreni but is tagged to the current one */
   isTagged?: boolean
   childCount?: number
   childrenDivisionSummary?: string
   participantCount?: number
+  memberSrenis?: Array<{ sreniId: string; sreniName: string }>
   sourceFile?: string
   uploadedBy?: string
   createdAt: string
@@ -212,6 +247,8 @@ export interface SreniContactsListApi extends PaginatedResponse<SreniContactRowA
   primaryContactStrategy?: string
   resolverKey?: HouseholdResolverKey
   participantTotal?: number
+  gadaAssignmentEnabled?: boolean
+  canManageGadaAssignments?: boolean
 }
 
 export interface SreniParticipantStatsApi {
@@ -266,6 +303,28 @@ export interface HouseholdMemberApi {
   updatedAt: string
 }
 
+export interface SevaContributionDocumentApi {
+  id: string
+  contributionId: string
+  fileName: string
+  fileType?: string
+  fileSize?: number
+  uploadedBy?: string
+  createdAt: string
+}
+
+export interface SevaContributionApi {
+  id: string
+  contactId: string
+  activityDate: string
+  sevaActivity?: string
+  details?: string
+  createdBy?: string
+  createdAt: string
+  updatedAt: string
+  documents: SevaContributionDocumentApi[]
+}
+
 export interface ContactSreniTagApi {
   id: string
   contactId: string
@@ -275,16 +334,50 @@ export interface ContactSreniTagApi {
   updatedAt: string
 }
 
-export interface GlobalContactUploadDuplicateApi {
+export type MemberContactUploadActionApi = 'insert' | 'update' | 'skip'
+
+export interface MemberContactParsedRowApi {
   rowIndex: number
-  name: string | null
-  personalNumber: string | null
-  existingSreniId: string | null
+  data: Record<string, string | number | boolean | null>
+  errors: string[]
 }
 
-export interface GlobalContactUploadResultApi {
+export interface MemberContactDuplicateMatchApi {
+  kind: 'household' | 'child'
+  rowIndex: number
+  matchKey: string
+  existingContactId: string
+  existingData: Record<string, string | number | boolean | null>
+  incomingData: Record<string, string | number | boolean | null>
+  childSlot?: number
+  parentContactId?: string
+  sreniId?: string
+  sreniName?: string
+  childName?: string
+  childDob?: string
+}
+
+export interface MemberContactPreviewResultApi {
+  rows: MemberContactParsedRowApi[]
+  duplicates: MemberContactDuplicateMatchApi[]
+  withinFileDuplicates: Array<{ rowIndexA: number; rowIndexB: number; matchKey: string }>
+  sreniColumns: Array<{ sreniId: string; sreniName: string; primaryContactStrategy: string | null }>
+  validRowCount: number
+  errorRowCount: number
+}
+
+export interface MemberContactCommitDecisionApi {
+  rowIndex: number
+  action: MemberContactUploadActionApi
+  data?: Record<string, string | number | boolean | null>
+}
+
+export interface MemberContactCommitResultApi {
   inserted: number
-  duplicates: GlobalContactUploadDuplicateApi[]
+  updated: number
+  skipped: number
+  childRowsCreated: number
+  childRowsUpdated: number
 }
 
 export interface CalendarEventApi {
@@ -943,7 +1036,7 @@ const withDateRangeQuery = (basePath: string, range?: DateRangeQuery, extra?: Re
 export const backendApi = {
   captchaChallenge: () =>
     api.get<CaptchaChallengeResponse>('/auth/captcha', {
-      retry: { attempts: 30, delayMs: 2000 },
+      retry: { attempts: 3, delayMs: 1000 },
     }),
 
   login: (identifier: string, password: string, captchaToken: string, captchaAnswer: string) =>
@@ -1107,6 +1200,8 @@ export const backendApi = {
     code?: string
     description?: string
     joinUsVisible?: boolean
+    showInUploadExcel?: boolean
+    gadaAssignmentEnabled?: boolean
     enrollmentScope?: string
     primaryContactStrategy?: string
   }) =>
@@ -1118,6 +1213,8 @@ export const backendApi = {
     description?: string
     active?: boolean
     joinUsVisible?: boolean
+    showInUploadExcel?: boolean
+    gadaAssignmentEnabled?: boolean
     enrollmentScope?: string
     primaryContactStrategy?: string
   }) =>
@@ -1450,6 +1547,42 @@ export const backendApi = {
   }) =>
     api.patch<SmtpIntegrationConfigApi>('/settings/smtp-integration-config', payload),
 
+  listJoinUsSubmissions: (params?: {
+    page?: number
+    pageSize?: number
+    status?: 'pending' | 'completed' | 'all'
+    sreniId?: string
+    search?: string
+  }) => {
+    const qs = new URLSearchParams()
+    qs.set('page', String(params?.page ?? 1))
+    qs.set('pageSize', String(params?.pageSize ?? 20))
+    qs.set('status', params?.status ?? 'pending')
+    if (params?.sreniId) qs.set('sreniId', params.sreniId)
+    if (params?.search?.trim()) qs.set('search', params.search.trim())
+    return api.get<{
+      items: JoinUsSubmissionApi[]
+      total: number
+      page: number
+      pageSize: number
+      totalPages: number
+      pendingCount: number
+    }>(`/org/join-us-submissions?${qs}`)
+  },
+
+  completeJoinUsReview: (
+    contactId: string,
+    payload: {
+      sreniId: string
+      sthanId: string
+      zoneId?: string
+      divisionId?: string | null
+      reviewNote?: string
+      currentStatus?: string
+    },
+  ) =>
+    api.post<SreniContactRowApi>(`/org/join-us-submissions/${encodeURIComponent(contactId)}/complete-review`, payload),
+
   // All contacts (across all Srenis)
   listAllContacts: (
     page = 1,
@@ -1464,24 +1597,92 @@ export const backendApi = {
   },
 
   // Sreni Contact List
-  listSreniContacts: (sreniId: string, page = 1, pageSize = 50) =>
-    api.get<SreniContactsListApi>(
-      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts?page=${page}&pageSize=${pageSize}`,
-    ),
-
-  uploadSreniContacts: (sreniId: string, file: File) => {
-    const form = new FormData()
-    form.append('file', file)
-    return api.postForm<{ inserted: number; sreniId: string }>(
-      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/upload`,
-      form,
-      { timeoutMs: CONTACT_UPLOAD_TIMEOUT_MS },
+  listSreniContacts: (
+    sreniId: string,
+    page = 1,
+    pageSize = 50,
+    gadaOptions?: { filter?: GadaContactListFilter; gadanayakUserId?: string },
+  ) => {
+    const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+    if (gadaOptions?.filter) qs.set('gadaFilter', gadaOptions.filter)
+    if (gadaOptions?.gadanayakUserId) qs.set('gadanayakUserId', gadaOptions.gadanayakUserId)
+    return api.get<SreniContactsListApi>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts?${qs}`,
     )
   },
+
+  listSreniGadanayaks: (sreniId: string, sthanId?: string) => {
+    const qs = sthanId ? `?sthanId=${encodeURIComponent(sthanId)}` : ''
+    return api.get<SreniGadanayakApi[]>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/gadanayaks${qs}`,
+    )
+  },
+
+  listEligibleGadanayakUsers: (sreniId: string, sthanId: string) =>
+    api.get<Array<{ id: string; name: string; email?: string }>>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/gadanayak-eligible-users?sthanId=${encodeURIComponent(sthanId)}`,
+    ),
+
+  registerSreniGadanayak: (sreniId: string, sthanId: string, userId: string) =>
+    api.post<SreniGadanayakApi>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/gadanayaks`,
+      { sthanId, userId },
+    ),
+
+  removeSreniGadanayak: (sreniId: string, gadanayakId: string) =>
+    api.delete<void>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/gadanayaks/${encodeURIComponent(gadanayakId)}`,
+    ),
+
+  assignContactGada: (sreniId: string, contactId: string, gadanayakUserId: string) =>
+    api.patch<{ contactId: string; gadanayakUserId: string; gadanayakUserName?: string }>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}/gada`,
+      { gadanayakUserId },
+    ),
+
+  unassignContactGada: (sreniId: string, contactId: string) =>
+    api.delete<void>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}/gada`,
+    ),
+
+  bulkAssignContactGada: (sreniId: string, contactIds: string[], gadanayakUserId: string) =>
+    api.post<{ assigned: number }>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/gada/bulk`,
+      { contactIds, gadanayakUserId },
+    ),
+
+  previewMemberContactUpload: (file: File, context?: { sreniId?: string; locationId?: string }) => {
+    const form = new FormData()
+    form.append('file', file)
+    const path = context?.sreniId
+      ? `/org/sreni-definitions/${encodeURIComponent(context.sreniId)}/contacts/upload/preview`
+      : context?.locationId
+        ? `/org/locations/${encodeURIComponent(context.locationId)}/contacts/upload/preview`
+        : '/org/contacts/upload/preview'
+    return api.postForm<MemberContactPreviewResultApi>(path, form, { timeoutMs: CONTACT_UPLOAD_TIMEOUT_MS })
+  },
+
+  commitMemberContactUpload: (
+    decisions: MemberContactCommitDecisionApi[],
+    sourceFile?: string,
+  ) =>
+    api.post<MemberContactCommitResultApi>('/org/contacts/upload/commit', {
+      decisions,
+      sourceFile,
+    }, { timeoutMs: CONTACT_UPLOAD_TIMEOUT_MS }),
+
+  downloadMemberContactTemplate: () =>
+    api.getBlob('/org/contacts/upload-template'),
 
   clearSreniContacts: (sreniId: string) =>
     api.delete<{ deleted: number; sreniId: string }>(
       `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts`,
+    ),
+
+  updateHouseholdContact: (contactId: string, data: Record<string, string | number | boolean | null>) =>
+    api.patch<SreniContactRowApi>(
+      `/org/contacts/${encodeURIComponent(contactId)}`,
+      { data },
     ),
 
   updateSreniContact: (sreniId: string, contactId: string, data: Record<string, string | number | boolean | null>) =>
@@ -1544,6 +1745,61 @@ export const backendApi = {
       `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}/members/${encodeURIComponent(memberId)}`,
     ),
 
+  listSevaContributions: (sreniId: string, contactId: string) =>
+    api.get<SevaContributionApi[]>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}/seva-contributions`,
+    ),
+
+  createSevaContribution: (
+    sreniId: string,
+    contactId: string,
+    payload: { activityDate: string; sevaActivity?: string; details?: string },
+  ) =>
+    api.post<SevaContributionApi>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}/seva-contributions`,
+      payload,
+    ),
+
+  updateSevaContribution: (
+    sreniId: string,
+    contactId: string,
+    contributionId: string,
+    payload: { activityDate?: string; sevaActivity?: string; details?: string },
+  ) =>
+    api.patch<SevaContributionApi>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}/seva-contributions/${encodeURIComponent(contributionId)}`,
+      payload,
+    ),
+
+  deleteSevaContribution: (sreniId: string, contactId: string, contributionId: string) =>
+    api.delete<void>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}/seva-contributions/${encodeURIComponent(contributionId)}`,
+    ),
+
+  uploadSevaContributionDocuments: (sreniId: string, contactId: string, contributionId: string, files: File[]) => {
+    const form = new FormData()
+    for (const file of files) {
+      form.append('files', file)
+    }
+    return api.postForm<SevaContributionDocumentApi[]>(
+      `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts/${encodeURIComponent(contactId)}/seva-contributions/${encodeURIComponent(contributionId)}/documents`,
+      form,
+    )
+  },
+
+  downloadSevaContributionDocument: async (documentId: string, fileName: string) => {
+    const blob = await api.getBlob(`/org/seva-contribution-documents/${encodeURIComponent(documentId)}/download`)
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = fileName
+    anchor.click()
+    URL.revokeObjectURL(url)
+  },
+
+  deleteSevaContributionDocument: (documentId: string) =>
+    api.delete<void>(`/org/seva-contribution-documents/${encodeURIComponent(documentId)}`),
+
   getSreniParticipantStats: (sreniId: string) =>
     api.get<SreniParticipantStatsApi>(
       `/org/sreni-definitions/${encodeURIComponent(sreniId)}/participants/stats`,
@@ -1562,17 +1818,14 @@ export const backendApi = {
   listSthans: (srenyId?: string) =>
     api.get<SthanBasicApi[]>(`/org/sthans${srenyId ? `?srenyId=${encodeURIComponent(srenyId)}` : ''}`),
 
-  uploadGlobalContacts: (file: File) => {
-    const form = new FormData()
-    form.append('file', file)
-    return api.postForm<GlobalContactUploadResultApi>(
-      '/org/contacts/upload',
-      form,
-      { timeoutMs: CONTACT_UPLOAD_TIMEOUT_MS },
-    )
-  },
 
   // Contact Sreni Tags (multi-sreni assignment)
+  listContactSreniTagsBatch: (contactIds: string[]) => {
+    if (!contactIds.length) return Promise.resolve({} as Record<string, ContactSreniTagApi[]>);
+    const qs = new URLSearchParams({ contactIds: contactIds.join(',') });
+    return api.get<Record<string, ContactSreniTagApi[]>>(`/org/contacts/sreni-tags?${qs.toString()}`);
+  },
+
   listContactSreniTags: (contactId: string) =>
     api.get<ContactSreniTagApi[]>(`/org/contacts/${encodeURIComponent(contactId)}/sreni-tags`),
 
@@ -1780,25 +2033,50 @@ export const backendApi = {
     api.post<JobPostingApi>('/public/jobs', payload),
   publicListSreniContactOptions: () =>
     api.get<{ items: PublicSreniOptionApi[] }>('/public/sreni-contacts/srenies'),
+
+  publicJoinUsFormOptions: () =>
+    api.get<{
+      mapsApiKey?: string
+      bloodGroups: Array<{ value: string; label: string }>
+      livingTypes: Array<{ value: string; label: string }>
+      childGrades: Array<{ value: string; label: string }>
+    }>('/public/sreni-contacts/form-options'),
+
   publicRegisterSreniContact: (payload: {
     sreniId: string
-    fullName: string
-    phone: string
+    name: string
+    mobileNo: string
+    dateOfBirth: string
+    familyOrBachelor: string
     email?: string
-    city?: string
-    country?: string
-    notes?: string
-    personalNumber?: string
-    familyOrBachelor?: string
-    family?: string
-    bachelor?: string
-    addressInUae?: string
-    company?: string
+    bloodGroup?: string
+    altMobileNo?: string
     profession?: string
-    wifeName?: string
-    landLine?: string
-    zoneOrLandMark?: string
-    district?: string
+    company?: string
+    jobTitle?: string
+    spouseName?: string
+    spouseDateOfBirth?: string
+    spouseMobileNo?: string
+    spouseEmail?: string
+    spouseBloodGroup?: string
+    spouseProfession?: string
+    spouseCompany?: string
+    child1Name?: string
+    child1Dob?: string
+    child1Grade?: string
+    child2Name?: string
+    child2Dob?: string
+    child2Grade?: string
+    child3Name?: string
+    child3Dob?: string
+    child3Grade?: string
+    addressInUae?: string
+    landLineNo?: string
+    home?: string
+    addressInIndia?: string
+    districtIndia?: string
+    googleMapLink?: string
+    remarks?: string
     captchaToken: string
     captchaAnswer: string
     website?: string
@@ -1893,15 +2171,6 @@ export const backendApi = {
     api.get<{ items: SthanContactRowApi[]; total: number; totalPages: number }>(
       `/org/locations/${encodeURIComponent(locationId)}/contacts?page=${page}&pageSize=${pageSize}`,
     ),
-  uploadSthanContacts: (locationId: string, file: File) => {
-    const form = new FormData()
-    form.append('file', file)
-    return api.postForm<{ inserted: number; locationId: string }>(
-      `/org/locations/${encodeURIComponent(locationId)}/contacts/upload`,
-      form,
-      { timeoutMs: CONTACT_UPLOAD_TIMEOUT_MS },
-    )
-  },
   clearSthanContacts: (locationId: string) =>
     api.delete<{ deleted: number }>(`/org/locations/${encodeURIComponent(locationId)}/contacts`),
 

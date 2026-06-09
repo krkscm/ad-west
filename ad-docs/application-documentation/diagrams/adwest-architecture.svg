@@ -1,14 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" role="img" aria-label="ADWest Layered Architecture">
+<svg xmlns="http://www.w3.org/2000/svg" width="1680" height="1120" viewBox="0 0 1680 1120" role="img" aria-label="ADWest Layered Architecture">
   <defs>
     <style>
       .title { font: 700 30px 'Segoe UI', Arial, sans-serif; fill: #0b1324; }
       .subtitle { font: 500 14px 'Segoe UI', Arial, sans-serif; fill: #334155; }
-      .section { font: 700 17px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .section { font: 700 16px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
       .line { font: 500 13px 'Segoe UI', Arial, sans-serif; fill: #1e293b; }
-      .small { font: 500 12px 'Segoe UI', Arial, sans-serif; fill: #475569; }
-      .box { stroke: #94a3b8; stroke-width: 1.4; rx: 16; ry: 16; }
+      .small { font: 500 11.5px 'Segoe UI', Arial, sans-serif; fill: #475569; }
+      .tiny { font: 500 10.5px 'Segoe UI', Arial, sans-serif; fill: #64748b; }
+      .box { stroke: #94a3b8; stroke-width: 1.4; rx: 14; ry: 14; }
+      .inner { stroke: #cbd5e1; stroke-width: 1.1; rx: 10; ry: 10; }
       .flow { stroke: #1f2937; stroke-width: 2.1; fill: none; marker-end: url(#arrow); }
       .flow2 { stroke: #475569; stroke-width: 1.8; stroke-dasharray: 7 6; fill: none; marker-end: url(#arrow2); }
+      .flow3 { stroke: #b45309; stroke-width: 1.8; stroke-dasharray: 5 5; fill: none; marker-end: url(#arrow3); }
     </style>
 
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
@@ -16,6 +19,9 @@
     </marker>
     <marker id="arrow2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
       <path d="M0,0 L0,6 L9,3 z" fill="#475569" />
+    </marker>
+    <marker id="arrow3" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#b45309" />
     </marker>
 
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
@@ -42,111 +48,168 @@
       <stop offset="0%" stop-color="#fef3c7" />
       <stop offset="100%" stop-color="#fde68a" />
     </linearGradient>
+    <linearGradient id="files" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ede9fe" />
+      <stop offset="100%" stop-color="#ddd6fe" />
+    </linearGradient>
+    <linearGradient id="access" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f1f5f9" />
+      <stop offset="100%" stop-color="#e2e8f0" />
+    </linearGradient>
   </defs>
 
-  <rect x="0" y="0" width="1600" height="980" fill="url(#bg)" />
+  <rect x="0" y="0" width="1680" height="1120" fill="url(#bg)" />
 
-  <text x="34" y="48" class="title">ADWest Runtime Architecture (Current Implementation)</text>
-  <text x="34" y="74" class="subtitle">React + Vite (3000) | NestJS API (3001, /api/v1) | PostgreSQL + Conditional In-Memory Stores</text>
+  <text x="34" y="46" class="title">ADWest Runtime Architecture</text>
+  <text x="34" y="72" class="subtitle">React + Vite (3000) | NestJS API (3001, /api/v1) | PostgreSQL migrations 000–078 | File store (UPLOAD_DIR)</text>
+  <text x="34" y="94" class="tiny">Aligned with codebase 2026-06-10 — contact scope, member upload, Seva Samithi, gada, join-us review</text>
 
-  <rect class="box" x="34" y="110" width="344" height="248" fill="url(#exp)" />
-  <text x="56" y="142" class="section">Experience Layer</text>
-  <text x="56" y="172" class="line">Admin Workspace</text>
-  <text x="56" y="194" class="line">Member Workspace</text>
-  <text x="56" y="216" class="line">Public Portal + Intake Pages</text>
-  <text x="56" y="248" class="small">Public Paths:</text>
-  <text x="56" y="270" class="small">/, /portal, /helpdesk, /jobs, /join-us</text>
-  <text x="56" y="292" class="small">/events/:id/register, /forgot-password, /reset-password</text>
-  <text x="56" y="324" class="small">Authenticated Workspaces: Admin / Member</text>
+  <!-- Experience Layer -->
+  <rect class="box" x="34" y="118" width="360" height="290" fill="url(#exp)" />
+  <text x="56" y="150" class="section">Experience Layer</text>
+  <text x="56" y="178" class="line">Admin workspace (/admin/*)</text>
+  <text x="56" y="200" class="line">Member portal</text>
+  <text x="56" y="222" class="line">Public portal and intake pages</text>
+  <text x="56" y="252" class="small">Public: /, /portal, /helpdesk, /jobs, /join-us</text>
+  <text x="56" y="272" class="small">/events/:id/register, /forgot-password, /reset-password</text>
+  <text x="56" y="302" class="small">Admin highlights:</text>
+  <text x="56" y="322" class="small">General Services — contacts, join-us-review, insights</text>
+  <text x="56" y="342" class="small">Per-Sreni — calendar, contacts, attendance, analytics</text>
+  <text x="56" y="362" class="small">Per-Sthan — reports, expenses, calendar, contacts</text>
+  <text x="56" y="382" class="small">Settings — permissions, users, locations, Sreni defs</text>
 
-  <rect class="box" x="416" y="110" width="430" height="248" fill="url(#web)" />
-  <text x="438" y="142" class="section">Web Application Layer (ad-west-web)</text>
-  <text x="438" y="172" class="line">App Shell: App.tsx route-mode resolution</text>
-  <text x="438" y="194" class="line">Providers: Auth, Theme, Toast, ConfirmDialog</text>
-  <text x="438" y="216" class="line">Shared API Wrapper: utils/api.ts + backendApi.ts</text>
-  <text x="438" y="248" class="small">Session Restore Gate prevents startup route flicker</text>
-  <text x="438" y="270" class="small">Role/menu-aware admin navigation and governance views</text>
-  <text x="438" y="292" class="small">General Services now includes Governance Contacts workspace</text>
-  <text x="438" y="314" class="small">Location Definition uses role_level parentValue for parent selection</text>
-  <text x="438" y="336" class="small">Public pages remain directly reachable by path design</text>
+  <!-- Web Layer -->
+  <rect class="box" x="420" y="118" width="440" height="290" fill="url(#web)" />
+  <text x="442" y="150" class="section">Web Layer (ad-west-web)</text>
+  <text x="442" y="178" class="line">App.tsx path routing + adminNavigation.ts</text>
+  <text x="442" y="200" class="line">api.ts + backendApi.ts → /api/v1 proxy</text>
+  <text x="442" y="222" class="line">AuthProvider session restore gate</text>
+  <text x="442" y="252" class="small">GlobalContactsPage — upload preview/commit, tags</text>
+  <text x="442" y="272" class="small">SreniContactListPage — gada filters, family members</text>
+  <text x="442" y="292" class="small">Seva Samithi — Member Srenis col, Seva activity modal</text>
+  <text x="442" y="312" class="small">JoinUsReviewPage — pending public registrations</text>
+  <text x="442" y="332" class="small">ContactUploadModal + ContactUploadReviewModal</text>
+  <text x="442" y="352" class="small">Table layouts, PageHeader, PaginationBar patterns</text>
+  <text x="442" y="382" class="small">Menu grants drive sidebar; data scope is API-enforced</text>
 
-  <rect class="box" x="878" y="110" width="688" height="560" fill="url(#api)" />
-  <text x="900" y="142" class="section">API Layer (ad-west-api / NestJS)</text>
-  <text x="900" y="172" class="line">Global Prefix: /api/v1</text>
-  <text x="900" y="194" class="line">Global Throttler Guard + Validation Pipe + Exception Filter</text>
+  <!-- Access Control callout -->
+  <rect class="box" x="34" y="430" width="826" height="108" fill="url(#access)" />
+  <text x="56" y="460" class="section">Access Control (three orthogonal layers)</text>
+  <text x="56" y="486" class="small">1. Menu grants (auth_admin_users) — which admin UI tabs are visible</text>
+  <text x="56" y="506" class="small">2. Permission sets (adwest.users) — which Srenis/locations data APIs may touch</text>
+  <text x="56" y="526" class="small">3. Role level ZONE / STHAN — sthan-scoped contact filtering via ContactAccessScopeService</text>
 
-  <rect class="box" x="900" y="224" width="300" height="180" fill="#ecfdf5" />
-  <text x="918" y="252" class="section">Core Domains</text>
-  <text x="918" y="280" class="small">CoreBusinessModule</text>
-  <text x="918" y="302" class="small">ApprovalWorkflowDefinitionsModule</text>
-  <text x="918" y="324" class="small">EnumValuesModule (parentValue hierarchy support)</text>
-  <text x="918" y="346" class="small">Location hierarchy: zone/sthan/division + parentId</text>
-  <text x="918" y="368" class="small">Contacts: upload, active toggle, delete, cross-Sreni tags</text>
-  <text x="918" y="390" class="small">Store abstraction with DB/In-memory binding</text>
+  <!-- API Layer -->
+  <rect class="box" x="888" y="118" width="758" height="620" fill="url(#api)" />
+  <text x="910" y="150" class="section">API Layer (ad-west-api / NestJS)</text>
+  <text x="910" y="176" class="small">Guards: CoreAdminAuthGuard, CoreMemberAuthGuard, GatewayAdminAuthGuard | Throttle + ValidationPipe</text>
 
-  <rect class="box" x="1220" y="224" width="324" height="180" fill="#ecfdf5" />
-  <text x="1238" y="252" class="section">User Management</text>
-  <text x="1238" y="280" class="small">auth, admin-users, role-definitions, menu-items</text>
-  <text x="1238" y="302" class="small">audit-logs, ai-chat, settings/* integration controllers</text>
-  <text x="1238" y="324" class="small">gmail send/inbox via SMTP/IMAP services</text>
-  <text x="1238" y="346" class="small">Admin + Member auth guards and role checks</text>
+  <!-- Core Business inner -->
+  <rect class="inner" x="910" y="196" width="350" height="320" fill="#ecfdf5" />
+  <text x="928" y="222" class="section">CoreBusinessModule</text>
+  <text x="928" y="246" class="small">Org: zones, locations, Sreni, Sthan, permissions, users</text>
+  <text x="928" y="266" class="small">Contacts: global list, per-Sreni list, tags, active lifecycle</text>
+  <text x="928" y="286" class="small">Member upload: template, preview, commit (household + child)</text>
+  <text x="928" y="306" class="small">ContactAccessScopeService — permission set + ZONE/STHAN</text>
+  <text x="928" y="326" class="small">Household members, participant resolver (BB / ladies)</text>
+  <text x="928" y="346" class="small">SevaSamithiContactService — registry (077)</text>
+  <text x="928" y="366" class="small">SevaSamithiContributionService — activity + docs (078)</text>
+  <text x="928" y="386" class="small">GadaAssignmentService — gadanayaks + contact assign (076)</text>
+  <text x="928" y="406" class="small">JoinUsReviewService — pending submissions (077)</text>
+  <text x="928" y="426" class="small">Sreni/Sthan: calendar, attendance, reports, analytics</text>
+  <text x="928" y="446" class="small">Documents, approvals runtime, responsibility chart</text>
+  <text x="928" y="476" class="tiny">Key routes: /org/contacts/upload/*, /org/join-us-submissions,</text>
+  <text x="928" y="492" class="tiny">/org/.../seva-contributions, /org/.../gadanayaks, /org/.../gada</text>
 
-  <rect class="box" x="900" y="426" width="300" height="220" fill="#ecfdf5" />
-  <text x="918" y="454" class="section">Public Gateway</text>
-  <text x="918" y="482" class="small">public/helpdesk</text>
-  <text x="918" y="504" class="small">public/jobs</text>
-  <text x="918" y="526" class="small">public/sreni-contacts</text>
-  <text x="918" y="548" class="small">gateway/helpdesk (admin)</text>
-  <text x="918" y="570" class="small">gateway/jobs (admin)</text>
-  <text x="918" y="602" class="small">Captcha + throttling for intake protection</text>
+  <!-- User Management inner -->
+  <rect class="inner" x="1280" y="196" width="350" height="150" fill="#ecfdf5" />
+  <text x="1298" y="222" class="section">UserManagementModule</text>
+  <text x="1298" y="246" class="small">auth/login, Google OAuth, forgot/reset password</text>
+  <text x="1298" y="266" class="small">admin-users, role-definitions, menu-items + grants</text>
+  <text x="1298" y="286" class="small">audit-logs, table-layouts, ai-chat/query</text>
+  <text x="1298" y="306" class="small">gmail/send + inbox (SMTP/IMAP settings)</text>
+  <text x="1298" y="326" class="small">Super-admin login via adwest.users path</text>
 
-  <rect class="box" x="1220" y="426" width="324" height="220" fill="#ecfdf5" />
-  <text x="1238" y="454" class="section">Member Services</text>
-  <text x="1238" y="482" class="small">member-services/reimbursements</text>
-  <text x="1238" y="504" class="small">member-services/events</text>
-  <text x="1238" y="526" class="small">member-services/notifications</text>
-  <text x="1238" y="548" class="small">public/events registration endpoints</text>
-  <text x="1238" y="570" class="small">Reimbursement validation: description min length + receipt required</text>
-  <text x="1238" y="592" class="small">Shared operational guard patterns</text>
+  <!-- Public Gateway inner -->
+  <rect class="inner" x="910" y="530" width="350" height="188" fill="#ecfdf5" />
+  <text x="928" y="556" class="section">PublicGatewayModule</text>
+  <text x="928" y="580" class="small">public/helpdesk, public/jobs (resume upload)</text>
+  <text x="928" y="600" class="small">public/sreni-contacts — Join Us register + sreni list</text>
+  <text x="928" y="620" class="small">gateway/helpdesk, gateway/jobs (admin)</text>
+  <text x="928" y="640" class="small">job_application_activities timeline (071–072)</text>
+  <text x="928" y="670" class="small">Captcha, honeypot, throttling on public intake</text>
 
-  <rect class="box" x="416" y="392" width="430" height="278" fill="url(#ext)" />
-  <text x="438" y="424" class="section">Integration Layer</text>
-  <text x="438" y="452" class="line">Google OAuth (start/callback + DB-first config)</text>
-  <text x="438" y="474" class="line">SMTP Email Delivery (gmail/send)</text>
-  <text x="438" y="496" class="line">IMAP Inbox Read (gmail/inbox)</text>
-  <text x="438" y="518" class="line">AI Query Endpoint (ai-chat/query)</text>
-  <text x="438" y="548" class="small">Config Endpoints:</text>
-  <text x="438" y="570" class="small">settings/google-integration-config</text>
-  <text x="438" y="592" class="small">settings/smtp-integration-config</text>
-  <text x="438" y="624" class="small">Settings resolve DB values with environment fallback</text>
+  <!-- Member Services inner -->
+  <rect class="inner" x="1280" y="360" width="350" height="168" fill="#ecfdf5" />
+  <text x="1298" y="386" class="section">MemberServicesModule</text>
+  <text x="1298" y="410" class="small">member-services/reimbursements (receipt required)</text>
+  <text x="1298" y="430" class="small">member-services/events, notifications</text>
+  <text x="1298" y="450" class="small">public/events/:id/register</text>
+  <text x="1298" y="480" class="small">Admin surfaces under General Services</text>
+  <text x="1298" y="510" class="small">MemberAuthGuard on member routes</text>
 
-  <rect class="box" x="878" y="702" width="688" height="224" fill="url(#store)" />
-  <text x="900" y="734" class="section">Data Layer (PostgreSQL + Migration Chain)</text>
-  <text x="900" y="762" class="line">Canonical SQL Source: ad-docs/database-script</text>
-  <text x="900" y="786" class="small">Core schema, auth, roles/menu grants, gateway/member services tables</text>
-  <text x="900" y="808" class="small">Recent evolution: location parent_id, enum parent_value, and contact hierarchy tags</text>
-  <text x="900" y="830" class="small">Migration segment 059-064 adds contact_sreni_tags, active flag, nullable sreni_id, parent links</text>
-  <text x="900" y="852" class="small">sreni_contacts now stores zone/sthan/division location tags for hierarchy-aware assignment</text>
-  <text x="900" y="874" class="small">Runtime mode: DB persistence when enabled, in-memory fallback on selected modules</text>
+  <!-- Supporting modules -->
+  <rect class="inner" x="1280" y="544" width="350" height="88" fill="#ecfdf5" />
+  <text x="1298" y="570" class="section">Supporting Modules</text>
+  <text x="1298" y="594" class="small">EnumValuesModule | ApprovalWorkflowDefinitionsModule | HealthModule</text>
+  <text x="1298" y="614" class="small">ENABLE_DB_PERSISTENCE toggles Postgres vs in-memory stores</text>
 
-  <path class="flow" d="M378 236 L416 236" />
-  <path class="flow" d="M846 236 L878 236" />
-  <path class="flow" d="M1050 646 L1050 702" />
-  <path class="flow" d="M1222 670 L1222 702" />
-  <path class="flow2" d="M846 530 L878 530" />
-  <path class="flow2" d="M632 358 L632 392" />
+  <!-- Integration Layer -->
+  <rect class="box" x="34" y="560" width="360" height="178" fill="url(#ext)" />
+  <text x="56" y="592" class="section">Integrations</text>
+  <text x="56" y="618" class="line">Google OAuth — /auth/google/*</text>
+  <text x="56" y="640" class="line">SMTP send + IMAP inbox — /gmail/*</text>
+  <text x="56" y="662" class="line">Settings: google + smtp config (DB-first)</text>
+  <text x="56" y="692" class="small">Config resolves DB then environment fallback</text>
+  <text x="56" y="714" class="small">AI query endpoint for governance insights</text>
 
-  <text x="386" y="220" class="small">HTTPS</text>
-  <text x="852" y="220" class="small">REST /api/v1</text>
-  <text x="1064" y="688" class="small">Hierarchy-aware contact writes</text>
-  <text x="1238" y="688" class="small">TypeORM + SQL</text>
-  <text x="852" y="520" class="small">Config + External Service Flows</text>
+  <!-- File storage -->
+  <rect class="box" x="420" y="560" width="440" height="178" fill="url(#files)" />
+  <text x="442" y="592" class="section">File Storage (UPLOAD_DIR)</text>
+  <text x="442" y="618" class="line">seva-contributions/{contactId}/{contributionId}/</text>
+  <text x="442" y="640" class="line">documents/{sreniId}/ — Sreni document uploads</text>
+  <text x="442" y="662" class="line">Job resumes — public gateway apply flow</text>
+  <text x="442" y="684" class="line">Member_Data_Upload_Template.xlsx — API template asset</text>
+  <text x="442" y="714" class="small">Multi-file seva docs: up to 10 files, 5 MB each</text>
 
-  <rect x="34" y="700" width="812" height="226" rx="14" ry="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" />
-  <text x="56" y="732" class="section">Legend and Notes</text>
-  <text x="56" y="760" class="small">Blue: user/experience layer | Cyan: web app layer | Green: API modules</text>
-  <text x="56" y="782" class="small">Yellow: integration services | Red: persistent data layer</text>
-  <text x="56" y="804" class="small">Solid arrow: primary request/data flow | Dashed arrow: integration or secondary runtime flow</text>
-  <text x="56" y="836" class="small">Security defaults include CORS allow-list, strict validation, throttling, and common response headers.</text>
-  <text x="56" y="858" class="small">Production startup enforces DB persistence mode.</text>
+  <!-- Data Layer -->
+  <rect class="box" x="888" y="762" width="758" height="248" fill="url(#store)" />
+  <text x="910" y="794" class="section">Data Layer — PostgreSQL (adwest schema)</text>
+  <text x="910" y="818" class="line">Canonical migrations: ad-docs/database-script (000–078)</text>
+  <text x="910" y="844" class="small">Auth: auth_admin_users, auth_member_users, auth_sessions, admin_menu_grants</text>
+  <text x="910" y="864" class="small">Access: permissions, permission_sets, users (role_id, sthan_id, permission_set_id)</text>
+  <text x="910" y="884" class="small">Contacts: sreni_contacts (household/child), contact_sreni_tags, household_members</text>
+  <text x="910" y="904" class="small">074 upload schema | 076 gada tables | 077 join-us review + seva_samithi_contacts</text>
+  <text x="910" y="924" class="small">078 seva_samithi_contributions + seva_samithi_contribution_documents</text>
+  <text x="910" y="944" class="small">Locations hierarchy (parent_id), enum_values (parent_value), Sreni/Sthan ops tables</text>
+  <text x="910" y="964" class="small">Public gateway + member services tables | Bootstrap DDL on API startup (dev idempotent)</text>
+  <text x="910" y="984" class="tiny">⚠ 074_member_data_upload.sql is destructive — backup before running on live contact data</text>
+
+  <!-- Flow arrows -->
+  <path class="flow" d="M394 263 L420 263" />
+  <path class="flow" d="M860 263 L888 263" />
+  <path class="flow" d="M1085 516 L1085 762" />
+  <path class="flow" d="M1355 708 L1355 762" />
+  <path class="flow2" d="M860 649 L888 649" />
+  <path class="flow2" d="M640 408 L640 560" />
+  <path class="flow3" d="M640 649 L888 820" />
+
+  <text x="398" y="248" class="small">HTTPS</text>
+  <text x="864" y="248" class="small">REST /api/v1</text>
+  <text x="1098" y="748" class="small">SQL + hydration</text>
+  <text x="1368" y="748" class="small">TypeORM maps</text>
+  <text x="864" y="636" class="small">OAuth / SMTP</text>
+  <text x="648" y="548" class="small">Scope check</text>
+  <text x="700" y="800" class="small">File paths</text>
+
+  <!-- Legend -->
+  <rect x="34" y="762" width="826" height="248" rx="14" ry="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2" />
+  <text x="56" y="794" class="section">Legend and Runtime Notes</text>
+  <text x="56" y="820" class="small">Blue — experience | Cyan — web SPA | Green — API modules | Yellow — integrations</text>
+  <text x="56" y="840" class="small">Purple — file storage | Red — PostgreSQL | Grey band — access control model</text>
+  <text x="56" y="866" class="small">Solid arrow — primary request/data flow | Dashed — integration/secondary | Orange dash — files to disk</text>
+  <text x="56" y="892" class="small">Seva Samithi contacts: registry table for SS list; other Sreni visibility via contact_sreni_tags only</text>
+  <text x="56" y="912" class="small">Production requires ENABLE_DB_PERSISTENCE=true; CORS allow-list; strict validation; global throttling</text>
+  <text x="56" y="932" class="small">Swagger: /api/docs (when enabled) | Vite proxy: /api/v1 → 127.0.0.1:3001</text>
+  <text x="56" y="962" class="tiny">See application-documentation/01–07 and diagrams/*.md for detailed module and route reference</text>
 </svg>

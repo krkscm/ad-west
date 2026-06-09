@@ -88,7 +88,7 @@ const selectorChipStyle = (active: boolean): React.CSSProperties => ({
 
 const DATASET_OPTIONS: Array<{ key: DatasetKey; label: string }> = [
   { key: 'all', label: 'All Domains' },
-  { key: 'contacts', label: 'Households' },
+  { key: 'contacts', label: 'Family contacts' },
   { key: 'participants', label: 'Participants' },
   { key: 'events', label: 'Events' },
   { key: 'attendance', label: 'Attendance' },
@@ -231,7 +231,8 @@ const mergeSavedLayout = (
 export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }) => {
   const { addToast } = useToast();
   const confirm = useConfirm();
-  const detailTableLayout = useTableLayout(`sreni-analytics-details-${sreniId}`);
+  const [detailLayoutEnabled, setDetailLayoutEnabled] = useState(false);
+  const detailTableLayout = useTableLayout(`sreni-analytics-details-${sreniId}`, { enabled: detailLayoutEnabled });
 
   const [tab, setTab] = useState<StudioTab>('details');
   const [loading, setLoading] = useState(false);
@@ -313,6 +314,12 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
       cancelled = true;
     };
   }, [sreniId, addToast]);
+
+  useEffect(() => {
+    if (tab === 'details' && contacts.length > 0) {
+      setDetailLayoutEnabled(true);
+    }
+  }, [tab, contacts.length]);
 
   useEffect(() => {
     let cancelled = false;

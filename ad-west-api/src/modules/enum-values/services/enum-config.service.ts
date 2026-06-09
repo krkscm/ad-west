@@ -73,6 +73,11 @@ export class EnumConfigService {
     return rows.map((r) => r.value);
   }
 
+  async listActiveOptions(enumType: string): Promise<Array<{ value: string; label: string }>> {
+    const rows = await this.loadRows(enumType);
+    return rows.map((r) => ({ value: r.value, label: r.label }));
+  }
+
   async getDefaultValue(enumType: string): Promise<string> {
     const rows = await this.loadRows(enumType);
     return rows[0]?.value ?? '';

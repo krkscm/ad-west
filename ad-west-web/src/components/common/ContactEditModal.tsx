@@ -1,19 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { DateField, validateBirthDate } from './DateFields';
 import { Modal } from './Modal';
-import type { ContactData, ContactEditField, ContactSelectOption } from '../../constants/contactColumns';
+import { useToast } from './Toast';
+import type { ContactData, ContactEditField, ContactEditFieldSection, ContactSelectOption } from '../../constants/contactColumns';
 import { backendApi, EnumValueApi } from '../../utils/backendApi';
 
 interface ContactEditModalProps {
   isOpen: boolean;
   title?: string;
-  fields: ContactEditField[];
+  sections: ContactEditFieldSection[];
   data: ContactData;
   isSaving: boolean;
   onClose: () => void;
   onSave: (data: ContactData) => void;
 }
 
-function useContactFieldEnums(fields: ContactEditField[]) {
+function useContactFieldEnums(fields: ContactEditField[], enabled: boolean) {
   const enumTypes = useMemo(
     () => [...new Set(fields.map((field) => field.enumType).filter((value): value is string => Boolean(value)))],
     [fields],
@@ -21,6 +23,7 @@ function useContactFieldEnums(fields: ContactEditField[]) {
   const [enumMap, setEnumMap] = useState<Record<string, EnumValueApi[]>>({});
 
   useEffect(() => {
+    if (!enabled) return;
     if (!enumTypes.length) {
       setEnumMap({});
       return;
@@ -39,7 +42,7 @@ function useContactFieldEnums(fields: ContactEditField[]) {
     return () => {
       cancelled = true;
     };
-  }, [enumTypes.join('|')]);
+  }, [enumTypes.join('|'), enabled]);
 
   return enumMap;
 }
@@ -78,14 +81,16 @@ function buildSelectOptions(
 export const ContactEditModal: React.FC<ContactEditModalProps> = ({
   isOpen,
   title = 'Edit Contact',
-  fields,
+  sections,
   data,
   isSaving,
   onClose,
   onSave,
 }) => {
+  const { addToast } = useToast();
+  const fields = useMemo(() => sections.flatMap((section) => section.fields), [sections]);
   const [formData, setFormData] = useState<ContactData>({});
-  const enumMap = useContactFieldEnums(fields);
+  const enumMap = useContactFieldEnums(fields, isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -103,6 +108,18 @@ export const ContactEditModal: React.FC<ContactEditModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    for (const field of fields) {
+      if (!field.birthDate) continue;
+      const raw = formData[field.key];
+      const trimmed = raw == null ? '' : String(raw).trim();
+      if (!trimmed) continue;
+      const birthDateError = validateBirthDate(trimmed, field.label);
+      if (birthDateError) {
+        addToast(birthDateError, 'warning');
+        return;
+      }
+    }
+
     const payload: ContactData = {};
     for (const field of fields) {
       const raw = formData[field.key];
@@ -124,6 +141,18 @@ export const ContactEditModal: React.FC<ContactEditModalProps> = ({
           placeholder={field.placeholder}
           onChange={(e) => handleChange(field.key, e.target.value)}
           style={{ resize: 'vertical' }}
+        />
+      );
+    }
+
+    if (field.inputType === 'date') {
+      return (
+        <DateField
+          value={value}
+          placeholderText={field.placeholder ?? 'DD-MM-YYYY'}
+          birthDate={field.birthDate}
+          onChange={(e) => handleChange(field.key, e.target.value)}
+          required={field.required}
         />
       );
     }
@@ -159,13 +188,32 @@ export const ContactEditModal: React.FC<ContactEditModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={title} maxWidth="640px">
+    <Modal isOpen={isOpen} onClose={onClose} title={title} maxWidth="720px">
       <form onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gap: '14px', maxHeight: '60vh', overflowY: 'auto', paddingRight: '4px' }}>
-          {fields.map((field) => (
-            <div key={field.key}>
-              <label className="form-label">{field.label}</label>
-              {renderField(field)}
+        <div style={{ display: 'grid', gap: '20px', maxHeight: '65vh', overflowY: 'auto', paddingRight: '4px' }}>
+          {sections.map((section) => (
+            <div key={section.id}>
+              <div style={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                color: 'var(--text-secondary-dark)',
+                marginBottom: '10px',
+                textTransform: 'uppercase',
+              }}>
+                {section.label}
+              </div>
+              <div style={{ display: 'grid', gap: '14px' }}>
+                {section.fields.map((field) => (
+                  <div key={field.key}>
+                    <label className="form-label">
+                      {field.label}
+                      {field.required && <span style={{ color: 'var(--danger)' }}> *</span>}
+                    </label>
+                    {renderField(field)}
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>

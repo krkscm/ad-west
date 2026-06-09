@@ -1,4 +1,5 @@
 import { ReactNode } from 'react'
+import { useNavigate } from '../../hooks/usePathname'
 
 interface Props {
   subtitle: string
@@ -10,6 +11,8 @@ interface Props {
  * Provides the Indian-culture.jpg background + frosted-glass header consistent with the portal page.
  */
 export function PublicPageShell({ subtitle, children }: Props) {
+  const navigate = useNavigate()
+
   return (
     <div
       className="public-theme"
@@ -88,7 +91,7 @@ export function PublicPageShell({ subtitle, children }: Props) {
           {/* Back to portal */}
           <button
             type="button"
-            onClick={() => { window.location.pathname = '/' }}
+            onClick={() => navigate('/portal')}
             style={{
               fontSize: '0.8rem',
               padding: '6px 14px',

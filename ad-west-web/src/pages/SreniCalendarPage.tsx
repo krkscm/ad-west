@@ -5,6 +5,7 @@ import { DateField, TimeField } from '../components/common/DateFields';
 import { ExportMenu, formatExportSections } from '../components/common/ExportMenu';
 import { PageHeader } from '../components/common/PageHeader';
 import { useAuth } from '../context/auth-context';
+import { useAdminDefinitions } from '../context/admin-definitions-context';
 import { backendApi, CalendarEventApi, LocationDefinitionApi } from '../utils/backendApi';
 import {
   exportSreniCalendar,
@@ -51,6 +52,7 @@ const loadManualSthanAccess = (adminId?: string): string[] => {
 
 export const SreniCalendarPage: React.FC<Props> = ({ sreniId, sreniName }) => {
   const { adminUser } = useAuth();
+  const { activeSthanLocations } = useAdminDefinitions();
   const { addToast } = useToast();
   const hasZoneRights = useMemo(() => {
     const scopes = adminUser?.roles?.map((r) => r.scopeType) ?? [];
@@ -68,8 +70,7 @@ export const SreniCalendarPage: React.FC<Props> = ({ sreniId, sreniName }) => {
   const loadEvents = useCallback(async () => {
     setIsLoading(true);
     try {
-      const locations = await backendApi.listLocationDefinitions();
-      const sthans = locations.filter((loc) => loc.level === 'STHAN' && loc.active);
+      const sthans = activeSthanLocations;
       const manualSthanIds = loadManualSthanAccess(adminUser?.sub);
       const allowedSthanIds = hasZoneRights ? sthans.map((loc) => loc.id) : manualSthanIds;
 
@@ -85,7 +86,7 @@ export const SreniCalendarPage: React.FC<Props> = ({ sreniId, sreniName }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [adminUser?.sub, hasZoneRights, sreniId]);
+  }, [adminUser?.sub, hasZoneRights, sreniId, activeSthanLocations]);
 
   useEffect(() => {
     void loadEvents();

@@ -13,7 +13,7 @@ import { PublicGatewayModule } from '@modules/public-gateway/public-gateway.modu
 import { MemberServicesModule } from '@modules/member-services/member-services.module';
 import { AppControllerModule } from './app.controller.module';
 
-loadEnv({ path: '.env.local' });
+loadEnv({ path: '.env.local', override: true });
 
 const useDbPersistence = process.env.ENABLE_DB_PERSISTENCE === 'true';
 

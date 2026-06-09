@@ -31,6 +31,7 @@ export const NotificationBell: React.FC = () => {
   }, [readStorageKey]);
 
   useEffect(() => {
+    if (!isOpen) return;
     const load = async () => {
       setLoading(true);
       try {

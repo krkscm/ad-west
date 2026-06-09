@@ -30,11 +30,27 @@
 - Request payload limits set to 1 MB
 - Common security headers applied by middleware
 
-## Operational Checklist
+## Environment variables (common)
 
-1. Apply migration scripts in order from `ad-docs/database-script`.
-2. Start API and verify `/api/v1` routes plus `/api/docs` when enabled.
-3. Start web app and verify public/admin/member route behavior.
-4. Verify login, session restoration, and role-based navigation.
-5. Verify gateway and member-services operational endpoints.
-6. Verify integration settings (Google and SMTP/IMAP) as applicable.
+| Variable | Purpose |
+|----------|---------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `ENABLE_DB_PERSISTENCE` | Must be `true` in production |
+| `CORS_ORIGIN` | Allowed browser origins |
+| `UPLOAD_DIR` | File upload root (documents, seva attachments, resumes) |
+| `VITE_API_PROXY_TARGET` | Web dev proxy target (default `http://127.0.0.1:3001`) |
+| `CONTACT_UPLOAD_TIMEOUT_MS` | Extended timeout for large Excel uploads (API + proxy) |
+
+## Operational checklist
+
+1. Apply migration scripts in order from `ad-docs/database-script` (through `078` for current codebase).
+2. If upgrading past `074`, **back up contact data** before running `074_member_data_upload.sql`.
+3. Run both `077_*` scripts in documented order (join-us review, then seva registry).
+4. Start API (`npm run start:dev` in `ad-west-api`, port **3001**).
+5. Start web (`npm run dev` in `ad-west-web`, port **3000**, strict).
+6. Verify health/login, menu grants, and permission-set scoped contact lists.
+7. Verify member upload: template download → preview → commit on Global or Sreni contacts.
+8. Verify Seva Samithi: registry list, seva activity modal, document upload/download.
+9. Verify Join Us: public `/join-us` submit and admin join-us-review queue.
+10. Verify gateway (helpdesk, jobs) and member-services endpoints.
+11. Verify Google and SMTP/IMAP settings if used.

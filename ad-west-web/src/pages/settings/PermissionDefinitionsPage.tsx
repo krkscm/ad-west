@@ -3,6 +3,7 @@ import { useToast } from '../../components/common/Toast';
 import { useConfirm } from '../../components/common/ConfirmDialog';
 import { PageHeader } from '../../components/common/PageHeader';
 import { EmptyState } from '../../components/common/EmptyState';
+import { useAdminDefinitions } from '../../context/admin-definitions-context';
 import { backendApi, LocationDefinitionApi, PermissionApi, SreniDefinitionApi } from '../../utils/backendApi';
 import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
 import { PaginationBar } from '../../components/common/PaginationBar';
@@ -17,6 +18,7 @@ const toUiError = (error: unknown, fallback: string): string => {
 export const PermissionDefinitionsPage: React.FC = () => {
   const { addToast } = useToast();
   const confirm = useConfirm();
+  const { sreniDefinitions, locationDefinitions } = useAdminDefinitions();
 
   const [items, setItems] = useState<PermissionApi[]>([]);
   const [total, setTotal] = useState(0);
@@ -45,11 +47,6 @@ export const PermissionDefinitionsPage: React.FC = () => {
     setCode(''); setName(''); setDescription(''); setFormOpen(false);
   };
 
-  const loadSupport = () => {
-    backendApi.listLocationDefinitions().then((loc) => setLocations(loc)).catch(() => {});
-    backendApi.listSreniDefinitions().then((sd) => setSreniDefs(sd)).catch(() => {});
-  };
-
   const loadPerms = (p: number, ps: number, q: string, locId: string) => {
     setIsLoading(true);
     backendApi.listPermissionsPaginated({ page: p, pageSize: ps, search: q, locationId: locId || undefined })
@@ -58,7 +55,11 @@ export const PermissionDefinitionsPage: React.FC = () => {
       .finally(() => setIsLoading(false));
   };
 
-  useEffect(() => { loadSupport(); }, []);
+  useEffect(() => {
+    setLocations(locationDefinitions);
+    setSreniDefs(sreniDefinitions);
+  }, [locationDefinitions, sreniDefinitions]);
+
   useEffect(() => { loadPerms(page, pageSize, search, locationFilter); }, [page, pageSize, locationFilter]);
 
   const handleSearchChange = (q: string) => {

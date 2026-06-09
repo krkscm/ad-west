@@ -1,89 +1,142 @@
 # 03 - Frontend Architecture
 
-## Frontend Stack
+## Stack
 
-- React + TypeScript
-- Vite build and dev server
-- SCSS-driven shared styling and theme tokens
+- React 18 + TypeScript
+- Vite dev server and production build
+- SCSS with shared theme tokens (`src/styles/`)
+- No React Router package — path-based rendering with custom history helpers (`appNavigation.ts`, `adminNavigation.ts`)
 
-## App Shell and Route Resolution
+## Entry and providers
 
-- Entry point: `src/main.tsx`
-- Root route switch and auth/public branching: `src/App.tsx`
+| File | Role |
+|------|------|
+| `src/main.tsx` | DOM mount |
+| `src/App.tsx` | Public vs authenticated workspace switch |
+| `AuthProvider` | Session restore, workspace routing |
+| `admin-definitions-context.tsx` | Cached zones, Srenis, sthans, locations for forms |
+| `ToastProvider`, `ConfirmDialogProvider`, `ThemeProvider` | Shared UX |
 
-The app uses path-based conditional rendering (no external router package in the root flow):
-- Public routes: `/`, `/portal`, `/helpdesk`, `/jobs`, `/jobs/apply`, `/jobs/post`, `/join-us`, `/events/:id/register`, `/forgot-password`, `/reset-password`
-- Auth route: `/login`
-- Authenticated workspaces: admin dashboard or member portal
+Public routes render **without** waiting for auth initialization. `/login` and authenticated workspaces wait for session restore to avoid login flash.
 
-`AuthProvider` gates workspace rendering until session restoration completes, preventing route flicker during startup.
-The `/login` route also defers rendering the sign-in page until initialization completes, so authenticated refreshes show the bootstrap loader instead of a transient login flash.
+## Route map
 
-## Primary Frontend Surfaces
+### Public routes (`App.tsx`)
 
-### Public Surface
+| Path | Page |
+|------|------|
+| `/`, `/portal` | `PublicPortalPage` |
+| `/helpdesk` | `PublicHelpdeskPage` |
+| `/join-us` | `PublicContactRegistrationPage` |
+| `/jobs`, `/jobs/apply`, `/jobs/post` | `PublicJobsPage` |
+| `/events/:id/register` | `PublicEventRegistrationPage` |
+| `/forgot-password`, `/reset-password` | Password recovery |
+| `/login` | `AdminLoginPage` |
 
-- Portal landing (`PublicPortalPage`)
-- Public helpdesk intake
-- Public jobs listing/apply/post
-- Public event registration
-- Public join-us contact registration
+### Admin workspace (`AdminDashboardPage.tsx`)
 
-### Admin Surface
+Path → tab mapping in `adminNavigation.ts`. Major static paths:
 
-- Admin dashboard and module tabs
-- Governance pages (including insights, approvals, responsibility chart, AI chatbot)
-- Governance Contacts workspace (`governance-contacts`) for global contact upload/review and assignment flows
-- Core business operations (Sreni/Sthan/reporting/attendance)
-- Helpdesk admin operations
-- Member services admin operations
-- Settings pages (Google integration, SMTP/IMAP integration, report config, layout/settings)
+**General Services** (parent key `governance`):
 
-### Member Surface
+| Path | Tab / page |
+|------|------------|
+| `/admin/general-services/insights` | Insights |
+| `/admin/general-services/approvals` | My approvals |
+| `/admin/general-services/contacts` | `GlobalContactsPage` |
+| `/admin/general-services/join-us-review` | `JoinUsReviewPage` |
+| `/admin/general-services/responsibility-chart` | Responsibility chart |
+| `/admin/general-services/reimbursements` | Reimbursements admin |
+| `/admin/general-services/events` | Special events |
+| `/admin/general-services/notifications` | Notifications |
+| `/admin/general-services/gmail` | Email workspace |
 
-- Member portal workspace
-- Member-authenticated feature access based on token/session context
+**Helpdesk:** `/admin/helpdesk/tickets`, `/jobs`, `/applications`
 
-## API Integration Model
+**Settings:** `/admin/settings/*` — roles, locations, Sreni definitions, permissions, permission sets, users, admins, approval workflows, attendance metrics, report config, Google, email, reference data
 
-Frontend API integration is layered:
+**Dynamic Sreni:** `/admin/sreni/{slug}/{calendar|contacts|attendance|documents|reports|analytics}`
 
-1. `src/utils/api.ts`
-	- Base URL defaults to `/api/v1`
-	- Enforces relative endpoint normalization
-	- Adds request timeout via `AbortController`
-	- Centralizes response and error parsing
+**Dynamic Sthan:** `/admin/sthan/{slug}/{calendar|reports|expenses|contacts}`
 
-2. `src/utils/backendApi.ts`
-	- Domain-specific wrappers for auth, gateway, member services, core business, settings, and analytics operations
-	- Form-data upload wrappers for public job application flows
-	- Global/sreni contact wrappers include upload, active toggle, delete, and cross-Sreni tag assignment APIs
-	- Location definition wrappers now pass hierarchy context (`parentId`) and consume role-level parent mappings
+Legacy paths redirect (e.g. `/admin/contacts` → general-services contacts; `/admin/ai-chatbot` → insights).
 
-## Context and Provider Layer
+### Member workspace
 
-App-level providers:
-- `ToastProvider`
-- `ConfirmDialogProvider`
-- `ThemeProvider`
-- `AuthProvider`
+`MemberPortalPage` — reimbursements, events, notifications for member token holders.
 
-These providers establish shared UX behaviors and session-aware access patterns across admin, member, and public screens.
+## Key feature pages
 
-## UI Architecture Notes
+### Contact governance
 
-- Public pages intentionally use a separate visual language from admin/member workspace.
-- Shared field and date-time components are reused across operational forms.
-- Dashboard and analytics pages prioritize role/menu-aware visibility and reusable control panels.
-- The frontend honors backend-driven menu grants for governance and settings navigation.
-- Governance and Member Services are presented under a shared sidebar parent group (`General Services`) in the admin workspace while child visibility remains grant-driven.
-- `Contacts` is an explicit child under `General Services` and is menu-grant aware.
-- Analytics Studio Detailed Reports now includes Table Customization using persisted per-user table layouts via the shared table-layout modal pattern.
-- In contact assignment flows, administrators can set primary Sreni division/standalone Sthan assignment.
-- In contact assignment flows, administrators can add additional Sreni tags with per-tag division context.
-- In contact assignment flows, administrators can manage active/inactive lifecycle state.
-- In Location Definition, parent options are inferred from `role_level` enum parent-child relationships.
+| Page | Features |
+|------|----------|
+| `GlobalContactsPage` | Paginated global list, upload modal, sreni tags, edit, active toggle |
+| `SreniContactListPage` | Per-Sreni list, columns layout, division/sthan assign, family members, upload |
+| `SthanContactsPage` | Sthan-scoped contacts |
+| `JoinUsReviewPage` | Pending public registrations, complete review |
 
-## Architecture Diagrams
+### Sreni contact list (2026 additions)
 
-- Governance contacts and assignment flow: `diagrams/frontend-governance-contacts-flow.md`
+When Sreni name matches Seva Samithi:
+
+- **Member Srenis** column from `contact_sreni_tags`
+- **Seva activity** row action → modal with date, activity text, details, multi-document upload/download
+- Upload uses member data template (not per-Sreni Yes/No columns for SS)
+
+When `gada_assignment_enabled` on Sreni:
+
+- Gada filter pills (All / Unassigned / Mine)
+- Assign Gada modal, Manage Gadanayaks modal
+
+### Upload flow
+
+| Component | Role |
+|-----------|------|
+| `ContactUploadModal` | File pick, calls preview API |
+| `ContactUploadReviewModal` | Row-level insert/update/skip decisions, commit |
+| `ContactEditModal` | Inline field sections from column metadata |
+
+Used from `GlobalContactsPage` and `SreniContactListPage`. Template: `public/templates/Member_Data_Upload_Template.xlsx` (also served by API).
+
+### Settings
+
+| Page | Notes |
+|------|-------|
+| `SreniDefinitionPage` | Join Us visibility, show in upload Excel, gada toggle |
+| `UsersFormPage` | Role, sthan, permission set, super-admin |
+| `PermissionSetsPage` / `PermissionDefinitionsPage` | Data access bundles |
+| `LocationDefinitionPage` | Hierarchy via `parentId` and role_level enums |
+
+## API integration
+
+1. **`src/utils/api.ts`** — fetch wrapper, `/api/v1` base, timeout, blob/form helpers
+2. **`src/utils/backendApi.ts`** — typed domain methods (contacts, gada, seva contributions, upload, join-us, etc.)
+
+Vite proxies `/api/v1` → `VITE_API_PROXY_TARGET` (default `http://127.0.0.1:3001`).
+
+### Notable client methods (contacts)
+
+- `previewMemberContactUpload`, `commitMemberContactUpload`, `downloadMemberContactTemplate`
+- `listSreniContacts` with `gadaFilter` / `gadanayakUserId`
+- `listSevaContributions`, `createSevaContribution`, `uploadSevaContributionDocuments`, `downloadSevaContributionDocument`
+- `listJoinUsSubmissions`, `completeJoinUsReview`
+
+## Shared UI patterns
+
+- `PageHeader` + `PaginationBar` on list pages
+- `TableLayoutModal` + `useTableLayout` for per-user column visibility
+- `TableRowActionsMenu` for row actions
+- `DateField` / `TimeField` for date-time inputs
+- Business-friendly labels from enum metadata (migration 075)
+
+## Navigation and visibility
+
+- Sidebar built from menu grants for non-super-admin admins
+- Super admins see full menu
+- `InternalLinkInterceptor` handles in-app admin links
+- Approval Workflows settings tab may be hidden by feature flag in `AdminDashboardPage`
+
+## Diagram
+
+- [frontend-governance-contacts-flow.md](./diagrams/frontend-governance-contacts-flow.md)

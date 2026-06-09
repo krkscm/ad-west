@@ -2,15 +2,26 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToast } from '../components/common/Toast';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { Modal } from '../components/common/Modal';
-import { DateField } from '../components/common/DateFields';
+import { DateField, validateBirthDate } from '../components/common/DateFields';
 import { ContactEditModal } from '../components/common/ContactEditModal';
 import { ContactUploadModal, SRENI_CONTACT_UPLOAD_DESCRIPTION } from '../components/common/ContactUploadModal';
 import { TableRowActionsMenu } from '../components/common/TableRowActionsMenu';
 import { TableLayoutModal } from '../components/common/TableLayoutModal';
 import { PageHeader, PageStat } from '../components/common/PageHeader';
 import { PAGE_SIZE_OPTIONS, PaginationBar } from '../components/common/PaginationBar';
-import { buildContactEditFields, MASTER_CONTACT_COLUMN_LABELS, orderContactColumns } from '../constants/contactColumns';
-import { backendApi, HouseholdMemberApi, HouseholdResolverKey, SreniContactRowApi, SreniDivisionApi, SthanBasicApi } from '../utils/backendApi';
+import { buildContactEditFieldSections, MASTER_CONTACT_COLUMN_LABELS, orderContactColumns } from '../constants/contactColumns';
+import { useAdminDefinitions } from '../context/admin-definitions-context';
+import {
+  backendApi,
+  GadaContactListFilter,
+  HouseholdMemberApi,
+  HouseholdResolverKey,
+  SevaContributionApi,
+  SreniContactRowApi,
+  SreniDivisionApi,
+  SreniGadanayakApi,
+  SthanBasicApi,
+} from '../utils/backendApi';
 import { useTableLayout } from '../hooks/useTableLayout';
 
 interface Props {
@@ -148,7 +159,7 @@ const HouseholdMembersModal: React.FC<HouseholdMembersModalProps> = ({
     setLoading(true);
     backendApi.listHouseholdMembers(sreniId, contact.id)
       .then(setMembers)
-      .catch((err) => addToast(toUiError(err, 'Failed to load household members.'), 'error'))
+      .catch((err) => addToast(toUiError(err, 'Failed to load family members.'), 'error'))
       .finally(() => setLoading(false));
   }, [sreniId, contact, addToast]);
 
@@ -182,6 +193,13 @@ const HouseholdMembersModal: React.FC<HouseholdMembersModalProps> = ({
     if (memberEnrollment && !newDivisionId) {
       addToast('Division is required for each child.', 'error');
       return;
+    }
+    if (newDob.trim()) {
+      const dobError = validateBirthDate(newDob, 'Child date of birth');
+      if (dobError) {
+        addToast(dobError, 'warning');
+        return;
+      }
     }
     setSaving(true);
     try {
@@ -233,7 +251,7 @@ const HouseholdMembersModal: React.FC<HouseholdMembersModalProps> = ({
     if (!contact || member.source === 'import') return;
     const ok = await confirm({
       title: 'Remove Participant',
-      message: `Remove "${member.name}" from this household?`,
+      message: `Remove "${member.name}" from this family contact?`,
       confirmLabel: 'Remove',
       danger: true,
     });
@@ -252,6 +270,13 @@ const HouseholdMembersModal: React.FC<HouseholdMembersModalProps> = ({
     if (!contact) return;
     const name = editName.trim();
     if (!name) return;
+    if (editDob.trim()) {
+      const dobError = validateBirthDate(editDob, 'Child date of birth');
+      if (dobError) {
+        addToast(dobError, 'warning');
+        return;
+      }
+    }
     setSaving(true);
     try {
       await backendApi.updateHouseholdMember(sreniId, contact.id, memberId, {
@@ -274,7 +299,7 @@ const HouseholdMembersModal: React.FC<HouseholdMembersModalProps> = ({
     if (!contact) return;
     const ok = await confirm({
       title: 'Remove Child',
-      message: `Remove "${member.name}" from this household?`,
+      message: `Remove "${member.name}" from this family contact?`,
       confirmLabel: 'Remove',
       danger: true,
     });
@@ -290,13 +315,13 @@ const HouseholdMembersModal: React.FC<HouseholdMembersModalProps> = ({
   };
 
   const roleLabel = (role: HouseholdMemberApi['role']) => {
-    if (role === 'head') return 'Head';
+    if (role === 'head') return 'Primary';
     if (role === 'spouse') return 'Spouse';
     return role;
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Household — ${contactName}`} maxWidth="520px">
+    <Modal isOpen={isOpen} onClose={onClose} title={`Family members — ${contactName}`} maxWidth="520px">
       {loading ? (
         <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem' }}>Loading members…</p>
       ) : (
@@ -336,7 +361,7 @@ const HouseholdMembersModal: React.FC<HouseholdMembersModalProps> = ({
                       {isEditing ? (
                         <div style={{ display: 'grid', gap: '8px' }}>
                           <input className="form-input" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Name" disabled={saving} />
-                          <DateField value={editDob} onChange={(e) => setEditDob(e.target.value)} disabled={saving} />
+                          <DateField value={editDob} birthDate onChange={(e) => setEditDob(e.target.value)} disabled={saving} />
                           {divisions.length > 0 && (
                             <select className="form-input" value={editDivisionId} onChange={(e) => setEditDivisionId(e.target.value)} disabled={saving}>
                               <option value="">— Division —</option>
@@ -368,7 +393,7 @@ const HouseholdMembersModal: React.FC<HouseholdMembersModalProps> = ({
             <div style={{ padding: '14px', borderRadius: '8px', border: '1px dashed var(--border-dark)', display: 'grid', gap: '10px' }}>
               <p style={{ margin: 0, fontSize: '0.8rem', fontWeight: 600 }}>Add child</p>
               <input className="form-input" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Child name" disabled={saving} />
-              <DateField value={newDob} onChange={(e) => setNewDob(e.target.value)} disabled={saving} />
+              <DateField value={newDob} birthDate onChange={(e) => setNewDob(e.target.value)} disabled={saving} />
               {divisions.length > 0 ? (
                 <select className="form-input" value={newDivisionId} onChange={(e) => setNewDivisionId(e.target.value)} disabled={saving}>
                   <option value="">— Select division —</option>
@@ -424,6 +449,225 @@ const HouseholdMembersModal: React.FC<HouseholdMembersModalProps> = ({
           </div>
         </div>
       )}
+    </Modal>
+  );
+};
+
+// ── Assign Gada Modal ─────────────────────────────────────────────────────────
+
+interface AssignGadaModalProps {
+  isOpen: boolean;
+  contact: SreniContactRowApi | null;
+  gadanayaks: SreniGadanayakApi[];
+  isSaving: boolean;
+  onClose: () => void;
+  onSave: (gadanayakUserId: string) => void;
+  onUnassign: () => void;
+}
+
+const AssignGadaModal: React.FC<AssignGadaModalProps> = ({
+  isOpen, contact, gadanayaks, isSaving, onClose, onSave, onUnassign,
+}) => {
+  const [gadanayakUserId, setGadanayakUserId] = useState('');
+
+  useEffect(() => {
+    if (contact) {
+      setGadanayakUserId(contact.gadanayakUserId ?? '');
+    }
+  }, [contact]);
+
+  const contactName = contact?.data['name'] != null ? String(contact.data['name']) : 'Contact';
+  const contactSthanId = contact?.sthanId ?? '';
+  const eligible = contactSthanId
+    ? gadanayaks.filter((g) => g.sthanId === contactSthanId)
+    : [];
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={`Assign Gada — ${contactName}`} maxWidth="400px">
+      <div style={{ display: 'grid', gap: '18px' }}>
+        {!contactSthanId ? (
+          <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary-dark)' }}>
+            Assign a sthan to this contact before assigning a gadanayak.
+          </p>
+        ) : eligible.length === 0 ? (
+          <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary-dark)' }}>
+            No gadanayaks registered for this contact&apos;s sthan. Use Manage Gadanayaks to add one.
+          </p>
+        ) : (
+          <div>
+            <label className="form-label">Gadanayak</label>
+            <select
+              className="form-input"
+              value={gadanayakUserId}
+              onChange={(e) => setGadanayakUserId(e.target.value)}
+            >
+              <option value="">— Select —</option>
+              {eligible.map((g) => (
+                <option key={g.id} value={g.userId}>{g.userName}{g.sthanName ? ` (${g.sthanName})` : ''}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '4px', flexWrap: 'wrap' }}>
+          {contact?.gadanayakUserId && (
+            <button type="button" className="btn btn-danger-outline" onClick={onUnassign} disabled={isSaving}>
+              Remove assignment
+            </button>
+          )}
+          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSaving}>Cancel</button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={isSaving || !gadanayakUserId || !contactSthanId}
+            onClick={() => onSave(gadanayakUserId)}
+          >
+            {isSaving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+// ── Gadanayaks Management Modal ───────────────────────────────────────────────
+
+interface GadanayaksModalProps {
+  isOpen: boolean;
+  sreniId: string;
+  sthans: SthanBasicApi[];
+  onClose: () => void;
+  onChanged: () => void;
+}
+
+const GadanayaksModal: React.FC<GadanayaksModalProps> = ({ isOpen, sreniId, sthans, onClose, onChanged }) => {
+  const { addToast } = useToast();
+  const confirm = useConfirm();
+  const [list, setList] = useState<SreniGadanayakApi[]>([]);
+  const [sthanId, setSthanId] = useState('');
+  const [eligibleUsers, setEligibleUsers] = useState<Array<{ id: string; name: string; email?: string }>>([]);
+  const [userId, setUserId] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const loadGadanayaks = useCallback(() => {
+    setLoading(true);
+    backendApi.listSreniGadanayaks(sreniId)
+      .then(setList)
+      .catch((err) => addToast(toUiError(err, 'Failed to load gadanayaks.'), 'error'))
+      .finally(() => setLoading(false));
+  }, [sreniId, addToast]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    loadGadanayaks();
+    if (sthans.length > 0 && !sthanId) {
+      setSthanId(sthans[0].id);
+    }
+  }, [isOpen, loadGadanayaks, sthans, sthanId]);
+
+  useEffect(() => {
+    if (!isOpen || !sthanId) {
+      setEligibleUsers([]);
+      setUserId('');
+      return;
+    }
+    backendApi.listEligibleGadanayakUsers(sreniId, sthanId)
+      .then((users) => {
+        setEligibleUsers(users);
+        setUserId(users[0]?.id ?? '');
+      })
+      .catch(() => setEligibleUsers([]));
+  }, [isOpen, sreniId, sthanId]);
+
+  const handleAdd = async () => {
+    if (!sthanId || !userId) return;
+    setSaving(true);
+    try {
+      await backendApi.registerSreniGadanayak(sreniId, sthanId, userId);
+      loadGadanayaks();
+      onChanged();
+      setUserId('');
+      addToast('Gadanayak registered.', 'success');
+    } catch (err) {
+      addToast(toUiError(err, 'Failed to register gadanayak.'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemove = async (g: SreniGadanayakApi) => {
+    const ok = await confirm({
+      title: 'Remove Gadanayak',
+      message: `Remove ${g.userName} as gadanayak? Their contact assignments will be cleared.`,
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await backendApi.removeSreniGadanayak(sreniId, g.id);
+      loadGadanayaks();
+      onChanged();
+      addToast('Gadanayak removed.', 'success');
+    } catch (err) {
+      addToast(toUiError(err, 'Failed to remove gadanayak.'), 'error');
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Manage Gadanayaks" maxWidth="520px">
+      <div style={{ marginBottom: '20px' }}>
+        <label className="form-label">Register gadanayak</label>
+        <div style={{ display: 'grid', gap: '8px' }}>
+          <select className="form-input" value={sthanId} onChange={(e) => setSthanId(e.target.value)} disabled={saving}>
+            <option value="">— Select sthan —</option>
+            {sthans.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <select className="form-input" value={userId} onChange={(e) => setUserId(e.target.value)} disabled={saving || !sthanId}>
+            <option value="">— Select user —</option>
+            {eligibleUsers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => void handleAdd()}
+            disabled={saving || !sthanId || !userId}
+          >
+            Add gadanayak
+          </button>
+        </div>
+        {sthanId && eligibleUsers.length === 0 && (
+          <p style={{ margin: '8px 0 0', fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>
+            No eligible users for this sthan (must have Sreni + sthan access and not already registered).
+          </p>
+        )}
+      </div>
+
+      <div style={{ height: '1px', background: 'var(--border-dark)', marginBottom: '16px' }} />
+
+      {loading ? (
+        <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', textAlign: 'center', padding: '16px 0' }}>Loading…</p>
+      ) : list.length === 0 ? (
+        <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', textAlign: 'center', padding: '16px 0' }}>
+          No gadanayaks registered yet.
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+          {list.map((g) => (
+            <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', border: '1px solid var(--border-dark)', borderRadius: '8px', background: 'var(--surface-dark)' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{g.userName}</div>
+                <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary-dark)' }}>{g.sthanName ?? g.sthanId}</div>
+              </div>
+              <button type="button" className="btn btn-danger-outline btn-sm" onClick={() => void handleRemove(g)}>Remove</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '18px' }}>
+        <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
+      </div>
     </Modal>
   );
 };
@@ -572,16 +816,308 @@ const DivisionsModal: React.FC<DivisionsModalProps> = ({ isOpen, sreniId, divisi
   );
 };
 
+// ── Seva Contributions Modal (Seva Samithi only) ──────────────────────────────
+
+interface SevaContributionsModalProps {
+  isOpen: boolean;
+  sreniId: string;
+  contact: SreniContactRowApi | null;
+  onClose: () => void;
+}
+
+const SevaContributionsModal: React.FC<SevaContributionsModalProps> = ({ isOpen, sreniId, contact, onClose }) => {
+  const { addToast } = useToast();
+  const confirm = useConfirm();
+  const [contributions, setContributions] = useState<SevaContributionApi[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [activityDate, setActivityDate] = useState('');
+  const [sevaActivity, setSevaActivity] = useState('');
+  const [details, setDetails] = useState('');
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+
+  const resetForm = useCallback(() => {
+    setEditingId(null);
+    setActivityDate('');
+    setSevaActivity('');
+    setDetails('');
+    setPendingFiles([]);
+  }, []);
+
+  const loadContributions = useCallback(() => {
+    if (!contact) return;
+    setLoading(true);
+    backendApi.listSevaContributions(sreniId, contact.id)
+      .then(setContributions)
+      .catch((err) => addToast(toUiError(err, 'Failed to load seva activity.'), 'error'))
+      .finally(() => setLoading(false));
+  }, [sreniId, contact, addToast]);
+
+  useEffect(() => {
+    if (isOpen && contact) {
+      resetForm();
+      loadContributions();
+    }
+  }, [isOpen, contact, loadContributions, resetForm]);
+
+  const contactName = contact?.data['name'] != null ? String(contact.data['name']) : 'Contact';
+
+  const handleSave = async () => {
+    if (!contact) return;
+    if (!activityDate.trim()) {
+      addToast('Activity date is required.', 'error');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const payload = {
+        activityDate: activityDate.trim(),
+        sevaActivity: sevaActivity.trim() || undefined,
+        details: details.trim() || undefined,
+      };
+      const saved = editingId
+        ? await backendApi.updateSevaContribution(sreniId, contact.id, editingId, payload)
+        : await backendApi.createSevaContribution(sreniId, contact.id, payload);
+
+      if (pendingFiles.length > 0) {
+        await backendApi.uploadSevaContributionDocuments(sreniId, contact.id, saved.id, pendingFiles);
+      }
+
+      resetForm();
+      loadContributions();
+      addToast(editingId ? 'Seva activity updated.' : 'Seva activity recorded.', 'success');
+    } catch (err) {
+      addToast(toUiError(err, 'Failed to save seva activity.'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEdit = (entry: SevaContributionApi) => {
+    setEditingId(entry.id);
+    setActivityDate(entry.activityDate);
+    setSevaActivity(entry.sevaActivity ?? '');
+    setDetails(entry.details ?? '');
+    setPendingFiles([]);
+  };
+
+  const handleDelete = async (entry: SevaContributionApi) => {
+    if (!contact) return;
+    const ok = await confirm({
+      title: 'Delete seva activity',
+      message: `Remove the seva activity from ${entry.activityDate}? Documents will also be deleted.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+
+    try {
+      await backendApi.deleteSevaContribution(sreniId, contact.id, entry.id);
+      if (editingId === entry.id) resetForm();
+      loadContributions();
+      addToast('Seva activity deleted.', 'success');
+    } catch (err) {
+      addToast(toUiError(err, 'Failed to delete seva activity.'), 'error');
+    }
+  };
+
+  const handleUploadToEntry = async (contributionId: string, fileList: FileList | null) => {
+    if (!contact || !fileList?.length) return;
+    setUploadingId(contributionId);
+    try {
+      await backendApi.uploadSevaContributionDocuments(
+        sreniId,
+        contact.id,
+        contributionId,
+        Array.from(fileList),
+      );
+      loadContributions();
+      addToast('Documents uploaded.', 'success');
+    } catch (err) {
+      addToast(toUiError(err, 'Failed to upload documents.'), 'error');
+    } finally {
+      setUploadingId(null);
+    }
+  };
+
+  const handleDeleteDocument = async (documentId: string) => {
+    const ok = await confirm({
+      title: 'Delete document',
+      message: 'Remove this document from the seva activity?',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+
+    try {
+      await backendApi.deleteSevaContributionDocument(documentId);
+      loadContributions();
+      addToast('Document deleted.', 'success');
+    } catch (err) {
+      addToast(toUiError(err, 'Failed to delete document.'), 'error');
+    }
+  };
+
+  const formatDisplayDate = (value: string) => {
+    const parsed = new Date(`${value}T00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString();
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={`Seva activity — ${contactName}`} maxWidth="640px">
+      <div style={{ display: 'grid', gap: '20px' }}>
+        <div className="glass-panel" style={{ padding: '16px', display: 'grid', gap: '14px' }}>
+          <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>
+            {editingId ? 'Edit activity' : 'Record new activity'}
+          </h4>
+          <div>
+            <label className="form-label">Date</label>
+            <DateField value={activityDate} onChange={(e) => setActivityDate(e.target.value)} />
+          </div>
+          <div>
+            <label className="form-label">Seva activity</label>
+            <textarea
+              className="form-input"
+              rows={3}
+              value={sevaActivity}
+              onChange={(e) => setSevaActivity(e.target.value)}
+              placeholder="Describe the seva activity or contribution"
+            />
+          </div>
+          <div>
+            <label className="form-label">Further details</label>
+            <textarea
+              className="form-input"
+              rows={3}
+              value={details}
+              onChange={(e) => setDetails(e.target.value)}
+              placeholder="Additional notes, hours, location, etc."
+            />
+          </div>
+          <div>
+            <label className="form-label">Documents</label>
+            <input
+              type="file"
+              className="form-input"
+              multiple
+              onChange={(e) => setPendingFiles(e.target.files ? Array.from(e.target.files) : [])}
+            />
+            {pendingFiles.length > 0 && (
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)', marginTop: '6px' }}>
+                {pendingFiles.length} file{pendingFiles.length !== 1 ? 's' : ''} selected
+              </p>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            {editingId && (
+              <button type="button" className="btn btn-secondary" onClick={resetForm} disabled={saving}>
+                Cancel edit
+              </button>
+            )}
+            <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving…' : editingId ? 'Update activity' : 'Save activity'}
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <h4 style={{ margin: '0 0 12px', fontSize: '0.9rem', fontWeight: 700 }}>Activity history</h4>
+          {loading ? (
+            <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.85rem' }}>Loading…</p>
+          ) : contributions.length === 0 ? (
+            <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.85rem' }}>No seva activity recorded yet.</p>
+          ) : (
+            <div style={{ display: 'grid', gap: '12px' }}>
+              {contributions.map((entry) => (
+                <div key={entry.id} className="glass-panel" style={{ padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{formatDisplayDate(entry.activityDate)}</div>
+                      {entry.sevaActivity && (
+                        <p style={{ margin: '8px 0 0', fontSize: '0.84rem', whiteSpace: 'pre-wrap' }}>{entry.sevaActivity}</p>
+                      )}
+                      {entry.details && (
+                        <p style={{ margin: '8px 0 0', fontSize: '0.8rem', color: 'var(--text-secondary-dark)', whiteSpace: 'pre-wrap' }}>
+                          {entry.details}
+                        </p>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                      <button type="button" className="btn btn-secondary btn-xs" onClick={() => handleEdit(entry)}>Edit</button>
+                      <button type="button" className="btn btn-danger-outline btn-xs" onClick={() => handleDelete(entry)}>Delete</button>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: '12px', display: 'grid', gap: '8px' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary-dark)' }}>Documents</div>
+                    {entry.documents.length > 0 ? (
+                      <div style={{ display: 'grid', gap: '6px' }}>
+                        {entry.documents.map((doc) => (
+                          <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-xs"
+                              onClick={() => backendApi.downloadSevaContributionDocument(doc.id, doc.fileName)}
+                            >
+                              {doc.fileName}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-danger-outline btn-xs"
+                              onClick={() => handleDeleteDocument(doc.id)}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)', opacity: 0.7 }}>No documents</span>
+                    )}
+                    <label className="btn btn-secondary btn-xs" style={{ width: 'fit-content', cursor: uploadingId === entry.id ? 'wait' : 'pointer' }}>
+                      {uploadingId === entry.id ? 'Uploading…' : 'Add documents'}
+                      <input
+                        type="file"
+                        multiple
+                        style={{ display: 'none' }}
+                        disabled={uploadingId === entry.id}
+                        onChange={(e) => {
+                          void handleUploadToEntry(entry.id, e.target.files);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) => {
   const { addToast } = useToast();
   const confirm = useConfirm();
+  const {
+    uploadSrenies: contextUploadSrenies,
+    locationNames: contextLocationNames,
+    ensureSthansLoaded,
+    sthans: contextSthans,
+  } = useAdminDefinitions();
   const [showLayoutModal, setShowLayoutModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [layoutEnabled, setLayoutEnabled] = useState(false);
 
-  // ── Table layout ──
-  const sreniLayout = useTableLayout('sreni-contacts');
+  // ── Table layout (deferred until contacts load or Columns is opened) ──
+  const sreniLayout = useTableLayout('sreni-contacts', { enabled: layoutEnabled });
 
   // ── State ──
   const [rows, setRows] = useState<SreniContactRowApi[]>([]);
@@ -594,9 +1130,18 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
   const [sourceFile, setSourceFile] = useState<string | null>(null);
   const [divisions, setDivisions] = useState<SreniDivisionApi[]>([]);
   const [showDivisionsModal, setShowDivisionsModal] = useState(false);
-  const [sthans, setSthans] = useState<SthanBasicApi[]>([]);
+  const [sthans, setSthans] = useState<SthanBasicApi[]>(contextSthans);
   const [assignTarget, setAssignTarget] = useState<SreniContactRowApi | null>(null);
+  const [gadaAssignTarget, setGadaAssignTarget] = useState<SreniContactRowApi | null>(null);
   const [householdTarget, setHouseholdTarget] = useState<SreniContactRowApi | null>(null);
+  const [sevaContributionsTarget, setSevaContributionsTarget] = useState<SreniContactRowApi | null>(null);
+  const [gadaAssignmentEnabled, setGadaAssignmentEnabled] = useState(false);
+  const [canManageGadaAssignments, setCanManageGadaAssignments] = useState(false);
+  const [gadaFilter, setGadaFilter] = useState<GadaContactListFilter>('all');
+  const [gadanayakFilterUserId, setGadanayakFilterUserId] = useState('');
+  const [gadanayaks, setGadanayaks] = useState<SreniGadanayakApi[]>([]);
+  const [showGadanayaksModal, setShowGadanayaksModal] = useState(false);
+  const [isSavingGadaAssign, setIsSavingGadaAssign] = useState(false);
   const [enrollmentScope, setEnrollmentScope] = useState('HOUSEHOLD');
   const [resolverKey, setResolverKey] = useState<HouseholdResolverKey>('household_head');
   const [femaleGenderMatches, setFemaleGenderMatches] = useState<string[]>(['f', 'female', 'woman', 'women']);
@@ -604,9 +1149,11 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
   const [isSavingAssign, setIsSavingAssign] = useState(false);
   const [editTarget, setEditTarget] = useState<SreniContactRowApi | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [femaleGenderLoaded, setFemaleGenderLoaded] = useState(false);
 
   const memberEnrollment = enrollmentScope === 'MEMBER' || resolverKey === 'enrolled_children';
   const femaleParticipantsMode = resolverKey === 'female_participants';
+  const isSevaSamithiSreni = /seva\s*samithi/i.test(sreniName);
 
   const sreniColDefs = useMemo(
     () => columns.filter((k) => k !== 'name').map((k) => ({ key: k, label: MASTER_CONTACT_COLUMN_LABELS.get(k) ?? k })),
@@ -624,15 +1171,25 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
     backendApi.listSreniDivisions(sreniId)
       .then(setDivisions)
       .catch(() => {/* non-critical */});
-    backendApi.listSthans()
-      .then(setSthans)
-      .catch(() => {/* non-critical */});
   }, [sreniId]);
 
-  const load = useCallback((p: number, ps?: number) => {
+  const loadGadanayaks = useCallback(() => {
+    if (!gadaAssignmentEnabled || !canManageGadaAssignments) return;
+    backendApi.listSreniGadanayaks(sreniId)
+      .then(setGadanayaks)
+      .catch(() => {/* non-critical */});
+  }, [sreniId, gadaAssignmentEnabled, canManageGadaAssignments]);
+
+  const load = useCallback((p: number, ps?: number, filterOverride?: GadaContactListFilter, gadanayakUserOverride?: string) => {
     setIsLoading(true);
     const size = ps ?? pageSize;
-    backendApi.listSreniContacts(sreniId, p, size)
+    const activeFilter = filterOverride ?? gadaFilter;
+    const activeGadanayakUserId = gadanayakUserOverride ?? gadanayakFilterUserId;
+    const gadaOptions = {
+      filter: activeFilter,
+      gadanayakUserId: activeFilter === 'all' && activeGadanayakUserId ? activeGadanayakUserId : undefined,
+    };
+    backendApi.listSreniContacts(sreniId, p, size, gadaOptions)
       .then((res) => {
         setRows(res.items);
         setTotal(res.total);
@@ -640,6 +1197,8 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
         setEnrollmentScope(res.enrollmentScope ?? 'HOUSEHOLD');
         setResolverKey(res.resolverKey ?? 'household_head');
         setParticipantTotal(res.participantTotal ?? res.total);
+        setGadaAssignmentEnabled(res.gadaAssignmentEnabled ?? false);
+        setCanManageGadaAssignments(res.canManageGadaAssignments ?? false);
         const colSet = new Set<string>();
         for (const r of res.items) Object.keys(r.data).forEach((k) => colSet.add(k));
         if (colSet.size > 0) {
@@ -649,20 +1208,58 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
       })
       .catch((err) => addToast(toUiError(err, 'Failed to load contacts.'), 'error'))
       .finally(() => setIsLoading(false));
-  }, [sreniId, pageSize, addToast]);
+  }, [sreniId, pageSize, gadaFilter, gadanayakFilterUserId, addToast]);
 
   useEffect(() => {
+    setSthans(contextSthans);
+  }, [contextSthans]);
+
+  useEffect(() => {
+    if (!isLoading && (rows.length > 0 || total > 0)) {
+      setLayoutEnabled(true);
+    }
+  }, [isLoading, rows.length, total]);
+
+  useEffect(() => {
+    if (!femaleParticipantsMode || !householdTarget || femaleGenderLoaded) return;
+    setFemaleGenderLoaded(true);
     backendApi.listEnumValues('female_gender_match', true)
       .then((values) => setFemaleGenderMatches(values.map((v) => v.value.toLowerCase())))
       .catch(() => {/* non-critical */});
+  }, [femaleParticipantsMode, householdTarget, femaleGenderLoaded]);
+
+  const editFieldOptions = useMemo(() => ({
+    uploadSrenies: contextUploadSrenies,
+    sthanNames: contextLocationNames.filter((l) => l.level === 'STHAN').map((l) => l.name),
+    zoneNames: contextLocationNames.filter((l) => l.level === 'ZONE').map((l) => l.name),
+  }), [contextUploadSrenies, contextLocationNames]);
+
+  const editSections = useMemo(
+    () => (editTarget ? buildContactEditFieldSections(columns, editTarget.data, editFieldOptions) : []),
+    [editTarget, columns, editFieldOptions],
+  );
+
+  const openEdit = useCallback((row: SreniContactRowApi) => {
+    setEditTarget(row);
   }, []);
+
+  const openAssign = useCallback((row: SreniContactRowApi) => {
+    ensureSthansLoaded();
+    setAssignTarget(row);
+  }, [ensureSthansLoaded]);
 
   useEffect(() => {
     setPage(1); setRows([]); setColumns([]); setTotal(0); setTotalPages(1); setSourceFile(null);
-    setSthans([]);
-    load(1);
+    setGadaFilter('all');
+    setGadanayakFilterUserId('');
+    load(1, undefined, 'all', '');
     loadDivisions();
-  }, [sreniId, load, loadDivisions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only reset when sreni changes
+  }, [sreniId]);
+
+  useEffect(() => {
+    loadGadanayaks();
+  }, [loadGadanayaks]);
 
   const handleClear = async () => {
     const ok = await confirm({
@@ -685,7 +1282,7 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
     if (!editTarget) return;
     setIsSavingEdit(true);
     try {
-      const updated = await backendApi.updateSreniContact(editTarget.sreniId, editTarget.id, data);
+      const updated = await backendApi.updateHouseholdContact(editTarget.id, data);
       setRows((prev) => prev.map((r) => r.id !== editTarget.id ? r : { ...r, data: updated.data }));
       setEditTarget(null);
       addToast('Contact updated.', 'success');
@@ -696,6 +1293,58 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
     }
   };
 
+  const handleSaveGadaAssign = async (gadanayakUserId: string) => {
+    if (!gadaAssignTarget) return;
+    setIsSavingGadaAssign(true);
+    try {
+      const result = await backendApi.assignContactGada(sreniId, gadaAssignTarget.id, gadanayakUserId);
+      setRows((prev) => prev.map((r) => r.id !== gadaAssignTarget.id ? r : {
+        ...r,
+        gadanayakUserId: result.gadanayakUserId,
+        gadanayakUserName: result.gadanayakUserName,
+      }));
+      setGadaAssignTarget(null);
+      addToast('Gada assignment saved.', 'success');
+    } catch (err) {
+      addToast(toUiError(err, 'Failed to assign gadanayak.'), 'error');
+    } finally {
+      setIsSavingGadaAssign(false);
+    }
+  };
+
+  const handleUnassignGada = async () => {
+    if (!gadaAssignTarget) return;
+    setIsSavingGadaAssign(true);
+    try {
+      await backendApi.unassignContactGada(sreniId, gadaAssignTarget.id);
+      setRows((prev) => prev.map((r) => r.id !== gadaAssignTarget.id ? r : {
+        ...r,
+        gadanayakUserId: undefined,
+        gadanayakUserName: undefined,
+      }));
+      setGadaAssignTarget(null);
+      addToast('Gada assignment removed.', 'success');
+    } catch (err) {
+      addToast(toUiError(err, 'Failed to remove gada assignment.'), 'error');
+    } finally {
+      setIsSavingGadaAssign(false);
+    }
+  };
+
+  const handleGadaFilterChange = (filter: GadaContactListFilter) => {
+    setGadaFilter(filter);
+    if (filter !== 'all') setGadanayakFilterUserId('');
+    setPage(1);
+    load(1, undefined, filter, filter === 'all' ? gadanayakFilterUserId : '');
+  };
+
+  const handleGadanayakUserFilterChange = (userId: string) => {
+    setGadanayakFilterUserId(userId);
+    setGadaFilter('all');
+    setPage(1);
+    load(1, undefined, 'all', userId);
+  };
+
   const handleSaveAssign = async (divisionId: string | null, sthanId: string | null) => {
     if (!assignTarget) return;
     const contact = assignTarget;
@@ -703,10 +1352,10 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
     try {
       const [updatedDiv, updatedSthan] = await Promise.all([
         divisionId !== (contact.divisionId ?? null)
-          ? backendApi.assignContactDivision(contact.sreniId, contact.id, divisionId)
+          ? backendApi.assignContactDivision(sreniId, contact.id, divisionId)
           : Promise.resolve(contact),
         sthanId !== (contact.sthanId ?? null)
-          ? backendApi.assignContactSthan(contact.sreniId, contact.id, sthanId)
+          ? backendApi.assignContactSthan(sreniId, contact.id, sthanId)
           : Promise.resolve(contact),
       ]);
       setRows((prev) => prev.map((r) => r.id !== contact.id ? r : {
@@ -730,7 +1379,7 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
     ];
     if (memberEnrollment || femaleParticipantsMode) {
       stats.push({
-        label: total !== 1 ? 'households' : 'household',
+        label: total !== 1 ? 'family contacts' : 'family contact',
         value: total,
       });
     }
@@ -771,10 +1420,26 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
         onClose={() => setAssignTarget(null)}
         onSave={handleSaveAssign}
       />
+      <AssignGadaModal
+        isOpen={gadaAssignTarget !== null}
+        contact={gadaAssignTarget}
+        gadanayaks={gadanayaks}
+        isSaving={isSavingGadaAssign}
+        onClose={() => setGadaAssignTarget(null)}
+        onSave={(userId) => void handleSaveGadaAssign(userId)}
+        onUnassign={() => void handleUnassignGada()}
+      />
+      <GadanayaksModal
+        isOpen={showGadanayaksModal}
+        sreniId={sreniId}
+        sthans={sthans}
+        onClose={() => setShowGadanayaksModal(false)}
+        onChanged={() => { loadGadanayaks(); load(page); }}
+      />
       <ContactEditModal
         isOpen={editTarget !== null}
         title={editTarget?.data['name'] != null ? `Edit — ${String(editTarget.data['name'])}` : 'Edit Contact'}
-        fields={editTarget ? buildContactEditFields(columns, editTarget.data) : []}
+        sections={editSections}
         data={editTarget?.data ?? {}}
         isSaving={isSavingEdit}
         onClose={() => setEditTarget(null)}
@@ -791,11 +1456,17 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
         onClose={() => setHouseholdTarget(null)}
         onChanged={() => load(page)}
       />
+      <SevaContributionsModal
+        isOpen={sevaContributionsTarget !== null}
+        sreniId={sreniId}
+        contact={sevaContributionsTarget}
+        onClose={() => setSevaContributionsTarget(null)}
+      />
       <ContactUploadModal
         isOpen={showUploadModal}
         description={SRENI_CONTACT_UPLOAD_DESCRIPTION}
         onClose={() => setShowUploadModal(false)}
-        onUpload={(file) => backendApi.uploadSreniContacts(sreniId, file)}
+        previewUpload={(file) => backendApi.previewMemberContactUpload(file, { sreniId })}
         onUploaded={() => {
           setPage(1);
           load(1);
@@ -811,6 +1482,11 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
             <button type="button" className="btn btn-secondary" onClick={() => setShowDivisionsModal(true)}>
               Manage Divisions
             </button>
+            {gadaAssignmentEnabled && canManageGadaAssignments && (
+              <button type="button" className="btn btn-secondary" onClick={() => { ensureSthansLoaded(); setShowGadanayaksModal(true); }}>
+                Manage Gadanayaks
+              </button>
+            )}
             {total > 0 && (
               <button type="button" className="btn btn-danger-outline" onClick={handleClear}>
                 Clear All
@@ -824,13 +1500,42 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
         }
       />
 
+      {gadaAssignmentEnabled && canManageGadaAssignments && total > 0 && (
+        <div className="glass-panel" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', padding: '12px 16px', marginBottom: '12px' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary-dark)' }}>Gada filter:</span>
+          {(['all', 'unassigned', 'mine'] as GadaContactListFilter[]).map((f) => (
+            <button
+              key={f}
+              type="button"
+              className={`page-size-pill${gadaFilter === f && !gadanayakFilterUserId ? ' is-active' : ''}`}
+              onClick={() => handleGadaFilterChange(f)}
+            >
+              {f === 'all' ? 'All' : f === 'unassigned' ? 'Unassigned' : 'Mine'}
+            </button>
+          ))}
+          {gadanayaks.length > 0 && (
+            <select
+              className="form-input"
+              style={{ width: 'auto', minWidth: '180px', fontSize: '0.8rem', padding: '6px 10px' }}
+              value={gadanayakFilterUserId}
+              onChange={(e) => handleGadanayakUserFilterChange(e.target.value)}
+            >
+              <option value="">By gadanayak…</option>
+              {gadanayaks.map((g) => (
+                <option key={g.id} value={g.userId}>{g.userName}</option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
+
       {/* Columns button */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
         <button
           type="button"
           className="btn btn-secondary"
           style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-          onClick={() => setShowLayoutModal(true)}
+          onClick={() => { setLayoutEnabled(true); setShowLayoutModal(true); }}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
           Columns
@@ -841,7 +1546,7 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
           )}
         </button>
       </div>
-      {(isLoading && rows.length === 0) || sreniLayout.loading ? (
+      {isLoading && rows.length === 0 ? (
         <div className="glass-panel" style={{ padding: '60px 24px', textAlign: 'center', color: 'var(--text-secondary-dark)' }}>
           Loading contacts…
         </div>
@@ -850,7 +1555,9 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
           <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📋</div>
           <h3 style={{ fontWeight: 700, marginBottom: '8px' }}>No contacts yet</h3>
           <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', margin: '0 auto 24px', maxWidth: '400px' }}>
-            Upload the master contact Excel template, or tag contacts from other Srenies to this Sreni via the global Contacts page.
+            {isSevaSamithiSreni
+              ? 'Upload the member data Excel template to register household primaries here. Sreni memberships from the upload appear in the Member Srenis column.'
+              : 'Upload the master contact Excel template, or tag contacts from other Srenies to this Sreni via the global Contacts page.'}
           </p>
           <button type="button" className="btn btn-primary" onClick={() => setShowUploadModal(true)}>Upload Contacts</button>
         </div>
@@ -871,6 +1578,8 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
                     <th style={{ whiteSpace: 'nowrap' }}>Division</th>
                   )}
                   <th style={{ whiteSpace: 'nowrap' }}>Sthan</th>
+                  {isSevaSamithiSreni && <th style={{ whiteSpace: 'nowrap' }}>Member Srenis</th>}
+                  {gadaAssignmentEnabled && <th style={{ whiteSpace: 'nowrap' }}>Gadanayak</th>}
                   {isLoading && columns.length === 0 ? <th>Loading…</th> : visibleSreniCols.map((col) => (
                     <th key={col} style={{ whiteSpace: 'nowrap' }}>{MASTER_CONTACT_COLUMN_LABELS.get(col) ?? col}</th>
                   ))}
@@ -930,6 +1639,24 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
                           ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', fontWeight: 600, background: 'rgba(20,184,166,0.1)', color: '#2dd4bf', padding: '2px 8px', borderRadius: '5px', border: '1px solid rgba(20,184,166,0.25)' }}>{sthanName}</span>
                           : <span style={{ opacity: 0.4, fontSize: '0.84rem' }}>—</span>}
                       </td>
+                      {isSevaSamithiSreni && (
+                        <td>
+                          {(row.memberSrenis?.length ?? 0) > 0 ? (
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>
+                              {row.memberSrenis!.map((s) => s.sreniName).join(', ')}
+                            </span>
+                          ) : (
+                            <span style={{ opacity: 0.4, fontSize: '0.84rem' }}>—</span>
+                          )}
+                        </td>
+                      )}
+                      {gadaAssignmentEnabled && (
+                        <td>
+                          {row.gadanayakUserName
+                            ? <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#c084fc' }}>{row.gadanayakUserName}</span>
+                            : <span style={{ opacity: 0.4, fontSize: '0.84rem' }}>—</span>}
+                        </td>
+                      )}
                       {visibleSreniCols.map((col) => {
                         const val = row.data[col];
                         return (
@@ -942,9 +1669,15 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
                         <TableRowActionsMenu
                           ariaLabel={`Actions for ${row.data['name'] != null ? String(row.data['name']) : 'contact'}`}
                           actions={[
-                            { label: 'Edit', onClick: () => setEditTarget(row) },
-                            { label: 'Household', onClick: () => setHouseholdTarget(row) },
-                            { label: 'Assign', onClick: () => setAssignTarget(row) },
+                                { label: 'Edit', onClick: () => openEdit(row) },
+                            { label: 'Family members', onClick: () => setHouseholdTarget(row) },
+                            ...(isSevaSamithiSreni
+                              ? [{ label: 'Seva activity', onClick: () => setSevaContributionsTarget(row) }]
+                              : []),
+                                { label: 'Assign', onClick: () => openAssign(row) },
+                            ...(gadaAssignmentEnabled && canManageGadaAssignments
+                              ? [{ label: 'Assign Gada', onClick: () => { ensureSthansLoaded(); loadGadanayaks(); setGadaAssignTarget(row); } }]
+                              : []),
                           ]}
                         />
                       </td>

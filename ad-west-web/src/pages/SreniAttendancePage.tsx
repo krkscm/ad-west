@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/auth-context';
+import { useAdminDefinitions } from '../context/admin-definitions-context';
 import { PageHeader } from '../components/common/PageHeader';
 import { backendApi, LocationDefinitionApi, SreniAttendanceListingItemApi } from '../utils/backendApi';
 
@@ -28,6 +29,7 @@ const toInputValue = (value: string | number | boolean | null | undefined): stri
 
 export const SreniAttendancePage: React.FC<Props> = ({ sreniId, sreniName }) => {
   const { adminUser } = useAuth();
+  const { activeSthanLocations } = useAdminDefinitions();
 
   const hasZoneRights = useMemo(() => {
     const scopes = adminUser?.roles?.map((role) => role.scopeType) ?? [];
@@ -43,8 +45,7 @@ export const SreniAttendancePage: React.FC<Props> = ({ sreniId, sreniName }) => 
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const locations = await backendApi.listLocationDefinitions();
-      const sthans = locations.filter((loc) => loc.level === 'STHAN' && loc.active);
+      const sthans = activeSthanLocations;
       const manualSthanIds = loadManualSthanAccess(adminUser?.sub);
       const allowedSthanIds = hasZoneRights ? sthans.map((loc) => loc.id) : manualSthanIds;
 
@@ -60,7 +61,7 @@ export const SreniAttendancePage: React.FC<Props> = ({ sreniId, sreniName }) => 
     } finally {
       setIsLoading(false);
     }
-  }, [adminUser?.sub, hasZoneRights, sreniId]);
+  }, [adminUser?.sub, hasZoneRights, sreniId, activeSthanLocations]);
 
   useEffect(() => {
     void load();

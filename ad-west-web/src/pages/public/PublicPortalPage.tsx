@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useNavigate } from '../../hooks/usePathname'
 
 interface PortalCard {
   icon: string
@@ -35,9 +36,9 @@ const PORTAL_CARDS: PortalCard[] = [
 ]
 
 export function PublicPortalPage() {
-  useEffect(() => { document.title = 'AD West - IFCA — Public Portal' }, [])
+  const navigate = useNavigate()
 
-  const navigate = (href: string) => { window.location.pathname = href }
+  useEffect(() => { document.title = 'AD West - IFCA — Public Portal' }, [])
 
   return (
     <div
@@ -117,7 +118,7 @@ export function PublicPortalPage() {
           </div>
           <button
             type="button"
-            onClick={() => { window.location.href = '/login' }}
+            onClick={() => navigate('/login')}
             style={{
               fontSize: '0.82rem',
               padding: '7px 18px',

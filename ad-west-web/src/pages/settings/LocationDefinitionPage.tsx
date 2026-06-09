@@ -5,6 +5,7 @@ import { PageHeader } from '../../components/common/PageHeader';
 import { EmptyState } from '../../components/common/EmptyState';
 import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
 import { PaginationBar } from '../../components/common/PaginationBar';
+import { useAdminDefinitions } from '../../context/admin-definitions-context';
 import { backendApi, EnumValueApi, LocationDefinitionApi } from '../../utils/backendApi';
 
 type LocationLevel = LocationDefinitionApi['level'];
@@ -38,6 +39,7 @@ const LevelBadge: React.FC<{ level: LocationLevel }> = ({ level }) => {
 export const LocationDefinitionPage: React.FC = () => {
   const { addToast } = useToast();
   const confirm = useConfirm();
+  const { locationDefinitions, refreshDefinitions } = useAdminDefinitions();
 
   const [items, setItems] = useState<LocationDefinitionApi[]>([]);
   const [total, setTotal] = useState(0);
@@ -60,13 +62,16 @@ export const LocationDefinitionPage: React.FC = () => {
   const [roleLevels, setRoleLevels] = useState<EnumValueApi[]>([]);
 
   useEffect(() => {
-    backendApi.listLocationDefinitions()
-      .then((locs) => setAllLocations(locs))
-      .catch(() => {});
+    setAllLocations(locationDefinitions);
+  }, [locationDefinitions]);
+
+  useEffect(() => {
+    if (!formOpen) return;
+    if (roleLevels.length > 0) return;
     backendApi.listEnumValues('role_level', true)
       .then((vals) => setRoleLevels(vals))
       .catch(() => {});
-  }, []);
+  }, [formOpen, roleLevels.length]);
 
   // Find the parent level value from the role_level hierarchy for the current level
   const currentLevelEnum = roleLevels.find((r) => r.value === level);
@@ -147,7 +152,7 @@ export const LocationDefinitionPage: React.FC = () => {
       }
       resetForm();
       load(page, pageSize, search, levelFilter);
-      backendApi.listLocationDefinitions().then((locs) => setAllLocations(locs)).catch(() => {});
+      void refreshDefinitions();
     } catch (error) {
       addToast(toUiError(error, 'Failed to save location.'), 'error');
     } finally {

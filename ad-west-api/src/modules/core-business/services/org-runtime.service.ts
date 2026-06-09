@@ -54,7 +54,8 @@ export class OrgRuntimeService {
 
   private mapSreniDefinitionRow(r: {
     id: string; name: string; description: string | null; code: string | null; active: boolean;
-    is_service_sreny: boolean; join_us_visible: boolean;
+    is_service_sreny: boolean; join_us_visible: boolean; show_in_upload_excel?: boolean;
+    gada_assignment_enabled?: boolean;
     enrollment_scope?: string | null; primary_contact_strategy?: string | null;
     created_by: string | null; updated_by: string | null;
     created_at: string | Date; updated_at: string | Date;
@@ -67,6 +68,8 @@ export class OrgRuntimeService {
       active: r.active,
       isServiceSreny: r.is_service_sreny,
       joinUsVisible: r.join_us_visible,
+      showInUploadExcel: r.show_in_upload_excel ?? false,
+      gadaAssignmentEnabled: r.gada_assignment_enabled ?? true,
       enrollmentScope: r.enrollment_scope ?? undefined,
       primaryContactStrategy: r.primary_contact_strategy ?? undefined,
       createdBy: r.created_by ?? undefined,
@@ -473,8 +476,8 @@ export class OrgRuntimeService {
         [searchParam],
       ),
       this.ctx.dataSource.query(
-        `SELECT id, name, description, code, active, is_service_sreny, join_us_visible,
-                enrollment_scope, primary_contact_strategy,
+        `SELECT id, name, description, code, active, is_service_sreny, join_us_visible, show_in_upload_excel,
+                gada_assignment_enabled, enrollment_scope, primary_contact_strategy,
                 created_by, updated_by, created_at, updated_at
          FROM adwest.srenies
          WHERE zone_id IS NULL AND ($1::text IS NULL OR name ILIKE $1 OR code ILIKE $1 OR description ILIKE $1)
@@ -505,6 +508,8 @@ export class OrgRuntimeService {
         description: dto.description,
         isServiceSreny: false,
         joinUsVisible: dto.joinUsVisible ?? false,
+        showInUploadExcel: dto.showInUploadExcel ?? false,
+        gadaAssignmentEnabled: dto.gadaAssignmentEnabled ?? true,
         enrollmentScope: householdConfig.enrollmentScope,
         primaryContactStrategy: householdConfig.primaryContactStrategy,
         active: true,
@@ -519,17 +524,20 @@ export class OrgRuntimeService {
 
     const rows = (await this.ctx.dataSource.query(
       `INSERT INTO adwest.srenies (
-         name, code, description, is_service_sreny, join_us_visible, active,
+         name, code, description, is_service_sreny, join_us_visible, show_in_upload_excel,
+         gada_assignment_enabled, active,
          enrollment_scope, primary_contact_strategy, created_by, updated_by
        )
-       VALUES ($1, $2, $3, false, $4, true, $5, $6, $7, $7)
-       RETURNING id, name, description, code, active, is_service_sreny, join_us_visible,
-                 enrollment_scope, primary_contact_strategy, created_by, updated_by, created_at, updated_at`,
+       VALUES ($1, $2, $3, false, $4, $5, $6, true, $7, $8, $9, $9)
+       RETURNING id, name, description, code, active, is_service_sreny, join_us_visible, show_in_upload_excel,
+                 gada_assignment_enabled, enrollment_scope, primary_contact_strategy, created_by, updated_by, created_at, updated_at`,
       [
         dto.name,
         dto.code ?? null,
         dto.description ?? null,
         dto.joinUsVisible ?? false,
+        dto.showInUploadExcel ?? false,
+        dto.gadaAssignmentEnabled ?? true,
         householdConfig.enrollmentScope,
         householdConfig.primaryContactStrategy,
         actorEmail ?? null,
@@ -542,6 +550,7 @@ export class OrgRuntimeService {
       active: boolean;
       is_service_sreny: boolean;
       join_us_visible: boolean;
+      show_in_upload_excel: boolean;
       enrollment_scope: string | null;
       primary_contact_strategy: string | null;
       created_by: string | null;
@@ -601,13 +610,13 @@ export class OrgRuntimeService {
   async updateSreniDefinition(sreniId: string, dto: UpdateSreniDefinitionDto, actorEmail?: string): Promise<SrenyRecord> {
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource && !this.ctx.srenies.has(sreniId)) {
       const rows = await this.ctx.dataSource.query(
-        `SELECT id, name, code, description, active, is_service_sreny, join_us_visible,
+        `SELECT id, name, code, description, active, is_service_sreny, join_us_visible, show_in_upload_excel,
                 enrollment_scope, primary_contact_strategy, created_by, updated_by, created_at, updated_at
          FROM adwest.srenies WHERE id=$1`,
         [sreniId],
       ) as Array<{
         id: string; name: string; code: string | null; description: string | null; active: boolean;
-        is_service_sreny: boolean; join_us_visible: boolean;
+        is_service_sreny: boolean; join_us_visible: boolean; show_in_upload_excel: boolean;
         enrollment_scope: string | null; primary_contact_strategy: string | null;
         created_by: string | null; updated_by: string | null;
         created_at: string | Date; updated_at: string | Date;
@@ -637,6 +646,8 @@ export class OrgRuntimeService {
         description: dto.description !== undefined ? dto.description : current.description,
         active: dto.active !== undefined ? dto.active : current.active,
         joinUsVisible: dto.joinUsVisible !== undefined ? dto.joinUsVisible : current.joinUsVisible,
+        showInUploadExcel: dto.showInUploadExcel !== undefined ? dto.showInUploadExcel : current.showInUploadExcel,
+        gadaAssignmentEnabled: dto.gadaAssignmentEnabled !== undefined ? dto.gadaAssignmentEnabled : current.gadaAssignmentEnabled,
         enrollmentScope: dto.enrollmentScope ?? current.enrollmentScope,
         primaryContactStrategy: dto.primaryContactStrategy ?? current.primaryContactStrategy,
         updatedBy: actorEmail ?? current.updatedBy,
@@ -651,6 +662,10 @@ export class OrgRuntimeService {
     const nextDescription = dto.description !== undefined ? dto.description : current.description ?? null;
     const nextActive = dto.active !== undefined ? dto.active : current.active;
     const nextJoinUsVisible = dto.joinUsVisible !== undefined ? dto.joinUsVisible : current.joinUsVisible;
+    const nextShowInUploadExcel = dto.showInUploadExcel !== undefined ? dto.showInUploadExcel : current.showInUploadExcel ?? false;
+    const nextGadaAssignmentEnabled = dto.gadaAssignmentEnabled !== undefined
+      ? dto.gadaAssignmentEnabled
+      : current.gadaAssignmentEnabled ?? true;
     const nextEnrollmentScope = dto.enrollmentScope ?? current.enrollmentScope ?? null;
     const nextPrimaryContactStrategy = dto.primaryContactStrategy ?? current.primaryContactStrategy ?? null;
 
@@ -661,13 +676,15 @@ export class OrgRuntimeService {
            description = $4,
            active      = $5,
            join_us_visible = $6,
-           enrollment_scope = $7,
-           primary_contact_strategy = $8,
-           updated_by  = $9,
+           show_in_upload_excel = $7,
+           gada_assignment_enabled = $8,
+           enrollment_scope = $9,
+           primary_contact_strategy = $10,
+           updated_by  = $11,
            updated_at  = now()
        WHERE id = $1
-       RETURNING id, name, description, code, active, is_service_sreny, join_us_visible,
-                 enrollment_scope, primary_contact_strategy, created_by, updated_by, created_at, updated_at`,
+       RETURNING id, name, description, code, active, is_service_sreny, join_us_visible, show_in_upload_excel,
+                 gada_assignment_enabled, enrollment_scope, primary_contact_strategy, created_by, updated_by, created_at, updated_at`,
       [
         sreniId,
         nextName,
@@ -675,13 +692,15 @@ export class OrgRuntimeService {
         nextDescription,
         nextActive,
         nextJoinUsVisible,
+        nextShowInUploadExcel,
+        nextGadaAssignmentEnabled,
         nextEnrollmentScope,
         nextPrimaryContactStrategy,
         actorEmail ?? null,
       ],
     )) as unknown as [Array<{
       id: string; name: string; description: string | null; code: string | null; active: boolean;
-      is_service_sreny: boolean; join_us_visible: boolean;
+      is_service_sreny: boolean; join_us_visible: boolean; show_in_upload_excel: boolean;
       enrollment_scope: string | null; primary_contact_strategy: string | null;
       created_by: string | null; updated_by: string | null;
       created_at: string | Date; updated_at: string | Date;

@@ -30,10 +30,11 @@ export function buildColumnItems(
   return result;
 }
 
-export function useTableLayout(tableKey: string) {
+export function useTableLayout(tableKey: string, options?: { enabled?: boolean }) {
+  const enabled = options?.enabled ?? true;
   const [layouts, setLayouts] = useState<TableLayoutApi[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -46,7 +47,10 @@ export function useTableLayout(tableKey: string) {
       .finally(() => setLoading(false));
   }, [tableKey]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!enabled) return;
+    load();
+  }, [load, enabled]);
 
   // Returns ColumnItems (ordered, with visibility) for given full column list
   const getColumnItems = useCallback(

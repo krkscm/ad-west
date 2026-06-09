@@ -10,11 +10,12 @@ import {
   Query,
   Res,
   UploadedFile,
+  UploadedFiles,
   UseGuards,
   UseInterceptors,
   BadRequestException,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage, memoryStorage } from 'multer';
 import { createReadStream } from 'fs';
 import * as pathLib from 'path';
@@ -78,11 +79,18 @@ import {
   UpdateSreniDivisionDto,
   AssignContactDivisionDto,
   AssignContactSthanDto,
+  RegisterGadanayakDto,
+  AssignContactGadaDto,
+  BulkAssignContactGadaDto,
+  CompleteJoinUsReviewDto,
   CreateHouseholdMemberDto,
+  CreateSevaContributionDto,
   SetContactActiveDto,
   SetContactSreniTagsDto,
   UpdateContactDataDto,
   UpdateHouseholdMemberDto,
+  UpdateSevaContributionDto,
+  MemberContactCommitDto,
 } from './dto/core-business.dto';
 import { CoreBusinessService } from './core-business.service';
 
@@ -757,21 +765,98 @@ export class CoreBusinessController {
     @Param('sreniId') sreniId: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @Query('gadaFilter') gadaFilter?: 'all' | 'unassigned' | 'mine',
+    @Query('gadanayakUserId') gadanayakUserId?: string,
+    @CurrentUser() actor?: AuthPrincipal,
   ) {
     return this.service.listSreniContacts(
       sreniId,
       page ? parseInt(page, 10) : 1,
       pageSize ? parseInt(pageSize, 10) : 50,
+      actor,
+      {
+        filter: gadaFilter,
+        gadanayakUserId,
+      },
     );
   }
 
-  @Post('org/sreni-definitions/:sreniId/contacts/upload')
+  @Get('org/sreni-definitions/:sreniId/gadanayaks')
+  @UseGuards(CoreAdminAuthGuard)
+  listSreniGadanayaks(
+    @Param('sreniId') sreniId: string,
+    @Query('sthanId') sthanId: string | undefined,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.listSreniGadanayaks(sreniId, actor, sthanId);
+  }
+
+  @Get('org/sreni-definitions/:sreniId/gadanayak-eligible-users')
+  @UseGuards(CoreAdminAuthGuard)
+  listEligibleGadanayakUsers(
+    @Param('sreniId') sreniId: string,
+    @Query('sthanId') sthanId: string,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.listEligibleGadanayakUsers(sreniId, sthanId, actor);
+  }
+
+  @Post('org/sreni-definitions/:sreniId/gadanayaks')
+  @UseGuards(CoreAdminAuthGuard)
+  registerSreniGadanayak(
+    @Param('sreniId') sreniId: string,
+    @Body() dto: RegisterGadanayakDto,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.registerSreniGadanayak(sreniId, dto.sthanId, dto.userId, actor);
+  }
+
+  @Delete('org/sreni-definitions/:sreniId/gadanayaks/:gadanayakId')
+  @UseGuards(CoreAdminAuthGuard)
+  removeSreniGadanayak(
+    @Param('sreniId') sreniId: string,
+    @Param('gadanayakId') gadanayakId: string,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.removeSreniGadanayak(sreniId, gadanayakId, actor);
+  }
+
+  @Patch('org/sreni-definitions/:sreniId/contacts/:contactId/gada')
+  @UseGuards(CoreAdminAuthGuard)
+  assignContactGada(
+    @Param('sreniId') sreniId: string,
+    @Param('contactId') contactId: string,
+    @Body() dto: AssignContactGadaDto,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.assignContactGada(sreniId, contactId, dto.gadanayakUserId, actor);
+  }
+
+  @Delete('org/sreni-definitions/:sreniId/contacts/:contactId/gada')
+  @UseGuards(CoreAdminAuthGuard)
+  unassignContactGada(
+    @Param('sreniId') sreniId: string,
+    @Param('contactId') contactId: string,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.unassignContactGada(sreniId, contactId, actor);
+  }
+
+  @Post('org/sreni-definitions/:sreniId/contacts/gada/bulk')
+  @UseGuards(CoreAdminAuthGuard)
+  bulkAssignContactGada(
+    @Param('sreniId') sreniId: string,
+    @Body() dto: BulkAssignContactGadaDto,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.bulkAssignContactGada(sreniId, dto.contactIds, dto.gadanayakUserId, actor);
+  }
+
+  @Post('org/sreni-definitions/:sreniId/contacts/upload/preview')
   @UseGuards(CoreAdminAuthGuard)
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
-  async uploadSreniContacts(
-    @Param('sreniId') sreniId: string,
+  async previewSreniContactUpload(
     @UploadedFile() file: Express.Multer.File | undefined,
-    @CurrentUser() actor?: AuthPrincipal,
   ) {
     if (!file) throw new BadRequestException('No file uploaded. Send the Excel file as "file" in a multipart/form-data request.');
     const allowedMimes = [
@@ -782,13 +867,99 @@ export class CoreBusinessController {
     if (!allowedMimes.includes(file.mimetype) && !file.originalname.match(/\.(xlsx|xls)$/i)) {
       throw new BadRequestException('Only .xlsx and .xls files are accepted.');
     }
-    return this.service.uploadSreniContacts(sreniId, file.buffer, file.originalname, actor?.email ?? actor?.userId);
+    return this.service.previewMemberContactUpload(file.buffer);
   }
 
   @Delete('org/sreni-definitions/:sreniId/contacts')
   @UseGuards(CoreAdminAuthGuard)
-  async clearSreniContacts(@Param('sreniId') sreniId: string) {
-    return this.service.clearSreniContacts(sreniId);
+  async clearSreniContacts(
+    @Param('sreniId') sreniId: string,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.clearSreniContacts(sreniId, actor);
+  }
+
+  @Get('org/contacts/upload-template')
+  @UseGuards(CoreAdminAuthGuard)
+  async downloadMemberContactTemplate(@Res() res: Response) {
+    const buffer = await this.service.downloadMemberContactTemplate();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="Member_Data_Upload_Template.xlsx"');
+    res.send(buffer);
+  }
+
+  @Post('org/contacts/upload/preview')
+  @UseGuards(CoreAdminAuthGuard)
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async previewMemberContactUpload(
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ) {
+    if (!file) throw new BadRequestException('No file uploaded. Send the Excel file as "file" in a multipart/form-data request.');
+    const allowedMimes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'application/octet-stream',
+    ];
+    if (!allowedMimes.includes(file.mimetype) && !file.originalname.match(/\.(xlsx|xls)$/i)) {
+      throw new BadRequestException('Only .xlsx and .xls files are accepted.');
+    }
+    return this.service.previewMemberContactUpload(file.buffer);
+  }
+
+  @Post('org/contacts/upload/commit')
+  @UseGuards(CoreAdminAuthGuard)
+  async commitMemberContactUpload(
+    @Body() dto: MemberContactCommitDto,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.commitMemberContactUpload(
+      dto.decisions,
+      dto.sourceFile ?? 'member-upload',
+      actor,
+      actor.email ?? actor.userId,
+    );
+  }
+
+  @Patch('org/contacts/:contactId')
+  @UseGuards(CoreAdminAuthGuard)
+  updateHouseholdContact(
+    @Param('contactId') contactId: string,
+    @Body() dto: UpdateContactDataDto,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.updateHouseholdContact(contactId, dto.data, actor);
+  }
+
+  @Get('org/join-us-submissions')
+  @UseGuards(CoreAdminAuthGuard)
+  listJoinUsSubmissions(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('status') status?: 'pending' | 'completed' | 'all',
+    @Query('sreniId') sreniId?: string,
+    @Query('search') search?: string,
+    @CurrentUser() actor?: AuthPrincipal,
+  ) {
+    return this.service.listJoinUsSubmissions(
+      {
+        page: page ? parseInt(page, 10) : 1,
+        pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+        status: status ?? 'pending',
+        sreniId: sreniId?.trim() || undefined,
+        search: search?.trim() || undefined,
+      },
+      actor!,
+    );
+  }
+
+  @Post('org/join-us-submissions/:contactId/complete-review')
+  @UseGuards(CoreAdminAuthGuard)
+  completeJoinUsReview(
+    @Param('contactId') contactId: string,
+    @Body() dto: CompleteJoinUsReviewDto,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.completeJoinUsReview(contactId, dto, actor);
   }
 
   @Get('org/contacts')
@@ -799,6 +970,7 @@ export class CoreBusinessController {
     @Query('sreniId') sreniId?: string,
     @Query('sthanId') sthanId?: string,
     @Query('search') search?: string,
+    @CurrentUser() actor?: AuthPrincipal,
   ) {
     return this.service.listAllContacts(
       page ? parseInt(page, 10) : 1,
@@ -808,26 +980,8 @@ export class CoreBusinessController {
         sthanId: sthanId?.trim() || undefined,
         search: search?.trim() || undefined,
       },
+      actor,
     );
-  }
-
-  @Post('org/contacts/upload')
-  @UseGuards(CoreAdminAuthGuard)
-  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
-  async uploadGlobalContacts(
-    @UploadedFile() file: Express.Multer.File | undefined,
-    @CurrentUser() actor?: AuthPrincipal,
-  ) {
-    if (!file) throw new BadRequestException('No file uploaded. Send the Excel file as "file" in a multipart/form-data request.');
-    const allowedMimes = [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel',
-      'application/octet-stream',
-    ];
-    if (!allowedMimes.includes(file.mimetype) && !file.originalname.match(/\.(xlsx|xls)$/i)) {
-      throw new BadRequestException('Only .xlsx and .xls files are accepted.');
-    }
-    return this.service.uploadGlobalContacts(file.buffer, file.originalname, actor?.email ?? actor?.userId);
   }
 
   @Patch('org/sreni-definitions/:sreniId/contacts/:contactId')
@@ -836,8 +990,9 @@ export class CoreBusinessController {
     @Param('sreniId') sreniId: string,
     @Param('contactId') contactId: string,
     @Body() dto: UpdateContactDataDto,
+    @CurrentUser() actor: AuthPrincipal,
   ) {
-    return this.service.updateContactData(sreniId, contactId, dto.data);
+    return this.service.updateContactData(sreniId, contactId, dto.data, actor);
   }
 
   @Patch('org/sreni-definitions/:sreniId/contacts/:contactId/division')
@@ -846,8 +1001,9 @@ export class CoreBusinessController {
     @Param('sreniId') sreniId: string,
     @Param('contactId') contactId: string,
     @Body() dto: AssignContactDivisionDto,
+    @CurrentUser() actor: AuthPrincipal,
   ) {
-    return this.service.assignContactDivision(sreniId, contactId, dto);
+    return this.service.assignContactDivision(sreniId, contactId, dto, actor);
   }
 
   @Patch('org/sreni-definitions/:sreniId/contacts/:contactId/sthan')
@@ -856,8 +1012,9 @@ export class CoreBusinessController {
     @Param('sreniId') sreniId: string,
     @Param('contactId') contactId: string,
     @Body() dto: AssignContactSthanDto,
+    @CurrentUser() actor: AuthPrincipal,
   ) {
-    return this.service.assignContactSthan(sreniId, contactId, dto);
+    return this.service.assignContactSthan(sreniId, contactId, dto, actor);
   }
 
   @Patch('org/sreni-definitions/:sreniId/contacts/:contactId/active')
@@ -866,8 +1023,9 @@ export class CoreBusinessController {
     @Param('sreniId') sreniId: string,
     @Param('contactId') contactId: string,
     @Body() dto: SetContactActiveDto,
+    @CurrentUser() actor: AuthPrincipal,
   ) {
-    return this.service.toggleContactActive(sreniId, contactId, dto.active);
+    return this.service.toggleContactActive(sreniId, contactId, dto.active, actor);
   }
 
   @Delete('org/sreni-definitions/:sreniId/contacts/:contactId')
@@ -875,8 +1033,9 @@ export class CoreBusinessController {
   deleteContact(
     @Param('sreniId') sreniId: string,
     @Param('contactId') contactId: string,
+    @CurrentUser() actor: AuthPrincipal,
   ) {
-    return this.service.deleteContact(sreniId, contactId);
+    return this.service.deleteContact(sreniId, contactId, actor);
   }
 
   @Get('org/sreni-definitions/:sreniId/contacts/:contactId/members')
@@ -884,8 +1043,9 @@ export class CoreBusinessController {
   listHouseholdMembers(
     @Param('sreniId') sreniId: string,
     @Param('contactId') contactId: string,
+    @CurrentUser() actor: AuthPrincipal,
   ) {
-    return this.service.listHouseholdMembers(sreniId, contactId);
+    return this.service.listHouseholdMembers(sreniId, contactId, actor);
   }
 
   @Post('org/sreni-definitions/:sreniId/contacts/:contactId/members')
@@ -894,8 +1054,9 @@ export class CoreBusinessController {
     @Param('sreniId') sreniId: string,
     @Param('contactId') contactId: string,
     @Body() dto: CreateHouseholdMemberDto,
+    @CurrentUser() actor: AuthPrincipal,
   ) {
-    return this.service.createHouseholdMember(sreniId, contactId, dto);
+    return this.service.createHouseholdMember(sreniId, contactId, dto, actor);
   }
 
   @Patch('org/sreni-definitions/:sreniId/contacts/:contactId/members/:memberId')
@@ -905,8 +1066,9 @@ export class CoreBusinessController {
     @Param('contactId') contactId: string,
     @Param('memberId') memberId: string,
     @Body() dto: UpdateHouseholdMemberDto,
+    @CurrentUser() actor: AuthPrincipal,
   ) {
-    return this.service.updateHouseholdMember(sreniId, contactId, memberId, dto);
+    return this.service.updateHouseholdMember(sreniId, contactId, memberId, dto, actor);
   }
 
   @Delete('org/sreni-definitions/:sreniId/contacts/:contactId/members/:memberId')
@@ -915,8 +1077,9 @@ export class CoreBusinessController {
     @Param('sreniId') sreniId: string,
     @Param('contactId') contactId: string,
     @Param('memberId') memberId: string,
+    @CurrentUser() actor: AuthPrincipal,
   ) {
-    return this.service.deleteHouseholdMember(sreniId, contactId, memberId);
+    return this.service.deleteHouseholdMember(sreniId, contactId, memberId, actor);
   }
 
   @Get('org/sreni-definitions/:sreniId/participants/stats')
@@ -944,14 +1107,133 @@ export class CoreBusinessController {
   listContactParticipants(
     @Param('sreniId') sreniId: string,
     @Param('contactId') contactId: string,
+    @CurrentUser() actor: AuthPrincipal,
   ) {
-    return this.service.listContactParticipants(sreniId, contactId);
+    return this.service.listContactParticipants(sreniId, contactId, actor);
+  }
+
+  @Get('org/sreni-definitions/:sreniId/contacts/:contactId/seva-contributions')
+  @UseGuards(CoreAdminAuthGuard)
+  listSevaContributions(
+    @Param('sreniId') sreniId: string,
+    @Param('contactId') contactId: string,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.listSevaContributions(sreniId, contactId, actor);
+  }
+
+  @Post('org/sreni-definitions/:sreniId/contacts/:contactId/seva-contributions')
+  @UseGuards(CoreAdminAuthGuard)
+  createSevaContribution(
+    @Param('sreniId') sreniId: string,
+    @Param('contactId') contactId: string,
+    @Body() dto: CreateSevaContributionDto,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.createSevaContribution(sreniId, contactId, dto, actor);
+  }
+
+  @Patch('org/sreni-definitions/:sreniId/contacts/:contactId/seva-contributions/:contributionId')
+  @UseGuards(CoreAdminAuthGuard)
+  updateSevaContribution(
+    @Param('sreniId') sreniId: string,
+    @Param('contactId') contactId: string,
+    @Param('contributionId') contributionId: string,
+    @Body() dto: UpdateSevaContributionDto,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.updateSevaContribution(sreniId, contactId, contributionId, dto, actor);
+  }
+
+  @Delete('org/sreni-definitions/:sreniId/contacts/:contactId/seva-contributions/:contributionId')
+  @UseGuards(CoreAdminAuthGuard)
+  deleteSevaContribution(
+    @Param('sreniId') sreniId: string,
+    @Param('contactId') contactId: string,
+    @Param('contributionId') contributionId: string,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.deleteSevaContribution(sreniId, contactId, contributionId, actor);
+  }
+
+  @Post('org/sreni-definitions/:sreniId/contacts/:contactId/seva-contributions/:contributionId/documents')
+  @UseGuards(CoreAdminAuthGuard)
+  @UseInterceptors(
+    FilesInterceptor('files', 10, {
+      storage: diskStorage({
+        destination: (req, _file, cb) => {
+          const base = process.env.UPLOAD_DIR ?? pathLib.join(process.cwd(), 'uploads');
+          const dir = pathLib.join(
+            base,
+            'seva-contributions',
+            req.params.contactId,
+            req.params.contributionId,
+          );
+          require('fs').mkdirSync(dir, { recursive: true });
+          cb(null, dir);
+        },
+        filename: (_req, file, cb) => {
+          const ext = pathLib.extname(file.originalname);
+          const base = pathLib.basename(file.originalname, ext).replace(/[^a-zA-Z0-9._-]/g, '_');
+          cb(null, `${Date.now()}-${base}${ext}`);
+        },
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
+  uploadSevaContributionDocuments(
+    @Param('sreniId') sreniId: string,
+    @Param('contactId') contactId: string,
+    @Param('contributionId') contributionId: string,
+    @UploadedFiles() files: Express.Multer.File[],
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    if (!files?.length) throw new BadRequestException('No files uploaded');
+    return this.service.uploadSevaContributionDocuments(sreniId, contactId, contributionId, files, actor);
+  }
+
+  @Get('org/seva-contribution-documents/:documentId/download')
+  @UseGuards(CoreAdminAuthGuard)
+  async downloadSevaContributionDocument(
+    @Param('documentId') documentId: string,
+    @Res() res: Response,
+  ) {
+    const { record, filePath } = await this.service.downloadSevaContributionDocument(documentId);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(record.fileName)}"`);
+    res.setHeader('Content-Type', record.fileType || 'application/octet-stream');
+    if (record.fileSize) res.setHeader('Content-Length', String(record.fileSize));
+    createReadStream(filePath).pipe(res as unknown as NodeJS.WritableStream);
+  }
+
+  @Delete('org/seva-contribution-documents/:documentId')
+  @UseGuards(CoreAdminAuthGuard)
+  deleteSevaContributionDocument(
+    @Param('documentId') documentId: string,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.deleteSevaContributionDocument(documentId, actor);
+  }
+
+  @Get('org/contacts/sreni-tags')
+  @UseGuards(CoreAdminAuthGuard)
+  listContactSreniTagsBatch(
+    @Query('contactIds') contactIds: string | undefined,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    const ids = (contactIds ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+    return this.service.listContactSreniTagsBatch(ids, actor);
   }
 
   @Get('org/contacts/:contactId/sreni-tags')
   @UseGuards(CoreAdminAuthGuard)
-  listContactSreniTags(@Param('contactId') contactId: string) {
-    return this.service.listContactSreniTags(contactId);
+  listContactSreniTags(
+    @Param('contactId') contactId: string,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.listContactSreniTags(contactId, actor);
   }
 
   @Put('org/contacts/:contactId/sreni-tags')
@@ -959,8 +1241,9 @@ export class CoreBusinessController {
   setContactSreniTags(
     @Param('contactId') contactId: string,
     @Body() dto: SetContactSreniTagsDto,
+    @CurrentUser() actor: AuthPrincipal,
   ) {
-    return this.service.setContactSreniTags(contactId, dto);
+    return this.service.setContactSreniTags(contactId, dto, actor);
   }
 
   // ── Sreni Divisions ────────────────────────────────────────────────────────
@@ -1199,13 +1482,11 @@ export class CoreBusinessController {
     );
   }
 
-  @Post('org/locations/:locationId/contacts/upload')
+  @Post('org/locations/:locationId/contacts/upload/preview')
   @UseGuards(CoreAdminAuthGuard)
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
-  async uploadSthanContacts(
-    @Param('locationId') locationId: string,
+  async previewSthanContactUpload(
     @UploadedFile() file: Express.Multer.File | undefined,
-    @CurrentUser() actor?: AuthPrincipal,
   ) {
     if (!file) throw new BadRequestException('No file uploaded. Send the Excel file as "file" in a multipart/form-data request.');
     const allowedMimes = [
@@ -1216,7 +1497,7 @@ export class CoreBusinessController {
     if (!allowedMimes.includes(file.mimetype) && !file.originalname.match(/\.(xlsx|xls)$/i)) {
       throw new BadRequestException('Only .xlsx and .xls files are accepted.');
     }
-    return this.service.uploadSthanContacts(locationId, file.buffer, file.originalname, actor?.email ?? actor?.userId);
+    return this.service.previewMemberContactUpload(file.buffer);
   }
 
   @Delete('org/locations/:locationId/contacts')

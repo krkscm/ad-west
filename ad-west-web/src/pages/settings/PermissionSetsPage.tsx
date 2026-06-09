@@ -6,6 +6,7 @@ import { FormSection } from '../../components/common/FormSection';
 import { FormActions } from '../../components/common/FormActions';
 import { EmptyState } from '../../components/common/EmptyState';
 import { PaginationBar } from '../../components/common/PaginationBar';
+import { useAdminDefinitions } from '../../context/admin-definitions-context';
 import { backendApi, LocationDefinitionApi, PermissionApi, PermissionSetApi } from '../../utils/backendApi';
 import { SwitchToggle } from '../../components/common/SwitchToggle';
 import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
@@ -22,6 +23,8 @@ const toUiError = (error: unknown, fallback: string): string => {
 export const PermissionSetsPage: React.FC = () => {
   const { addToast } = useToast();
   const confirm = useConfirm();
+  const { locationDefinitions } = useAdminDefinitions();
+  const permissionsLoaded = useRef(false);
 
   const [sets, setSets] = useState<PermissionSetApi[]>([]);
   const [total, setTotal] = useState(0);
@@ -48,9 +51,12 @@ export const PermissionSetsPage: React.FC = () => {
     setSelectedPermIds(new Set()); setPermSearch(''); setFormOpen(false);
   };
 
-  const loadSupport = () => {
-    backendApi.listPermissions().then((perms) => setAllPermissions(perms)).catch(() => {});
-    backendApi.listLocationDefinitions().then((locs) => setLocations(locs)).catch(() => {});
+  const ensurePermissionsLoaded = () => {
+    if (permissionsLoaded.current) return;
+    permissionsLoaded.current = true;
+    backendApi.listPermissions().then((perms) => setAllPermissions(perms)).catch(() => {
+      permissionsLoaded.current = false;
+    });
   };
 
   const loadSets = (p: number, ps: number, q: string) => {
@@ -61,7 +67,12 @@ export const PermissionSetsPage: React.FC = () => {
       .finally(() => setIsLoading(false));
   };
 
-  useEffect(() => { loadSupport(); }, []);
+  useEffect(() => { setLocations(locationDefinitions); }, [locationDefinitions]);
+
+  useEffect(() => {
+    if (formOpen) ensurePermissionsLoaded();
+  }, [formOpen]);
+
   useEffect(() => { loadSets(page, pageSize, search); }, [page, pageSize]);
 
   const handleSearchChange = (q: string) => {

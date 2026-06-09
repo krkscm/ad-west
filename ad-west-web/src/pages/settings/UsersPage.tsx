@@ -5,6 +5,7 @@ import { PageHeader } from '../../components/common/PageHeader';
 import { EmptyState } from '../../components/common/EmptyState';
 import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
 import { PaginationBar } from '../../components/common/PaginationBar';
+import { useAdminDefinitions } from '../../context/admin-definitions-context';
 import {
   backendApi,
   LocationDefinitionApi,
@@ -30,6 +31,7 @@ interface UsersPageProps {
 export const UsersPage: React.FC<UsersPageProps> = ({ onAdd, onEdit, editingUserId }) => {
   const { addToast } = useToast();
   const confirm = useConfirm();
+  const { locationDefinitions } = useAdminDefinitions();
 
   const [users, setUsers] = useState<UserApi[]>([]);
   const [total, setTotal] = useState(0);
@@ -51,12 +53,6 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onAdd, onEdit, editingUser
     } catch (e) {
       addToast(toUiError(e, 'Failed to load roles.'), 'error');
     }
-    try {
-      const loc = await backendApi.listLocationDefinitions();
-      setLocations(loc);
-    } catch (e) {
-      addToast(toUiError(e, 'Failed to load locations.'), 'error');
-    }
   };
 
   const loadUsers = async (p = page, ps = pageSize, q = search) => {
@@ -68,6 +64,10 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onAdd, onEdit, editingUser
     } catch (e) { addToast(toUiError(e, 'Failed to load users.'), 'error'); }
     finally { setIsLoading(false); }
   };
+
+  useEffect(() => {
+    setLocations(locationDefinitions);
+  }, [locationDefinitions]);
 
   useEffect(() => {
     void loadSupport();

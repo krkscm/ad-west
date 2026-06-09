@@ -18,6 +18,7 @@ export interface AdminSessionUser {
 
 export interface AuthContextType {
   token: string | null
+  memberToken: string | null
   adminUser: AdminSessionUser | null
   memberUser: Contact | null
   mustResetPassword: boolean

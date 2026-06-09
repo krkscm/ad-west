@@ -1,6 +1,14 @@
 # AD West - Multi-Project Repository
 
-This repository contains two independent projects for the AD West application.
+This repository contains three coordinated parts for the AD West application:
+
+| Part | Folder | Role |
+|------|--------|------|
+| **Web** | `ad-west-web/` | React admin, member, and public SPA |
+| **API** | `ad-west-api/` | NestJS REST API (`/api/v1`) |
+| **Docs & DB** | `ad-docs/` | Architecture docs and PostgreSQL migrations |
+
+**Documentation:** start at [ad-docs/application-documentation/README.md](./ad-docs/application-documentation/README.md).
 
 ## Projects
 
@@ -17,8 +25,11 @@ A modern React application built with Vite, TypeScript, and best practices for m
 - Context API for state management
 - Utility functions for API calls
 - Public utility entry points at `/helpdesk`, `/jobs`, and `/jobs/apply?job=<jobId>`, plus internal admin management pages for helpdesk tickets, job postings, and job applications
-- Public portal entry point at `/` and `/portal`, plus a sectioned Join Us intake at `/join-us` for Sreni-based contact registration
-- Public job applications now support optional resume uploads with client/server validation for PDF, DOC, and DOCX files up to 1 MB, and authenticated admin resume viewing
+- Public portal at `/` and `/portal`; Join Us at `/join-us`; admin review at `/admin/general-services/join-us-review`
+- Member data Excel upload with preview/commit (global and per-Sreni contacts)
+- Seva Samithi contact list with seva activity log and document attachments
+- Gada (Gadanayak) assignment UI on eligible Sreni contact lists
+- Public job applications with resume upload (PDF/DOC/DOCX) and admin resume viewing
 
 **Quick Start:**
 ```bash
@@ -76,17 +87,31 @@ npm run start:dev  # Runs on http://localhost:3001
 ```
 ad-west-api/
 ├── src/
-│   ├── common/         # Shared utilities (filters, exceptions, middleware)
-│   ├── modules/        # Feature modules
-│   │   └── health/     # Health check module
-│   ├── config/         # Configuration files
-│   ├── app.module.ts   # Root module
-│   └── main.ts         # Application entry point
-├── dist/               # Compiled output
-├── package.json
-├── tsconfig.json
+│   ├── common/              # Filters, exceptions
+│   ├── modules/
+│   │   ├── core-business/   # Org, contacts, Sreni/Sthan, documents, reports
+│   │   ├── user-management/ # Auth, menus, integrations
+│   │   ├── public-gateway/  # Helpdesk, jobs
+│   │   ├── member-services/
+│   │   ├── enum-values/
+│   │   └── health/
+│   ├── app.module.ts
+│   └── main.ts
+├── assets/templates/        # Member data upload Excel template
 └── README.md
 ```
+
+---
+
+### 3. **ad-docs** - Documentation and database migrations
+
+**Location:** `ad-docs/`
+
+- Ordered PostgreSQL scripts (`database-script/000`–`078`)
+- Application architecture reference (`application-documentation/`)
+- Templates for change requests and test cases
+
+Apply migrations before running the API against a fresh database. See [ad-docs/database-script/README.md](./ad-docs/database-script/README.md).
 
 ---
 
@@ -122,7 +147,13 @@ npm run dev
 **Terminal 2 - API:**
 ```bash
 cd ad-west-api
-npm run dev
+npm run start:dev
+```
+
+**Database (first time or after pulling new migrations):**
+```powershell
+$env:DATABASE_URL = "<your-postgresql-url>"
+psql $env:DATABASE_URL -f ad-docs/database-script/<pending-script>.sql
 ```
 
 The frontend will be available at `http://localhost:3000`
@@ -147,7 +178,8 @@ The API will be available at `http://localhost:3001`
 - **Styling:** Keep styles modular and co-located with components when possible
 - **Location Definitions:** Existing locations can now be edited and moved between `Zone` and `Sthan` levels from the settings page.
 - **Admin Navigation:** `Permission Sets` and `Users` now live as standalone full-page admin sections instead of nested settings entries.
-- **Access Grants:** The access-grants settings surface and related API routes have been removed.
+- **Contact scope:** Data visibility uses Settings Users + permission sets (not admin menu grants alone).
+- **Seva Samithi / Gada / Join Us:** See `ad-docs/application-documentation/` for current behavior.
 
 ### Backend (ad-west-api)
 - **Routes:** Organize API endpoints by feature in `app/api/`

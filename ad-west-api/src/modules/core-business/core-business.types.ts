@@ -25,6 +25,8 @@ export interface SrenyRecord {
   zoneId?: string;
   isServiceSreny: boolean;
   joinUsVisible: boolean;
+  showInUploadExcel?: boolean;
+  gadaAssignmentEnabled?: boolean;
   enrollmentScope?: string;
   primaryContactStrategy?: string;
   code?: string;
@@ -446,11 +448,50 @@ export interface SreniDivisionRecord {
   updatedAt: string;
 }
 
-export interface GlobalContactUploadDuplicate {
+export type MemberContactUploadAction = 'insert' | 'update' | 'skip';
+
+export interface MemberContactDuplicateMatch {
+  kind: 'household' | 'child';
   rowIndex: number;
-  name: string | null;
-  personalNumber: string | null;
-  existingSreniId: string | null;
+  matchKey: string;
+  existingContactId: string;
+  existingData: Record<string, string | number | boolean | null>;
+  incomingData: Record<string, string | number | boolean | null>;
+  childSlot?: number;
+  parentContactId?: string;
+  sreniId?: string;
+  sreniName?: string;
+  childName?: string;
+  childDob?: string;
+}
+
+export interface MemberContactParsedRow {
+  rowIndex: number;
+  data: Record<string, string | number | boolean | null>;
+  errors: string[];
+}
+
+export interface MemberContactPreviewResult {
+  rows: MemberContactParsedRow[];
+  duplicates: MemberContactDuplicateMatch[];
+  withinFileDuplicates: Array<{ rowIndexA: number; rowIndexB: number; matchKey: string }>;
+  sreniColumns: Array<{ sreniId: string; sreniName: string; primaryContactStrategy: string | null }>;
+  validRowCount: number;
+  errorRowCount: number;
+}
+
+export interface MemberContactCommitDecision {
+  rowIndex: number;
+  action: MemberContactUploadAction;
+  data?: Record<string, string | number | boolean | null>;
+}
+
+export interface MemberContactCommitResult {
+  inserted: number;
+  updated: number;
+  skipped: number;
+  childRowsCreated: number;
+  childRowsUpdated: number;
 }
 
 export type SreniContactCellValue = string | number | boolean | null;
@@ -510,17 +551,23 @@ export interface SreniContactRecord {
   sreniId: string | null;
   rowIndex: number;
   data: Record<string, string | number | boolean | null>;
+  contactKind?: 'household' | 'child';
+  parentContactId?: string;
+  srNo?: number;
   zoneLocationId?: string;
   sthanLocationId?: string;
   divisionLocationId?: string;
   divisionId?: string;
   sthanId?: string;
+  gadanayakUserId?: string;
+  gadanayakUserName?: string;
   active: boolean;
   sourceFile?: string;
   uploadedBy?: string;
   childCount?: number;
   childrenDivisionSummary?: string;
   participantCount?: number;
+  memberSrenis?: Array<{ sreniId: string; sreniName: string }>;
   createdAt: string;
   updatedAt: string;
 }

@@ -46,29 +46,50 @@ export class PublicSreniContactsController {
     return { items: await this.service.listPublicSreniOptions() };
   }
 
+  @Get('form-options')
+  async getFormOptions() {
+    return this.service.getPublicJoinUsFormOptions();
+  }
+
   @Post('register')
   @Throttle({ default: { limit: 6, ttl: 60000 } })
   async register(
     @Body()
     body: {
       sreniId: string;
-      fullName: string;
-      phone: string;
+      name: string;
+      mobileNo: string;
+      dateOfBirth: string;
+      familyOrBachelor: string;
       email?: string;
-      city?: string;
-      country?: string;
-      notes?: string;
-      personalNumber?: string;
-      familyOrBachelor?: string;
-      family?: string;
-      bachelor?: string;
-      addressInUae?: string;
-      company?: string;
+      bloodGroup?: string;
+      altMobileNo?: string;
       profession?: string;
-      wifeName?: string;
-      landLine?: string;
-      zoneOrLandMark?: string;
-      district?: string;
+      company?: string;
+      jobTitle?: string;
+      spouseBloodGroup?: string;
+      spouseProfession?: string;
+      spouseCompany?: string;
+      spouseName?: string;
+      spouseDateOfBirth?: string;
+      spouseMobileNo?: string;
+      spouseEmail?: string;
+      child1Name?: string;
+      child1Dob?: string;
+      child1Grade?: string;
+      child2Name?: string;
+      child2Dob?: string;
+      child2Grade?: string;
+      child3Name?: string;
+      child3Dob?: string;
+      child3Grade?: string;
+      addressInUae?: string;
+      landLineNo?: string;
+      home?: string;
+      addressInIndia?: string;
+      districtIndia?: string;
+      googleMapLink?: string;
+      remarks?: string;
       captchaToken: string;
       captchaAnswer: string;
       website?: string;
@@ -81,28 +102,46 @@ export class PublicSreniContactsController {
       throw new BadRequestException('Captcha validation failed.');
     }
     if (!body.sreniId?.trim()) throw new BadRequestException('Sreni is required.');
-    if (!body.fullName?.trim()) throw new BadRequestException('Full name is required.');
-    if (!body.phone?.trim()) throw new BadRequestException('Phone number is required.');
+    if (!body.name?.trim()) throw new BadRequestException('Name (Primary Member) is required.');
+    if (!body.mobileNo?.trim()) throw new BadRequestException('Mobile No is required.');
+    if (!body.dateOfBirth?.trim()) throw new BadRequestException('Date of Birth is required.');
+    if (!body.familyOrBachelor?.trim()) throw new BadRequestException('Family / Bachelor is required.');
 
     return this.service.submitPublicSreniContact({
       sreniId: body.sreniId,
-      fullName: body.fullName,
-      phone: body.phone,
-      email: body.email,
-      city: body.city,
-      country: body.country,
-      notes: body.notes,
-      personalNumber: body.personalNumber,
+      name: body.name,
+      mobileNo: body.mobileNo,
+      dateOfBirth: body.dateOfBirth,
       familyOrBachelor: body.familyOrBachelor,
-      family: body.family,
-      bachelor: body.bachelor,
-      addressInUae: body.addressInUae,
-      company: body.company,
+      email: body.email,
+      bloodGroup: body.bloodGroup,
+      altMobileNo: body.altMobileNo,
       profession: body.profession,
-      wifeName: body.wifeName,
-      landLine: body.landLine,
-      zoneOrLandMark: body.zoneOrLandMark,
-      district: body.district,
+      company: body.company,
+      jobTitle: body.jobTitle,
+      spouseName: body.spouseName,
+      spouseDateOfBirth: body.spouseDateOfBirth,
+      spouseMobileNo: body.spouseMobileNo,
+      spouseEmail: body.spouseEmail,
+      spouseBloodGroup: body.spouseBloodGroup,
+      spouseProfession: body.spouseProfession,
+      spouseCompany: body.spouseCompany,
+      child1Name: body.child1Name,
+      child1Dob: body.child1Dob,
+      child1Grade: body.child1Grade,
+      child2Name: body.child2Name,
+      child2Dob: body.child2Dob,
+      child2Grade: body.child2Grade,
+      child3Name: body.child3Name,
+      child3Dob: body.child3Dob,
+      child3Grade: body.child3Grade,
+      addressInUae: body.addressInUae,
+      landLineNo: body.landLineNo,
+      home: body.home,
+      addressInIndia: body.addressInIndia,
+      districtIndia: body.districtIndia,
+      googleMapLink: body.googleMapLink,
+      remarks: body.remarks,
       submittedFrom: 'public_join_us_page',
     });
   }

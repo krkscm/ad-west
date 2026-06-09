@@ -125,6 +125,51 @@ export class CoreBusinessDbBootstrapService {
         CREATE INDEX IF NOT EXISTS idx_analytics_studio_layouts_owner
         ON adwest.analytics_studio_layouts (sreni_id, user_id, layout_type, updated_at DESC)
       `);
+      await this.dataSource.query(`
+        CREATE TABLE IF NOT EXISTS adwest.seva_samithi_contacts (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          contact_id UUID NOT NULL REFERENCES adwest.sreni_contacts(id) ON DELETE CASCADE,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          CONSTRAINT uq_seva_samithi_contacts_contact UNIQUE (contact_id)
+        )
+      `);
+      await this.dataSource.query(`
+        CREATE INDEX IF NOT EXISTS idx_seva_samithi_contacts_contact_id
+        ON adwest.seva_samithi_contacts (contact_id)
+      `);
+      await this.dataSource.query(`
+        CREATE TABLE IF NOT EXISTS adwest.seva_samithi_contributions (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          contact_id UUID NOT NULL REFERENCES adwest.sreni_contacts(id) ON DELETE CASCADE,
+          activity_date DATE NOT NULL,
+          seva_activity TEXT,
+          details TEXT,
+          created_by TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `);
+      await this.dataSource.query(`
+        CREATE INDEX IF NOT EXISTS idx_seva_samithi_contributions_contact_date
+        ON adwest.seva_samithi_contributions (contact_id, activity_date DESC)
+      `);
+      await this.dataSource.query(`
+        CREATE TABLE IF NOT EXISTS adwest.seva_samithi_contribution_documents (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          contribution_id UUID NOT NULL REFERENCES adwest.seva_samithi_contributions(id) ON DELETE CASCADE,
+          file_name TEXT NOT NULL,
+          file_type TEXT,
+          file_path TEXT NOT NULL,
+          file_size BIGINT,
+          uploaded_by TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `);
+      await this.dataSource.query(`
+        CREATE INDEX IF NOT EXISTS idx_seva_samithi_contribution_documents_contribution
+        ON adwest.seva_samithi_contribution_documents (contribution_id)
+      `);
       // Add Reports menu for any existing srenies that don't yet have one.
       await this.dataSource.query(`
         INSERT INTO adwest.menu_items (id, key, label, parent_key, icon, sort_order, active, created_at, updated_at)

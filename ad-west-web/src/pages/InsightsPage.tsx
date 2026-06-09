@@ -10,6 +10,7 @@ import {
   Tooltip as RTooltip,
   Cell,
 } from 'recharts'
+import { useAdminDefinitions } from '../context/admin-definitions-context'
 import { backendApi } from '../utils/backendApi'
 
 type InsightDatePreset = 'last_1_month' | 'last_3_months' | 'last_6_months' | 'last_1_year' | 'custom'
@@ -104,6 +105,7 @@ const toMonthIso = (year: number, month: number): string => `${year}-${String(mo
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function InsightsPage() {
+  const { sreniDefinitions, activeSthanLocations } = useAdminDefinitions()
   const [loading, setLoading] = useState(true)
   const [datePreset, setDatePreset] = useState<InsightDatePreset>('last_1_month')
 
@@ -154,20 +156,21 @@ export function InsightsPage() {
 
       if (!cancelled) setLoading(true)
 
-      const [sr, locations, mr] = await Promise.allSettled([
-        backendApi.listSreniDefinitions(),
-        backendApi.listLocationDefinitions(),
-        backendApi.listAllMonthlyReports(selectedRange),
-      ])
+      const sreniItems = sreniDefinitions
+      const sthanItems = activeSthanLocations
+
+      if (sreniItems.length === 0 && sthanItems.length === 0) {
+        if (!cancelled) {
+          setSrenies([])
+          setSthans([])
+          setLoading(false)
+        }
+        return
+      }
+
+      const mr = await Promise.allSettled([backendApi.listAllMonthlyReports(selectedRange)]).then((r) => r[0])
 
       if (cancelled) return
-
-      const sreniItems = sr.status === 'fulfilled'
-        ? (Array.isArray(sr.value) ? sr.value : (sr.value as any).items ?? [])
-        : []
-      const sthanItems = locations.status === 'fulfilled'
-        ? locations.value.filter((location: any) => location.level === 'STHAN' && location.active)
-        : []
 
       setSrenies(sreniItems)
       setSthans(sthanItems)
@@ -262,7 +265,7 @@ export function InsightsPage() {
     return () => {
       cancelled = true
     }
-  }, [customDateRangeInvalid, selectedRange])
+  }, [customDateRangeInvalid, selectedRange, sreniDefinitions, activeSthanLocations])
 
   const contactsBySreni = useMemo(() => {
     return srenies
@@ -499,7 +502,7 @@ export function InsightsPage() {
 
       {/* Row 1: Contacts */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-        <ChartCard title="Sreni Participants" subtitle={`${kpis.sreniContactsTotal} resolved participants (households, children, or ladies)`}>
+        <ChartCard title="Sreni Participants" subtitle={`${kpis.sreniContactsTotal} resolved participants (family contacts, children, or women)`}>
           {renderHorizontalBar(contactsBySreni, 'Participants', 'No Sreni participant data yet')}
         </ChartCard>
 

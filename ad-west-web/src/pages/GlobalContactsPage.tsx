@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../components/common/Toast';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { Modal } from '../components/common/Modal';
 import { ContactEditModal } from '../components/common/ContactEditModal';
 import { ContactUploadModal, GLOBAL_CONTACT_UPLOAD_DESCRIPTION } from '../components/common/ContactUploadModal';
-import { buildContactEditFields, MASTER_CONTACT_COLUMN_LABELS, orderContactColumns } from '../constants/contactColumns';
+import { buildContactEditFieldSections, MASTER_CONTACT_COLUMN_LABELS, orderContactColumns } from '../constants/contactColumns';
 import { TableLayoutModal } from '../components/common/TableLayoutModal';
 import { SwitchToggle } from '../components/common/SwitchToggle';
 import { PageHeader } from '../components/common/PageHeader';
@@ -12,6 +12,7 @@ import { PAGE_SIZE_OPTIONS, PaginationBar } from '../components/common/Paginatio
 import { EmptyState } from '../components/common/EmptyState';
 import { TableRowActionsMenu } from '../components/common/TableRowActionsMenu';
 import { useTableLayout } from '../hooks/useTableLayout';
+import { useAdminDefinitions } from '../context/admin-definitions-context';
 import {
   backendApi,
   ContactSreniTagApi,
@@ -205,9 +206,18 @@ const AssignTagsModal: React.FC<AssignTagsModalProps> = ({
 export const GlobalContactsPage: React.FC = () => {
   const { addToast } = useToast();
   const confirm = useConfirm();
+  const {
+    sreniDefinitions,
+    locationDefinitions,
+    uploadSrenies: contextUploadSrenies,
+    locationNames: contextLocationNames,
+    ensureSthansLoaded: contextEnsureSthansLoaded,
+    sthans: contextSthans,
+  } = useAdminDefinitions();
 
-  // ── Table layout ──
-  const layout = useTableLayout('global-contacts');
+  // ── Table layout (deferred until contacts load or Columns is opened) ──
+  const [layoutEnabled, setLayoutEnabled] = useState(false);
+  const layout = useTableLayout('global-contacts', { enabled: layoutEnabled });
   const [showLayoutModal, setShowLayoutModal] = useState(false);
 
   // ── Data state ──
@@ -218,10 +228,16 @@ export const GlobalContactsPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
 
-  // ── Reference data ──
-  const [srenies, setSrenies] = useState<SreniDefinitionApi[]>([]);
-  const [sthans, setSthans] = useState<SthanBasicApi[]>([]);
+  // ── Reference data (from admin shell; extra locations lazy-loaded for edit) ──
+  const [srenies, setSrenies] = useState<SreniDefinitionApi[]>(sreniDefinitions);
+  const [sthans, setSthans] = useState<SthanBasicApi[]>(contextSthans);
+  const [locationNames, setLocationNames] = useState(contextLocationNames);
   const [divisionsBySreni, setDivisionsBySreni] = useState<Map<string, SreniDivisionApi[]>>(new Map());
+  const locationsLoaded = useRef(locationDefinitions.length > 0);
+
+  // ── Batch-loaded additional sreni tags for current page ──
+  const [tagsByContactId, setTagsByContactId] = useState<Record<string, ContactSreniTagApi[]>>({});
+  const [tagsLoading, setTagsLoading] = useState(false);
 
   // ── Filter state ──
   const [filterSreniId, setFilterSreniId] = useState('');
@@ -297,15 +313,83 @@ export const GlobalContactsPage: React.FC = () => {
   }, [addToast, pageSize]);
 
   useEffect(() => {
-    backendApi.listSreniDefinitions()
-      .then((items) => {
-        setSrenies(items);
+    setSrenies(sreniDefinitions);
+  }, [sreniDefinitions]);
+
+  useEffect(() => {
+    setLocationNames(contextLocationNames);
+    if (contextLocationNames.length > 0) locationsLoaded.current = true;
+  }, [contextLocationNames]);
+
+  useEffect(() => {
+    setSthans(contextSthans);
+  }, [contextSthans]);
+
+  const ensureSthansLoaded = useCallback(() => {
+    contextEnsureSthansLoaded();
+  }, [contextEnsureSthansLoaded]);
+
+  const ensureLocationsLoaded = useCallback(() => {
+    if (locationsLoaded.current) return;
+    if (locationDefinitions.length > 0) {
+      setLocationNames(contextLocationNames);
+      locationsLoaded.current = true;
+      return;
+    }
+    locationsLoaded.current = true;
+    backendApi.listLocationDefinitions()
+      .then((items) => setLocationNames(items.map((l) => ({ name: l.name, level: l.level }))))
+      .catch(() => { locationsLoaded.current = false; });
+  }, [locationDefinitions.length, contextLocationNames]);
+
+  useEffect(() => {
+    if (!isLoading && (rows.length > 0 || total > 0)) {
+      setLayoutEnabled(true);
+    }
+  }, [isLoading, rows.length, total]);
+
+  useEffect(() => {
+    const contactIds = rows.map((row) => row.id);
+    if (!contactIds.length) {
+      setTagsByContactId({});
+      setTagsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setTagsLoading(true);
+    backendApi.listContactSreniTagsBatch(contactIds)
+      .then((byContactId) => {
+        if (!cancelled) setTagsByContactId(byContactId);
       })
-      .catch(() => {});
-    backendApi.listSthans()
-      .then(setSthans)
-      .catch(() => {});
-  }, []);
+      .catch(() => {
+        if (!cancelled) setTagsByContactId({});
+      })
+      .finally(() => {
+        if (!cancelled) setTagsLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [rows]);
+
+  useEffect(() => {
+    if (rows.some((row) => row.sthanId)) {
+      ensureSthansLoaded();
+    }
+  }, [rows, ensureSthansLoaded]);
+
+  const editFieldOptions = useMemo(() => ({
+    uploadSrenies: contextUploadSrenies.length > 0
+      ? contextUploadSrenies
+      : srenies.filter((s) => s.showInUploadExcel).map((s) => ({ id: s.id, name: s.name })),
+    sthanNames: locationNames.filter((l) => l.level === 'STHAN').map((l) => l.name),
+    zoneNames: locationNames.filter((l) => l.level === 'ZONE').map((l) => l.name),
+  }), [contextUploadSrenies, srenies, locationNames]);
+
+  const editSections = useMemo(
+    () => (editTarget ? buildContactEditFieldSections(columns, editTarget.data, editFieldOptions) : []),
+    [editTarget, columns, editFieldOptions],
+  );
 
   useEffect(() => {
     load(1, filterSreniId, filterSthanId, appliedSearch);
@@ -315,14 +399,30 @@ export const GlobalContactsPage: React.FC = () => {
   const sthanById = useMemo(() => new Map(sthans.map((s) => [s.id, s.name])), [sthans]);
   const sreniById = useMemo(() => new Map(srenies.map((s) => [s.id, s.name])), [srenies]);
 
+  const openEdit = useCallback((row: SreniContactRowApi) => {
+    ensureLocationsLoaded();
+    setEditTarget(row);
+  }, [ensureLocationsLoaded]);
+
   const openAssign = async (contact: SreniContactRowApi) => {
+    ensureSthansLoaded();
     setAssignContact(contact);
+    loadDivisions(contact.sreniId);
+
+    const cachedTags = tagsByContactId[contact.id];
+    if (cachedTags !== undefined) {
+      setExistingTags(cachedTags);
+      setIsLoadingTags(false);
+      cachedTags.forEach((t) => loadDivisions(t.sreniId));
+      return;
+    }
+
     setExistingTags([]);
     setIsLoadingTags(true);
-    loadDivisions(contact.sreniId);
     try {
       const tags = await backendApi.listContactSreniTags(contact.id);
       setExistingTags(tags);
+      setTagsByContactId((prev) => ({ ...prev, [contact.id]: tags }));
       tags.forEach((t) => loadDivisions(t.sreniId));
     } catch {
       // non-critical — modal opens with empty tags
@@ -337,14 +437,22 @@ export const GlobalContactsPage: React.FC = () => {
     sreniTags: Array<{ sreniId: string; divisionId: string | null }>;
   }) => {
     if (!assignContact) return;
+    const assignmentSreniId = assignContact.sreniId
+      ?? args.sreniTags[0]?.sreniId
+      ?? existingTags[0]?.sreniId
+      ?? '';
+    if (!assignmentSreniId) {
+      addToast('Cannot assign: no Sreni context for this contact.', 'error');
+      return;
+    }
     setIsSavingAssign(true);
     try {
       await Promise.all([
         args.sthanId !== (assignContact.sthanId ?? null)
-          ? backendApi.assignContactSthan(assignContact.sreniId, assignContact.id, args.sthanId)
+          ? backendApi.assignContactSthan(assignmentSreniId, assignContact.id, args.sthanId)
           : Promise.resolve(),
         args.primaryDivisionId !== (assignContact.divisionId ?? null)
-          ? backendApi.assignContactDivision(assignContact.sreniId, assignContact.id, args.primaryDivisionId)
+          ? backendApi.assignContactDivision(assignmentSreniId, assignContact.id, args.primaryDivisionId)
           : Promise.resolve(),
         backendApi.setContactSreniTags(assignContact.id, args.sreniTags),
       ]);
@@ -354,6 +462,8 @@ export const GlobalContactsPage: React.FC = () => {
         sthanId: args.sthanId ?? undefined,
         divisionId: args.primaryDivisionId ?? undefined,
       }));
+      const refreshedTags = await backendApi.listContactSreniTags(assignContact.id);
+      setTagsByContactId((prev) => ({ ...prev, [assignContact.id]: refreshedTags }));
       setAssignContact(null);
       addToast('Assignments saved.', 'success');
     } catch (err) {
@@ -388,7 +498,7 @@ export const GlobalContactsPage: React.FC = () => {
     if (!editTarget) return;
     setIsSavingEdit(true);
     try {
-      const updated = await backendApi.updateSreniContact(editTarget.sreniId, editTarget.id, data);
+      const updated = await backendApi.updateHouseholdContact(editTarget.id, data);
       setRows((prev) => prev.map((r) => r.id !== editTarget.id ? r : { ...r, data: updated.data }));
       setEditTarget(null);
       addToast('Contact updated.', 'success');
@@ -451,7 +561,7 @@ export const GlobalContactsPage: React.FC = () => {
       <ContactEditModal
         isOpen={editTarget !== null}
         title={editTarget?.data['name'] != null ? `Edit — ${String(editTarget.data['name'])}` : 'Edit Contact'}
-        fields={editTarget ? buildContactEditFields(columns, editTarget.data) : []}
+        sections={editSections}
         data={editTarget?.data ?? {}}
         isSaving={isSavingEdit}
         onClose={() => setEditTarget(null)}
@@ -461,9 +571,8 @@ export const GlobalContactsPage: React.FC = () => {
       <ContactUploadModal
         isOpen={showUploadModal}
         description={GLOBAL_CONTACT_UPLOAD_DESCRIPTION}
-        duplicateSreniById={sreniById}
         onClose={() => setShowUploadModal(false)}
-        onUpload={(file) => backendApi.uploadGlobalContacts(file)}
+        previewUpload={(file) => backendApi.previewMemberContactUpload(file)}
         onUploaded={() => {
           setPage(1);
           load(1, filterSreniId, filterSthanId, appliedSearch);
@@ -531,7 +640,12 @@ export const GlobalContactsPage: React.FC = () => {
 
         <div style={{ flex: '1 1 160px' }}>
           <label className="form-label" style={{ marginBottom: '4px' }}>Filter by Sthan</label>
-          <select className="form-input" value={filterSthanId} onChange={(e) => setFilterSthanId(e.target.value)}>
+          <select
+            className="form-input"
+            value={filterSthanId}
+            onFocus={ensureSthansLoaded}
+            onChange={(e) => setFilterSthanId(e.target.value)}
+          >
             <option value="">All Sthans</option>
             {sthans.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
@@ -544,7 +658,7 @@ export const GlobalContactsPage: React.FC = () => {
           type="button"
           className="btn btn-secondary"
           style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-          onClick={() => setShowLayoutModal(true)}
+          onClick={() => { setLayoutEnabled(true); setShowLayoutModal(true); }}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
@@ -560,7 +674,7 @@ export const GlobalContactsPage: React.FC = () => {
       </div>
 
       {/* Table */}
-      {(isLoading && rows.length === 0) || layout.loading ? (
+      {isLoading && rows.length === 0 ? (
         <div className="glass-panel loading-state">Loading contacts…</div>
       ) : !isLoading && total === 0 ? (
         <EmptyState
@@ -625,7 +739,31 @@ export const GlobalContactsPage: React.FC = () => {
                             </span>
                           </td>
                           <td>
-                            <AdditionalSreniTags contactId={row.id} sreniById={sreniById} />
+                            {tagsLoading && tagsByContactId[row.id] === undefined ? (
+                              <span style={{ opacity: 0.35, fontSize: '0.8rem' }}>…</span>
+                            ) : (tagsByContactId[row.id] ?? []).length === 0 ? (
+                              <span style={{ opacity: 0.35, fontSize: '0.84rem' }}>—</span>
+                            ) : (
+                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                {(tagsByContactId[row.id] ?? []).map((t) => (
+                                  <span
+                                    key={t.id}
+                                    style={{
+                                      fontSize: '0.73rem',
+                                      fontWeight: 600,
+                                      background: 'rgba(249,115,22,0.1)',
+                                      color: '#fb923c',
+                                      padding: '2px 7px',
+                                      borderRadius: '5px',
+                                      border: '1px solid rgba(249,115,22,0.25)',
+                                      whiteSpace: 'nowrap',
+                                    }}
+                                  >
+                                    {sreniById.get(t.sreniId) ?? t.sreniId}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </td>
                           <td>
                             {divName
@@ -649,7 +787,7 @@ export const GlobalContactsPage: React.FC = () => {
                             <TableRowActionsMenu
                               ariaLabel={`Actions for ${row.data['name'] != null ? String(row.data['name']) : 'contact'}`}
                               actions={[
-                                { label: 'Edit', onClick: () => setEditTarget(row) },
+                                { label: 'Edit', onClick: () => openEdit(row) },
                                 { label: 'Assign', onClick: () => void openAssign(row) },
                                 {
                                   label: isInactive ? 'Activate' : 'Deactivate',
@@ -682,37 +820,6 @@ export const GlobalContactsPage: React.FC = () => {
           />
         </>
       )}
-    </div>
-  );
-};
-
-// ── Additional sreni tags inline cell ─────────────────────────────────────────
-
-const tagCache = new Map<string, ContactSreniTagApi[]>();
-
-const AdditionalSreniTags: React.FC<{ contactId: string; sreniById: Map<string, string> }> = ({ contactId, sreniById }) => {
-  const [tags, setTags] = useState<ContactSreniTagApi[] | null>(tagCache.get(contactId) ?? null);
-
-  useEffect(() => {
-    if (tags !== null) return;
-    backendApi.listContactSreniTags(contactId)
-      .then((t) => {
-        tagCache.set(contactId, t);
-        setTags(t);
-      })
-      .catch(() => setTags([]));
-  }, [contactId, tags]);
-
-  if (tags === null) return <span style={{ opacity: 0.35, fontSize: '0.8rem' }}>…</span>;
-  if (tags.length === 0) return <span style={{ opacity: 0.35, fontSize: '0.84rem' }}>—</span>;
-
-  return (
-    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-      {tags.map((t) => (
-        <span key={t.id} style={{ fontSize: '0.73rem', fontWeight: 600, background: 'rgba(249,115,22,0.1)', color: '#fb923c', padding: '2px 7px', borderRadius: '5px', border: '1px solid rgba(249,115,22,0.25)', whiteSpace: 'nowrap' }}>
-          {sreniById.get(t.sreniId) ?? t.sreniId}
-        </span>
-      ))}
     </div>
   );
 };

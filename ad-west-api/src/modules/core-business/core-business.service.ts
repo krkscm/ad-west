@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -73,12 +74,21 @@ import {
   AssignContactDivisionDto,
   AssignContactSthanDto,
   CreateHouseholdMemberDto,
+  CreateSevaContributionDto,
   SetContactSreniTagsDto,
   UpdateHouseholdMemberDto,
+  UpdateSevaContributionDto,
 } from './dto/core-business.dto';
 import { ApprovalRuntimeService } from './services/approval-runtime.service';
 import { AttendanceRuntimeService, type AttendanceRuntimeContext } from './services/attendance-runtime.service';
 import { CalendarEventsRuntimeService, type CalendarEventsRuntimeContext } from './services/calendar-events-runtime.service';
+import { ContactAccessScope, ContactAccessScopeService } from './services/contact-access-scope.service';
+import { SevaSamithiContactService } from './services/seva-samithi-contact.service';
+import {
+  SevaSamithiContributionService,
+  type SevaContributionDocumentRecord,
+  type SevaContributionRecord,
+} from './services/seva-samithi-contribution.service';
 import { CoreBusinessAccessUtilsService } from './services/core-business-access-utils.service';
 import { CoreBusinessDbBootstrapService } from './services/core-business-db-bootstrap.service';
 import { CoreBusinessDbHydrationService } from './services/core-business-db-hydration.service';
@@ -92,6 +102,19 @@ import { ProgramRuntimeService, type ProgramRuntimeContext } from './services/pr
 import { ResponsibilityChartRuntimeService } from './services/responsibility-chart-runtime.service';
 import { OrgRuntimeService, type OrgRuntimeContext } from './services/org-runtime.service';
 import { SreniAdminRuntimeService } from './services/sreni-admin-runtime.service';
+import { ContactTemplateGeneratorService } from './services/contact-template-generator.service';
+import { MemberContactPersistenceService } from './services/member-contact-persistence.service';
+import { MemberContactUploadService } from './services/member-contact-upload.service';
+import {
+  GadaAssignmentService,
+  type ContactGadaAssignmentRecord,
+  type GadaListQueryOptions,
+  type SreniGadanayakRecord,
+} from './services/gada-assignment.service';
+import {
+  JoinUsReviewService,
+  type JoinUsSubmissionRecord,
+} from './services/join-us-review.service';
 import { ENUM_TYPES } from '@modules/enum-values/enum-types.constants';
 import { HouseholdEnumConfigService, type HouseholdResolverKey } from './services/household-enum-config.service';
 import { SreniReportsRuntimeService } from './services/sreni-reports-runtime.service';
@@ -109,7 +132,9 @@ import type {
   AttendanceRecord,
   CalendarEventRecord,
   ContactSreniTagRecord,
-  GlobalContactUploadDuplicate,
+  MemberContactCommitDecision,
+  MemberContactCommitResult,
+  MemberContactPreviewResult,
   HouseholdMemberEnrollmentRecord,
   HouseholdMemberRecord,
   CoreBusinessPersistenceReadinessRecord,
@@ -179,7 +204,6 @@ export type {
   ReportTemplateRecord,
   RegistrationRecord,
   ContactSreniTagRecord,
-  GlobalContactUploadDuplicate,
   HouseholdMemberEnrollmentRecord,
   HouseholdMemberRecord,
   PrimaryContactStrategy,
@@ -245,6 +269,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   private attendanceRuntimeService: AttendanceRuntimeService | null = null;
   private calendarEventsRuntimeService: CalendarEventsRuntimeService | null = null;
   private coreBusinessAccessUtilsService: CoreBusinessAccessUtilsService | null = null;
+  private contactAccessScopeService: ContactAccessScopeService | null = null;
   private coreBusinessDbBootstrapService: CoreBusinessDbBootstrapService | null = null;
   private coreBusinessDbHydrationService: CoreBusinessDbHydrationService | null = null;
   private coreBusinessDomainUtilsService: CoreBusinessDomainUtilsService | null = null;
@@ -256,6 +281,10 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   private programRuntimeService: ProgramRuntimeService | null = null;
   private orgRuntimeService: OrgRuntimeService | null = null;
   private sreniAdminRuntimeService: SreniAdminRuntimeService | null = null;
+  private readonly memberContactUploadService = new MemberContactUploadService();
+  private gadaAssignmentService: GadaAssignmentService | null = null;
+  private joinUsReviewService: JoinUsReviewService | null = null;
+  private contactTemplateGeneratorService: ContactTemplateGeneratorService | null = null;
   private householdEnumConfigService: HouseholdEnumConfigService | null = null;
   private sreniReportsRuntimeService: SreniReportsRuntimeService | null = null;
   private responsibilityChartRuntimeService: ResponsibilityChartRuntimeService | null = null;
@@ -1445,6 +1474,77 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.coreBusinessAccessUtilsService;
   }
 
+  private getContactAccessScopeService(): ContactAccessScopeService {
+    if (!this.contactAccessScopeService) {
+      this.contactAccessScopeService = new ContactAccessScopeService(
+        this.dataSource,
+        this.users,
+        this.permissionSets,
+        this.permissions,
+      );
+    }
+    return this.contactAccessScopeService;
+  }
+
+  private requireContactActor(actor?: AuthPrincipal): AuthPrincipal {
+    if (!actor) {
+      throw new ForbiddenException('Settings user account is required for contact data access');
+    }
+    return actor;
+  }
+
+  private async resolveContactScope(actor: AuthPrincipal): Promise<ContactAccessScope> {
+    return this.getContactAccessScopeService().resolveScope(actor);
+  }
+
+  private async assertContactAccess(
+    actor: AuthPrincipal,
+    contactId: string,
+    contextSreniId?: string,
+  ): Promise<ContactAccessScope> {
+    const scopeService = this.getContactAccessScopeService();
+    const scope = await scopeService.resolveScope(actor);
+    if (scope.unrestricted) {
+      return scope;
+    }
+
+    if (contextSreniId) {
+      scopeService.assertCanAccessSreni(scope, contextSreniId);
+    }
+
+    let snapshot = await scopeService.loadContactAccessSnapshot(contactId);
+    if (!snapshot) {
+      const contact = Array.from(this.sreniContacts.values()).find((item) => item.id === contactId);
+      if (!contact) {
+        throw new NotFoundException('Contact not found');
+      }
+      snapshot = {
+        sreniId: contact.sreniId,
+        sthanLocationId: contact.sthanLocationId,
+        locationId: undefined,
+        sthanId: contact.sthanId,
+        taggedSreniIds: [],
+      };
+    }
+
+    if (
+      contextSreniId
+      && this.dataSource
+      && await SevaSamithiContactService.isSevaSamithiSreni(this.dataSource, contextSreniId)
+    ) {
+      const sevaService = new SevaSamithiContactService(this.dataSource);
+      const inRegistry = await sevaService.isContactInRegistry(contactId);
+      if (!inRegistry) {
+        throw new ForbiddenException('You do not have access to this contact');
+      }
+      sevaService.assertSevaSamithiContactAccess(scope, snapshot, scopeService);
+      return scope;
+    }
+
+    scopeService.assertCanAccessContact(scope, snapshot, contextSreniId);
+    return scope;
+  }
+
   private getHouseholdEnumConfig(): HouseholdEnumConfigService {
     if (!this.householdEnumConfigService) {
       this.householdEnumConfigService = new HouseholdEnumConfigService(this.runtimeMode, this.dataSource);
@@ -1537,20 +1637,81 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getSreniAdminRuntime().deleteSreniDivision(sreniId, divisionId);
   }
 
-  async assignContactDivision(sreniId: string, contactId: string, dto: AssignContactDivisionDto): Promise<SreniContactRecord> {
+  async assignContactDivision(
+    sreniId: string,
+    contactId: string,
+    dto: AssignContactDivisionDto,
+    actor: AuthPrincipal,
+  ): Promise<SreniContactRecord> {
+    await this.assertContactAccess(this.requireContactActor(actor), contactId, sreniId);
     return this.getSreniAdminRuntime().assignContactDivision(sreniId, contactId, dto);
   }
 
-  async assignContactSthan(sreniId: string, contactId: string, dto: AssignContactSthanDto): Promise<SreniContactRecord> {
+  async assignContactSthan(
+    sreniId: string,
+    contactId: string,
+    dto: AssignContactSthanDto,
+    actor: AuthPrincipal,
+  ): Promise<SreniContactRecord> {
+    await this.assertContactAccess(this.requireContactActor(actor), contactId, sreniId);
     return this.getSreniAdminRuntime().assignContactSthan(sreniId, contactId, dto);
   }
 
   // ── Sreni Contact List ─────────────────────────────────────────────────────
 
+  private getGadaAssignmentService(): GadaAssignmentService {
+    if (!this.gadaAssignmentService) {
+      this.gadaAssignmentService = new GadaAssignmentService(this.dataSource);
+    }
+    return this.gadaAssignmentService;
+  }
+
+  private getJoinUsReviewService(): JoinUsReviewService {
+    if (!this.joinUsReviewService) {
+      this.joinUsReviewService = new JoinUsReviewService(this.dataSource);
+    }
+    return this.joinUsReviewService;
+  }
+
+  async listJoinUsSubmissions(
+    params: { page?: number; pageSize?: number; status?: 'pending' | 'completed' | 'all'; sreniId?: string; search?: string },
+    actor: AuthPrincipal,
+  ): Promise<{
+    items: JoinUsSubmissionRecord[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    pendingCount: number;
+  }> {
+    const scope = await this.resolveContactScope(this.requireContactActor(actor));
+    return this.getJoinUsReviewService().listSubmissions(scope, params);
+  }
+
+  async completeJoinUsReview(
+    contactId: string,
+    dto: {
+      sreniId: string;
+      sthanId: string;
+      zoneId?: string;
+      divisionId?: string | null;
+      reviewNote?: string;
+      currentStatus?: string;
+    },
+    actor: AuthPrincipal,
+  ): Promise<SreniContactRecord> {
+    const scope = await this.resolveContactScope(this.requireContactActor(actor));
+    await this.assertContactAccess(actor, contactId);
+    const userId = scope.userId;
+    return this.getJoinUsReviewService().completeReview(contactId, dto, userId, scope);
+  }
+
   async listSreniContacts(
     sreniId: string,
     page = 1,
     pageSize = 50,
+    actor?: AuthPrincipal,
+    gadaOptions?: GadaListQueryOptions,
   ): Promise<{
     items: SreniContactRecord[];
     total: number;
@@ -1561,64 +1722,266 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     primaryContactStrategy: string;
     resolverKey: HouseholdResolverKey;
     participantTotal: number;
+    gadaAssignmentEnabled: boolean;
+    canManageGadaAssignments: boolean;
   }> {
-    return this.getSreniAdminRuntime().listSreniContacts(sreniId, page, pageSize);
+    const scope = await this.resolveContactScope(this.requireContactActor(actor));
+    this.getContactAccessScopeService().assertCanAccessSreni(scope, sreniId);
+    return this.getSreniAdminRuntime().listSreniContacts(sreniId, page, pageSize, scope, gadaOptions);
   }
 
-  async uploadSreniContacts(
+  async listSreniGadanayaks(
     sreniId: string,
-    fileBuffer: Buffer,
-    originalName: string,
-    uploadedBy?: string,
-  ): Promise<{ inserted: number; sreniId: string }> {
-    return this.getSreniAdminRuntime().uploadSreniContacts(sreniId, fileBuffer, originalName, uploadedBy);
+    actor: AuthPrincipal,
+    sthanId?: string,
+  ): Promise<SreniGadanayakRecord[]> {
+    const scope = await this.resolveContactScope(this.requireContactActor(actor));
+    this.getContactAccessScopeService().assertCanAccessSreni(scope, sreniId);
+    await this.getGadaAssignmentService().assertCanManageAssignments(scope, sreniId);
+    return this.getGadaAssignmentService().listGadanayaks(sreniId, sthanId);
   }
 
-  async clearSreniContacts(sreniId: string): Promise<{ deleted: number; sreniId: string }> {
+  async listEligibleGadanayakUsers(
+    sreniId: string,
+    sthanId: string,
+    actor: AuthPrincipal,
+  ): Promise<Array<{ id: string; name: string; email?: string }>> {
+    const scope = await this.resolveContactScope(this.requireContactActor(actor));
+    this.getContactAccessScopeService().assertCanAccessSreni(scope, sreniId);
+    await this.getGadaAssignmentService().assertCanManageAssignments(scope, sreniId);
+    return this.getGadaAssignmentService().listEligibleGadanayakUsers(sreniId, sthanId);
+  }
+
+  async registerSreniGadanayak(
+    sreniId: string,
+    sthanId: string,
+    userId: string,
+    actor: AuthPrincipal,
+  ): Promise<SreniGadanayakRecord> {
+    const scope = await this.resolveContactScope(this.requireContactActor(actor));
+    this.getContactAccessScopeService().assertCanAccessSreni(scope, sreniId);
+    await this.getGadaAssignmentService().assertCanManageAssignments(scope, sreniId);
+    return this.getGadaAssignmentService().registerGadanayak(sreniId, sthanId, userId, scope.userId);
+  }
+
+  async removeSreniGadanayak(
+    sreniId: string,
+    gadanayakId: string,
+    actor: AuthPrincipal,
+  ): Promise<void> {
+    const scope = await this.resolveContactScope(this.requireContactActor(actor));
+    this.getContactAccessScopeService().assertCanAccessSreni(scope, sreniId);
+    await this.getGadaAssignmentService().assertCanManageAssignments(scope, sreniId);
+    await this.getGadaAssignmentService().removeGadanayak(sreniId, gadanayakId);
+  }
+
+  async assignContactGada(
+    sreniId: string,
+    contactId: string,
+    gadanayakUserId: string,
+    actor: AuthPrincipal,
+  ): Promise<ContactGadaAssignmentRecord> {
+    const scope = await this.resolveContactScope(this.requireContactActor(actor));
+    this.getContactAccessScopeService().assertCanAccessSreni(scope, sreniId);
+    await this.getGadaAssignmentService().assertCanManageAssignments(scope, sreniId);
+    await this.assertContactAccess(actor, contactId, sreniId);
+    const snapshot = await this.getContactAccessScopeService().loadContactAccessSnapshot(contactId);
+    if (!snapshot) {
+      throw new NotFoundException('Contact not found');
+    }
+    return this.getGadaAssignmentService().assignContact(
+      sreniId,
+      contactId,
+      gadanayakUserId,
+      scope.userId,
+      snapshot,
+    );
+  }
+
+  async unassignContactGada(
+    sreniId: string,
+    contactId: string,
+    actor: AuthPrincipal,
+  ): Promise<void> {
+    const scope = await this.resolveContactScope(this.requireContactActor(actor));
+    this.getContactAccessScopeService().assertCanAccessSreni(scope, sreniId);
+    await this.getGadaAssignmentService().assertCanManageAssignments(scope, sreniId);
+    await this.assertContactAccess(actor, contactId, sreniId);
+    await this.getGadaAssignmentService().unassignContact(sreniId, contactId);
+  }
+
+  async bulkAssignContactGada(
+    sreniId: string,
+    contactIds: string[],
+    gadanayakUserId: string,
+    actor: AuthPrincipal,
+  ): Promise<{ assigned: number }> {
+    const scope = await this.resolveContactScope(this.requireContactActor(actor));
+    this.getContactAccessScopeService().assertCanAccessSreni(scope, sreniId);
+    await this.getGadaAssignmentService().assertCanManageAssignments(scope, sreniId);
+    for (const contactId of contactIds) {
+      await this.assertContactAccess(actor, contactId, sreniId);
+    }
+    return this.getGadaAssignmentService().bulkAssignContacts(
+      sreniId,
+      contactIds,
+      gadanayakUserId,
+      scope.userId,
+    );
+  }
+
+  async clearSreniContacts(sreniId: string, actor: AuthPrincipal): Promise<{ deleted: number; sreniId: string }> {
+    const scope = await this.resolveContactScope(this.requireContactActor(actor));
+    this.getContactAccessScopeService().assertCanAccessSreni(scope, sreniId);
     return this.getSreniAdminRuntime().clearSreniContacts(sreniId);
   }
 
-  async uploadGlobalContacts(
-    fileBuffer: Buffer,
-    originalName: string,
+  async downloadMemberContactTemplate(): Promise<Buffer> {
+    if (!this.dataSource) {
+      throw new BadRequestException('Template download requires database persistence.');
+    }
+    if (!this.contactTemplateGeneratorService) {
+      this.contactTemplateGeneratorService = new ContactTemplateGeneratorService(this.dataSource);
+    }
+    return this.contactTemplateGeneratorService.generateWorkbook();
+  }
+
+  async previewMemberContactUpload(fileBuffer: Buffer): Promise<MemberContactPreviewResult> {
+    if (!this.dataSource) {
+      throw new BadRequestException('Contact upload preview requires database persistence.');
+    }
+    return this.memberContactUploadService.previewUpload(this.dataSource, fileBuffer);
+  }
+
+  async commitMemberContactUpload(
+    decisions: MemberContactCommitDecision[],
+    sourceFile: string,
+    actor: AuthPrincipal,
     uploadedBy?: string,
-  ): Promise<{ inserted: number; duplicates: GlobalContactUploadDuplicate[] }> {
-    return this.getSreniAdminRuntime().uploadGlobalContacts(fileBuffer, originalName, uploadedBy);
+  ): Promise<MemberContactCommitResult> {
+    const scope = await this.resolveContactScope(this.requireContactActor(actor));
+    const scopeService = this.getContactAccessScopeService();
+    if (!scope.unrestricted && this.dataSource) {
+      const persistence = new MemberContactPersistenceService();
+      const sreniColumns = await persistence.loadUploadSreniColumns(this.dataSource);
+      for (const decision of decisions) {
+        if (decision.action === 'skip') {
+          continue;
+        }
+        scopeService.assertUploadRowInScope(scope, decision.data ?? {}, sreniColumns);
+      }
+    }
+
+    return this.memberContactUploadService.commitUpload(
+      {
+        srenies: this.srenies,
+        sreniDivisions: this.sreniDivisions,
+        sreniContacts: this.sreniContacts,
+        householdMembers: this.householdMembers,
+        householdEnrollments: this.householdEnrollments,
+        enumConfig: this.getHouseholdEnumConfig(),
+        reportMetricDefinitions: this.reportMetricDefinitions,
+        sreniMonthlyReports: this.sreniMonthlyReports,
+        sreniReportParameters: this.sreniReportParameters,
+        runtimeMode: this.runtimeMode,
+        dataSource: this.dataSource,
+        newId: (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        toIsoTimestamp: (value) => (typeof value === 'string' ? value : value.toISOString()),
+      },
+      decisions,
+      sourceFile,
+      uploadedBy,
+    );
   }
 
   async listAllContacts(
     page = 1,
     pageSize = 50,
     filters?: { sreniId?: string; sthanId?: string; search?: string },
+    actor?: AuthPrincipal,
   ): Promise<{ items: (SreniContactRecord & { sreniName: string })[]; total: number; page: number; pageSize: number; totalPages: number }> {
-    return this.getSreniAdminRuntime().listAllContacts(page, pageSize, filters);
+    const scope = await this.resolveContactScope(this.requireContactActor(actor));
+    const scopedFilters = this.getContactAccessScopeService().clampListFilters(scope, filters);
+    return this.getSreniAdminRuntime().listAllContacts(page, pageSize, scopedFilters, scope);
+  }
+
+  async updateHouseholdContact(
+    contactId: string,
+    data: Record<string, string | number | boolean | null>,
+    actor: AuthPrincipal,
+  ): Promise<SreniContactRecord> {
+    await this.assertContactAccess(this.requireContactActor(actor), contactId);
+    return this.getSreniAdminRuntime().updateHouseholdContact(contactId, data);
   }
 
   async updateContactData(
     sreniId: string,
     contactId: string,
     data: Record<string, string | number | boolean | null>,
+    actor: AuthPrincipal,
   ): Promise<SreniContactRecord> {
+    await this.assertContactAccess(this.requireContactActor(actor), contactId, sreniId);
     return this.getSreniAdminRuntime().updateContactData(sreniId, contactId, data);
   }
 
-  async toggleContactActive(sreniId: string, contactId: string, active: boolean): Promise<SreniContactRecord> {
+  async toggleContactActive(
+    sreniId: string,
+    contactId: string,
+    active: boolean,
+    actor: AuthPrincipal,
+  ): Promise<SreniContactRecord> {
+    await this.assertContactAccess(this.requireContactActor(actor), contactId, sreniId);
     return this.getSreniAdminRuntime().toggleContactActive(sreniId, contactId, active);
   }
 
-  async deleteContact(sreniId: string, contactId: string): Promise<{ deleted: boolean }> {
+  async deleteContact(
+    sreniId: string,
+    contactId: string,
+    actor: AuthPrincipal,
+  ): Promise<{ deleted: boolean }> {
+    await this.assertContactAccess(this.requireContactActor(actor), contactId, sreniId);
     return this.getSreniAdminRuntime().deleteContact(sreniId, contactId);
   }
 
-  async listContactSreniTags(contactId: string): Promise<ContactSreniTagRecord[]> {
+  async listContactSreniTags(contactId: string, actor: AuthPrincipal): Promise<ContactSreniTagRecord[]> {
+    await this.assertContactAccess(this.requireContactActor(actor), contactId);
     return this.getSreniAdminRuntime().listContactSreniTags(contactId);
   }
 
-  async setContactSreniTags(contactId: string, dto: SetContactSreniTagsDto): Promise<ContactSreniTagRecord[]> {
+  async listContactSreniTagsBatch(
+    contactIds: string[],
+    actor: AuthPrincipal,
+  ): Promise<Record<string, ContactSreniTagRecord[]>> {
+    const principal = this.requireContactActor(actor);
+    for (const contactId of contactIds) {
+      await this.assertContactAccess(principal, contactId);
+    }
+    return this.getSreniAdminRuntime().listContactSreniTagsBatch(contactIds);
+  }
+
+  async setContactSreniTags(
+    contactId: string,
+    dto: SetContactSreniTagsDto,
+    actor: AuthPrincipal,
+  ): Promise<ContactSreniTagRecord[]> {
+    const scope = await this.assertContactAccess(this.requireContactActor(actor), contactId);
+    if (!scope.unrestricted) {
+      const scopeService = this.getContactAccessScopeService();
+      for (const tag of dto.tags ?? []) {
+        if (tag.sreniId?.trim()) {
+          scopeService.assertCanAccessSreni(scope, tag.sreniId);
+        }
+      }
+    }
     return this.getSreniAdminRuntime().setContactSreniTags(contactId, dto);
   }
 
-  async listHouseholdMembers(sreniId: string, contactId: string): Promise<HouseholdMemberRecord[]> {
+  async listHouseholdMembers(
+    sreniId: string,
+    contactId: string,
+    actor: AuthPrincipal,
+  ): Promise<HouseholdMemberRecord[]> {
+    await this.assertContactAccess(this.requireContactActor(actor), contactId, sreniId);
     return this.getSreniAdminRuntime().listHouseholdMembers(sreniId, contactId);
   }
 
@@ -1626,7 +1989,9 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     sreniId: string,
     contactId: string,
     dto: CreateHouseholdMemberDto,
+    actor: AuthPrincipal,
   ): Promise<HouseholdMemberRecord> {
+    await this.assertContactAccess(this.requireContactActor(actor), contactId, sreniId);
     return this.getSreniAdminRuntime().createHouseholdMember(sreniId, contactId, dto);
   }
 
@@ -1635,11 +2000,19 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     contactId: string,
     memberId: string,
     dto: UpdateHouseholdMemberDto,
+    actor: AuthPrincipal,
   ): Promise<HouseholdMemberRecord> {
+    await this.assertContactAccess(this.requireContactActor(actor), contactId, sreniId);
     return this.getSreniAdminRuntime().updateHouseholdMember(sreniId, contactId, memberId, dto);
   }
 
-  async deleteHouseholdMember(sreniId: string, contactId: string, memberId: string): Promise<void> {
+  async deleteHouseholdMember(
+    sreniId: string,
+    contactId: string,
+    memberId: string,
+    actor: AuthPrincipal,
+  ): Promise<void> {
+    await this.assertContactAccess(this.requireContactActor(actor), contactId, sreniId);
     return this.getSreniAdminRuntime().deleteHouseholdMember(sreniId, contactId, memberId);
   }
 
@@ -1647,8 +2020,97 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getSreniAdminRuntime().getSreniParticipantStats(sreniId);
   }
 
-  async listContactParticipants(sreniId: string, contactId: string): Promise<SreniParticipantRecord[]> {
+  async listContactParticipants(
+    sreniId: string,
+    contactId: string,
+    actor: AuthPrincipal,
+  ): Promise<SreniParticipantRecord[]> {
+    await this.assertContactAccess(this.requireContactActor(actor), contactId, sreniId);
     return this.getSreniAdminRuntime().listContactParticipants(sreniId, contactId);
+  }
+
+  private async assertSevaSamithiContributionAccess(
+    sreniId: string,
+    contactId: string,
+    actor: AuthPrincipal,
+  ): Promise<void> {
+    if (
+      !this.dataSource
+      || !await SevaSamithiContactService.isSevaSamithiSreni(this.dataSource, sreniId)
+    ) {
+      throw new ForbiddenException('Seva contributions are only available for Seva Samithi contacts');
+    }
+    await this.assertContactAccess(this.requireContactActor(actor), contactId, sreniId);
+  }
+
+  private getSevaSamithiContributionService(): SevaSamithiContributionService {
+    return new SevaSamithiContributionService(this.dataSource);
+  }
+
+  async listSevaContributions(
+    sreniId: string,
+    contactId: string,
+    actor: AuthPrincipal,
+  ): Promise<SevaContributionRecord[]> {
+    await this.assertSevaSamithiContributionAccess(sreniId, contactId, actor);
+    return this.getSevaSamithiContributionService().listByContact(contactId);
+  }
+
+  async createSevaContribution(
+    sreniId: string,
+    contactId: string,
+    dto: CreateSevaContributionDto,
+    actor: AuthPrincipal,
+  ): Promise<SevaContributionRecord> {
+    await this.assertSevaSamithiContributionAccess(sreniId, contactId, actor);
+    return this.getSevaSamithiContributionService().create(contactId, dto, actor);
+  }
+
+  async updateSevaContribution(
+    sreniId: string,
+    contactId: string,
+    contributionId: string,
+    dto: UpdateSevaContributionDto,
+    actor: AuthPrincipal,
+  ): Promise<SevaContributionRecord> {
+    await this.assertSevaSamithiContributionAccess(sreniId, contactId, actor);
+    return this.getSevaSamithiContributionService().update(contactId, contributionId, dto);
+  }
+
+  async deleteSevaContribution(
+    sreniId: string,
+    contactId: string,
+    contributionId: string,
+    actor: AuthPrincipal,
+  ): Promise<void> {
+    await this.assertSevaSamithiContributionAccess(sreniId, contactId, actor);
+    return this.getSevaSamithiContributionService().delete(contactId, contributionId);
+  }
+
+  async uploadSevaContributionDocuments(
+    sreniId: string,
+    contactId: string,
+    contributionId: string,
+    files: Express.Multer.File[],
+    actor: AuthPrincipal,
+  ): Promise<SevaContributionDocumentRecord[]> {
+    await this.assertSevaSamithiContributionAccess(sreniId, contactId, actor);
+    return this.getSevaSamithiContributionService().uploadDocuments(contactId, contributionId, files, actor);
+  }
+
+  async downloadSevaContributionDocument(
+    documentId: string,
+  ): Promise<{ record: SevaContributionDocumentRecord; filePath: string }> {
+    return this.getSevaSamithiContributionService().downloadDocument(documentId);
+  }
+
+  async deleteSevaContributionDocument(documentId: string, actor: AuthPrincipal): Promise<void> {
+    this.requireContactActor(actor);
+    return this.getSevaSamithiContributionService().deleteDocument(documentId);
+  }
+
+  getSevaContributionUploadDir(contactId: string, contributionId: string): string {
+    return this.getSevaSamithiContributionService().contributionUploadDir(contactId, contributionId);
   }
 
   async listSreniParticipants(
@@ -1801,9 +2263,6 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getSthanRuntime().listSthanContacts(locationId, page, pageSize);
   }
 
-  async uploadSthanContacts(locationId: string, fileBuffer: Buffer, originalName: string, uploadedBy?: string): Promise<{ inserted: number; locationId: string }> {
-    return this.getSthanRuntime().uploadSthanContacts(locationId, fileBuffer, originalName, uploadedBy);
-  }
 
   async clearSthanContacts(locationId: string): Promise<{ deleted: number }> {
     return this.getSthanRuntime().clearSthanContacts(locationId);

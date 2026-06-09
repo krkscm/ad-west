@@ -13,16 +13,36 @@ export function NotificationCarouselModal({ userType }: Props) {
   const [dismissed, setDismissed] = useState(false)
 
   useEffect(() => {
-    backendApi.listNotifications(true)
-      .then((res) => {
-        const relevant = res.items.filter((n) => n.target === 'all' || n.target === userType)
-        if (relevant.length > 0) {
-          setNotifications(relevant)
-          setVisible(true)
-        }
-      })
-      .catch(() => {})
+    const dismissedKey = `adwest-carousel-dismissed-${userType}`
+    try {
+      if (sessionStorage.getItem(dismissedKey) === '1') return
+    } catch {
+      // ignore storage errors
+    }
+
+    const timer = window.setTimeout(() => {
+      backendApi.listNotifications(true)
+        .then((res) => {
+          const relevant = res.items.filter((n) => n.target === 'all' || n.target === userType)
+          if (relevant.length > 0) {
+            setNotifications(relevant)
+            setVisible(true)
+          }
+        })
+        .catch(() => {})
+    }, 800)
+
+    return () => window.clearTimeout(timer)
   }, [userType])
+
+  const handleDismiss = () => {
+    setDismissed(true)
+    try {
+      sessionStorage.setItem(`adwest-carousel-dismissed-${userType}`, '1')
+    } catch {
+      // ignore storage errors
+    }
+  }
 
   if (!visible || dismissed || notifications.length === 0) return null
 
@@ -39,7 +59,7 @@ export function NotificationCarouselModal({ userType }: Props) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 2000, padding: '16px',
       }}
-      onClick={(e) => { if (e.target === e.currentTarget) setDismissed(true) }}
+      onClick={(e) => { if (e.target === e.currentTarget) handleDismiss() }}
     >
       <div
         style={{
@@ -50,7 +70,7 @@ export function NotificationCarouselModal({ userType }: Props) {
       >
         {/* Close */}
         <div style={{ position: 'absolute', top: '10px', right: '12px' }}>
-          <IconButton label="Close" variant="ghost" onClick={() => setDismissed(true)}>
+          <IconButton label="Close" variant="ghost" onClick={handleDismiss}>
             <CloseIcon />
           </IconButton>
         </div>
@@ -99,7 +119,7 @@ export function NotificationCarouselModal({ userType }: Props) {
               <button className="btn btn-secondary btn-sm page-nav-btn" onClick={next}>Next →</button>
             </>
           )}
-          <button className="btn btn-secondary" onClick={() => setDismissed(true)}>
+          <button className="btn btn-secondary" onClick={handleDismiss}>
             {total > 1 ? 'Close All' : 'Got it'}
           </button>
         </div>

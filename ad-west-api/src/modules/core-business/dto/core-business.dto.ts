@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
@@ -13,6 +14,7 @@ import {
   Max,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
 
 export class CreateZoneDto {
@@ -83,12 +85,20 @@ export class CreateSreniDefinitionDto {
   joinUsVisible?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  showInUploadExcel?: boolean;
+
+  @IsOptional()
   @IsString()
   enrollmentScope?: string;
 
   @IsOptional()
   @IsString()
   primaryContactStrategy?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  gadaAssignmentEnabled?: boolean;
 }
 
 export class UpdateSreniDefinitionDto {
@@ -114,12 +124,95 @@ export class UpdateSreniDefinitionDto {
   joinUsVisible?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  showInUploadExcel?: boolean;
+
+  @IsOptional()
   @IsString()
   enrollmentScope?: string;
 
   @IsOptional()
   @IsString()
   primaryContactStrategy?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  gadaAssignmentEnabled?: boolean;
+}
+
+export class RegisterGadanayakDto {
+  @IsString()
+  @IsNotEmpty()
+  sthanId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  userId!: string;
+}
+
+export class AssignContactGadaDto {
+  @IsString()
+  @IsNotEmpty()
+  gadanayakUserId!: string;
+}
+
+export class BulkAssignContactGadaDto {
+  @IsArray()
+  @IsString({ each: true })
+  contactIds!: string[];
+
+  @IsString()
+  @IsNotEmpty()
+  gadanayakUserId!: string;
+}
+
+export class CompleteJoinUsReviewDto {
+  @IsString()
+  @IsNotEmpty()
+  sreniId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  sthanId!: string;
+
+  @IsOptional()
+  @IsString()
+  zoneId?: string;
+
+  @IsOptional()
+  @IsString()
+  divisionId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  reviewNote?: string;
+
+  @IsOptional()
+  @IsString()
+  currentStatus?: string;
+}
+
+export class MemberContactCommitDecisionDto {
+  @IsInt()
+  rowIndex!: number;
+
+  @IsIn(['insert', 'update', 'skip'])
+  action!: 'insert' | 'update' | 'skip';
+
+  @IsOptional()
+  @IsObject()
+  data?: Record<string, string | number | boolean | null>;
+}
+
+export class MemberContactCommitDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MemberContactCommitDecisionDto)
+  decisions!: MemberContactCommitDecisionDto[];
+
+  @IsOptional()
+  @IsString()
+  sourceFile?: string;
 }
 
 export class CreateAnalyticsStudioLayoutDto {
@@ -1326,4 +1419,31 @@ export class UpdateHouseholdMemberDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+}
+
+export class CreateSevaContributionDto {
+  @IsDateString()
+  activityDate!: string;
+
+  @IsOptional()
+  @IsString()
+  sevaActivity?: string;
+
+  @IsOptional()
+  @IsString()
+  details?: string;
+}
+
+export class UpdateSevaContributionDto {
+  @IsOptional()
+  @IsDateString()
+  activityDate?: string;
+
+  @IsOptional()
+  @IsString()
+  sevaActivity?: string;
+
+  @IsOptional()
+  @IsString()
+  details?: string;
 }

@@ -12,6 +12,7 @@ import { HelpdeskTicketEntity } from './entities/helpdesk-ticket.entity';
 import { JobApplicationActivityEntity } from './entities/job-application-activity.entity';
 import { JobApplicationEntity } from './entities/job-application.entity';
 import { JobPostingEntity } from './entities/job-posting.entity';
+import { MemberContactPersistenceService } from '../core-business/services/member-contact-persistence.service';
 
 export type TicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
 export type TicketCategory = 'general' | 'technical' | 'financial' | 'membership' | 'other';
@@ -260,6 +261,21 @@ export class PublicGatewayService {
     return phone.replace(/\D/g, '');
   }
 
+  async getPublicJoinUsFormOptions(): Promise<{
+    mapsApiKey?: string;
+    bloodGroups: Array<{ value: string; label: string }>;
+    livingTypes: Array<{ value: string; label: string }>;
+    childGrades: Array<{ value: string; label: string }>;
+  }> {
+    const [bloodGroups, livingTypes, childGrades] = await Promise.all([
+      this.enumConfig.listActiveOptions(ENUM_TYPES.CONTACT_BLOOD_GROUP),
+      this.enumConfig.listActiveOptions(ENUM_TYPES.CONTACT_LIVING_TYPE),
+      this.enumConfig.listActiveOptions(ENUM_TYPES.CONTACT_CHILD_GRADE),
+    ]);
+    const mapsApiKey = process.env.GOOGLE_MAPS_API_KEY?.trim() || undefined;
+    return { mapsApiKey, bloodGroups, livingTypes, childGrades };
+  }
+
   async listPublicSreniOptions(): Promise<PublicSreniOption[]> {
     if (!this.useDb()) {
       return [];
@@ -282,36 +298,52 @@ export class PublicGatewayService {
 
   async submitPublicSreniContact(data: {
     sreniId: string;
-    fullName: string;
-    phone: string;
+    name: string;
+    mobileNo: string;
+    dateOfBirth: string;
+    familyOrBachelor: string;
     email?: string;
-    city?: string;
-    country?: string;
-    notes?: string;
-    personalNumber?: string;
-    familyOrBachelor?: string;
-    family?: string;
-    bachelor?: string;
-    addressInUae?: string;
-    company?: string;
+    bloodGroup?: string;
+    altMobileNo?: string;
     profession?: string;
-    wifeName?: string;
-    landLine?: string;
-    zoneOrLandMark?: string;
-    district?: string;
+    company?: string;
+    jobTitle?: string;
+    spouseName?: string;
+    spouseDateOfBirth?: string;
+    spouseMobileNo?: string;
+    spouseEmail?: string;
+    spouseBloodGroup?: string;
+    spouseProfession?: string;
+    spouseCompany?: string;
+    child1Name?: string;
+    child1Dob?: string;
+    child1Grade?: string;
+    child2Name?: string;
+    child2Dob?: string;
+    child2Grade?: string;
+    child3Name?: string;
+    child3Dob?: string;
+    child3Grade?: string;
+    addressInUae?: string;
+    landLineNo?: string;
+    home?: string;
+    addressInIndia?: string;
+    districtIndia?: string;
+    googleMapLink?: string;
+    remarks?: string;
     submittedFrom?: string;
   }): Promise<PublicSreniContactSubmissionResult> {
     if (!this.useDb()) {
       throw new ServiceUnavailableException('Public contact registration is available only when DB persistence is enabled.');
     }
 
-    const trimmedName = data.fullName.trim();
-    const trimmedPhone = data.phone.trim();
+    const trimmedName = data.name.trim();
+    const trimmedMobile = data.mobileNo.trim();
     const trimmedEmail = data.email?.trim() || null;
-    const normalizedPhone = this.normalizePhoneForMatch(trimmedPhone);
+    const normalizedPhone = this.normalizePhoneForMatch(trimmedMobile);
 
-    if (!PHONE_PERMISSIVE_REGEX.test(trimmedPhone) || normalizedPhone.length < 7 || normalizedPhone.length > 15) {
-      throw new BadRequestException('Phone number format is invalid. Please use a valid phone number with country code if available.');
+    if (!PHONE_PERMISSIVE_REGEX.test(trimmedMobile) || normalizedPhone.length < 7 || normalizedPhone.length > 15) {
+      throw new BadRequestException('Mobile number format is invalid. Please use a valid number with country code if available.');
     }
 
     if (trimmedEmail && !EMAIL_FORMAT_REGEX.test(trimmedEmail)) {
@@ -321,7 +353,7 @@ export class PublicGatewayService {
     const sreniRows = await this.ticketRepo!.manager.query(
       `SELECT id::text AS id
        FROM adwest.srenies
-       WHERE id::text = $1 AND active = true
+       WHERE id::text = $1 AND active = true AND join_us_visible = true
        LIMIT 1`,
       [data.sreniId],
     ) as Array<{ id: string }>;
@@ -330,78 +362,71 @@ export class PublicGatewayService {
       throw new BadRequestException('Selected sreni is not available.');
     }
 
-    const duplicateRows = await this.ticketRepo!.manager.query(
-      `SELECT id::text AS id
-       FROM adwest.sreni_contacts
-       WHERE sreni_id = $1
-         AND (
-           regexp_replace(COALESCE(data->>'phone', ''), '[^0-9]', '', 'g') = $2
-           OR ($3::text IS NOT NULL AND lower(COALESCE(data->>'email', '')) = lower($3::text))
-         )
-       LIMIT 1`,
-      [data.sreniId, normalizedPhone, trimmedEmail],
-    ) as Array<{ id: string }>;
+    const persistence = new MemberContactPersistenceService();
+    const dataSource = this.ticketRepo!.manager.connection;
 
-    if (duplicateRows.length > 0) {
-      throw new ConflictException('A contact with the same phone or email already exists for this sreni.');
-    }
-
-    const contactPayload = {
-      full_name: trimmedName,
-      phone: trimmedPhone,
+    const contactPayload: Record<string, string | number | boolean | null> = {
+      name: trimmedName,
+      mobileNo: trimmedMobile,
+      dateOfBirth: data.dateOfBirth.trim(),
+      familyOrBachelor: data.familyOrBachelor.trim(),
       email: trimmedEmail,
-      city: data.city?.trim() || null,
-      country: data.country?.trim() || null,
-      notes: data.notes?.trim() || null,
-      personal_number: data.personalNumber?.trim() || null,
-      family_or_bachelor: data.familyOrBachelor?.trim() || null,
-      family: data.family?.trim() || null,
-      bachelor: data.bachelor?.trim() || null,
-      address_in_uae: data.addressInUae?.trim() || null,
-      company: data.company?.trim() || null,
+      bloodGroup: data.bloodGroup?.trim() || null,
+      altMobileNo: data.altMobileNo?.trim() || null,
       profession: data.profession?.trim() || null,
-      wife_name: data.wifeName?.trim() || null,
-      land_line: data.landLine?.trim() || null,
-      zone_or_land_mark: data.zoneOrLandMark?.trim() || null,
-      district: data.district?.trim() || null,
-      template_fields: {
-        Name: trimmedName,
-        'Personal Number': data.personalNumber?.trim() || null,
-        'Family / Bachelor': data.familyOrBachelor?.trim() || null,
-        Family: data.family?.trim() || null,
-        Bachelor: data.bachelor?.trim() || null,
-        'Address in UAE': data.addressInUae?.trim() || null,
-        Company: data.company?.trim() || null,
-        Profession: data.profession?.trim() || null,
-        WifeName: data.wifeName?.trim() || null,
-        'Land Line': data.landLine?.trim() || null,
-        'Zone / Land mark': data.zoneOrLandMark?.trim() || null,
-        District: data.district?.trim() || null,
-      },
+      company: data.company?.trim() || null,
+      jobTitle: data.jobTitle?.trim() || null,
+      spouseName: data.spouseName?.trim() || null,
+      spouseDateOfBirth: data.spouseDateOfBirth?.trim() || null,
+      spouseMobileNo: data.spouseMobileNo?.trim() || null,
+      spouseEmail: data.spouseEmail?.trim() || null,
+      spouseBloodGroup: data.spouseBloodGroup?.trim() || null,
+      spouseProfession: data.spouseProfession?.trim() || null,
+      spouseCompany: data.spouseCompany?.trim() || null,
+      child1Name: data.child1Name?.trim() || null,
+      child1Dob: data.child1Dob?.trim() || null,
+      child1Grade: data.child1Grade?.trim() || null,
+      child2Name: data.child2Name?.trim() || null,
+      child2Dob: data.child2Dob?.trim() || null,
+      child2Grade: data.child2Grade?.trim() || null,
+      child3Name: data.child3Name?.trim() || null,
+      child3Dob: data.child3Dob?.trim() || null,
+      child3Grade: data.child3Grade?.trim() || null,
+      addressInUae: data.addressInUae?.trim() || null,
+      landLineNo: data.landLineNo?.trim() || null,
+      home: data.home?.trim() || null,
+      addressInIndia: data.addressInIndia?.trim() || null,
+      districtIndia: data.districtIndia?.trim() || null,
+      googleMapLink: data.googleMapLink?.trim() || null,
+      remarks: data.remarks?.trim() || null,
       source: 'public_join_form',
-      submitted_from: data.submittedFrom ?? null,
-      submitted_at: new Date().toISOString(),
+      submittedFrom: data.submittedFrom ?? null,
+      submittedAt: new Date().toISOString(),
     };
 
-    const result = await this.ticketRepo!.manager.query(
-      `WITH next_row AS (
-         SELECT COALESCE(MAX(row_index), 0) + 1 AS row_index
-         FROM adwest.sreni_contacts
-         WHERE sreni_id = $1
-       )
-       INSERT INTO adwest.sreni_contacts (sreni_id, row_index, data, source_file, uploaded_by)
-       SELECT $1, next_row.row_index, $2::jsonb, 'public-join-us-form', 'public'
-       FROM next_row
-       RETURNING id::text AS id, sreni_id::text AS sreni_id, row_index, created_at`,
-      [data.sreniId, JSON.stringify(contactPayload)],
-    ) as Array<{ id: string; sreni_id: string; row_index: number; created_at: string | Date }>;
+    const validationErrors = persistence.validateJoinUsRequired(contactPayload);
+    if (validationErrors.length) {
+      throw new BadRequestException(validationErrors.join(' '));
+    }
 
-    const row = result[0];
+    const existing = await persistence.findHouseholdByDedupKey(dataSource, trimmedName, trimmedMobile);
+    if (existing) {
+      throw new ConflictException('A contact with the same Mobile No and Name already exists.');
+    }
+
+    const inserted = await persistence.insertJoinUsHousehold(
+      dataSource,
+      contactPayload,
+      data.sreniId,
+      'public-join-us-form',
+      'public',
+    );
+
     return {
-      id: row.id,
-      sreniId: row.sreni_id,
-      rowIndex: row.row_index,
-      createdAt: new Date(row.created_at).toISOString(),
+      id: inserted.id,
+      sreniId: data.sreniId,
+      rowIndex: inserted.rowIndex,
+      createdAt: new Date().toISOString(),
     };
   }
 

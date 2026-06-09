@@ -7,7 +7,8 @@ import { TableRowActionsMenu } from '../components/common/TableRowActionsMenu';
 import { TableLayoutModal } from '../components/common/TableLayoutModal';
 import { PageHeader } from '../components/common/PageHeader';
 import { PAGE_SIZE_OPTIONS, PaginationBar } from '../components/common/PaginationBar';
-import { buildContactEditFields, MASTER_CONTACT_COLUMN_LABELS, orderContactColumns } from '../constants/contactColumns';
+import { buildContactEditFieldSections, MASTER_CONTACT_COLUMN_LABELS, orderContactColumns } from '../constants/contactColumns';
+import { useAdminDefinitions } from '../context/admin-definitions-context';
 import { backendApi, SthanContactRowApi } from '../utils/backendApi';
 import { useTableLayout } from '../hooks/useTableLayout';
 
@@ -25,6 +26,7 @@ const toUiError = (error: unknown, fallback: string): string => {
 export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName }) => {
   const { addToast } = useToast();
   const confirm = useConfirm();
+  const { uploadSrenies, locationNames } = useAdminDefinitions();
   const [rows, setRows] = useState<SthanContactRowApi[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
   const [total, setTotal] = useState(0);
@@ -37,8 +39,9 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [editTarget, setEditTarget] = useState<SthanContactRowApi | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [layoutEnabled, setLayoutEnabled] = useState(false);
 
-  const layout = useTableLayout('sthan-contacts');
+  const layout = useTableLayout('sthan-contacts', { enabled: layoutEnabled });
 
   const colDefs = useMemo(
     () => columns.filter((k) => k !== 'name').map((k) => ({ key: k, label: MASTER_CONTACT_COLUMN_LABELS.get(k) ?? k })),
@@ -75,6 +78,23 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
     load(1);
   }, [locationId, load]);
 
+  useEffect(() => {
+    if (!isLoading && (rows.length > 0 || total > 0)) {
+      setLayoutEnabled(true);
+    }
+  }, [isLoading, rows.length, total]);
+
+  const editFieldOptions = useMemo(() => ({
+    uploadSrenies,
+    sthanNames: locationNames.filter((l) => l.level === 'STHAN').map((l) => l.name),
+    zoneNames: locationNames.filter((l) => l.level === 'ZONE').map((l) => l.name),
+  }), [uploadSrenies, locationNames]);
+
+  const editSections = useMemo(
+    () => (editTarget ? buildContactEditFieldSections(columns, editTarget.data, editFieldOptions) : []),
+    [editTarget, columns, editFieldOptions],
+  );
+
   const handleSaveEdit = async (data: Record<string, string | number | boolean | null>) => {
     if (!editTarget) return;
     setIsSavingEdit(true);
@@ -99,9 +119,14 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
     });
     if (!ok) return;
     try {
-      const result = await backendApi.clearSthanContacts(locationId);
-      addToast(`Cleared ${result.deleted} contact${result.deleted !== 1 ? 's' : ''}.`, 'success');
-      setRows([]); setColumns([]); setTotal(0); setTotalPages(1); setSourceFile(null);
+      await backendApi.clearSthanContacts(locationId);
+      setRows([]);
+      setTotal(0);
+      setTotalPages(1);
+      setPage(1);
+      setColumns([]);
+      setSourceFile(null);
+      addToast('Contact list cleared.', 'success');
     } catch (err) {
       addToast(toUiError(err, 'Failed to clear contacts.'), 'error');
     }
@@ -109,16 +134,6 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
 
   return (
     <div className="animate-slide-up">
-      <ContactEditModal
-        isOpen={editTarget !== null}
-        title={editTarget?.data['name'] != null ? `Edit — ${String(editTarget.data['name'])}` : 'Edit Contact'}
-        fields={editTarget ? buildContactEditFields(columns, editTarget.data) : []}
-        data={editTarget?.data ?? {}}
-        isSaving={isSavingEdit}
-        onClose={() => setEditTarget(null)}
-        onSave={handleSaveEdit}
-      />
-
       <TableLayoutModal
         isOpen={showLayoutModal}
         onClose={() => setShowLayoutModal(false)}
@@ -131,140 +146,113 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
         onUpdate={(id, cols, nm) => layout.updateLayout(id, cols, nm)}
         onDelete={layout.deleteLayout}
       />
+
+      <ContactEditModal
+        isOpen={editTarget !== null}
+        title={editTarget?.data['name'] != null ? `Edit — ${String(editTarget.data['name'])}` : 'Edit Contact'}
+        sections={editSections}
+        data={editTarget?.data ?? {}}
+        isSaving={isSavingEdit}
+        onClose={() => setEditTarget(null)}
+        onSave={handleSaveEdit}
+      />
+
       <ContactUploadModal
         isOpen={showUploadModal}
         description={STHAN_CONTACT_UPLOAD_DESCRIPTION}
         onClose={() => setShowUploadModal(false)}
-        onUpload={(file) => backendApi.uploadSthanContacts(locationId, file)}
+        previewUpload={(file) => backendApi.previewMemberContactUpload(file, { locationId })}
         onUploaded={() => {
           setPage(1);
           load(1);
         }}
       />
+
       <PageHeader
         icon="📋"
-        title={`${locationName} — Contacts`}
-        subtitle={`Contact list for this sthan, uploaded from Excel.${sourceFile ? ` Source: ${sourceFile}` : ''}`}
-        stats={[
-          { label: 'contacts', value: total, variant: 'info' },
-          ...(columns.length > 0 ? [{ label: 'columns', value: columns.length }] : []),
-        ]}
+        title={`${locationName} Contacts`}
+        subtitle="Manage contacts assigned to this Sthan."
+        stats={[{ label: 'contacts', value: total, variant: 'info' }]}
         actions={
           <>
-            {columns.length > 0 && (
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setShowLayoutModal(true)}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                Columns
-                {layout.activeLayoutName && (
-                  <span style={{ fontSize: '0.72rem', fontWeight: 700, background: 'rgba(99,102,241,0.15)', color: 'var(--primary)', padding: '1px 6px', borderRadius: '4px' }}>
-                    {layout.activeLayoutName}
-                  </span>
-                )}
-              </button>
+            {sourceFile && (
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)' }}>
+                Source: {sourceFile}
+              </span>
             )}
-            {total > 0 && (
-              <button type="button" className="btn btn-danger-outline" onClick={handleClear}>
-                Clear All
-              </button>
-            )}
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => setShowUploadModal(true)}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line>
-                <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path>
-              </svg>
+            <button type="button" className="btn btn-secondary" onClick={() => void handleClear()}>
+              Clear List
+            </button>
+            <button type="button" className="btn btn-primary" onClick={() => setShowUploadModal(true)}>
               Upload Contacts
             </button>
           </>
         }
       />
 
-      {/* Empty state */}
-      {!isLoading && total === 0 && (
-        <div className="glass-panel" style={{ padding: '60px 24px', textAlign: 'center' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📋</div>
-          <h3 style={{ fontWeight: 700, marginBottom: '8px' }}>No contacts yet</h3>
-          <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', marginBottom: '24px', maxWidth: '400px', margin: '0 auto 24px' }}>
-            Upload an Excel file (.xlsx or .xls) to populate this sthan's contact list.
-          </p>
-          <button type="button" className="btn btn-primary" onClick={() => setShowUploadModal(true)}>
-            Upload Contacts
-          </button>
-        </div>
-      )}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+          onClick={() => { setLayoutEnabled(true); setShowLayoutModal(true); }}
+        >
+          Columns
+          {layout.activeLayoutName && (
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, background: 'rgba(99,102,241,0.15)', color: 'var(--primary)', padding: '1px 6px', borderRadius: '4px' }}>
+              {layout.activeLayoutName}
+            </span>
+          )}
+        </button>
+      </div>
 
-      {/* Table */}
-      {(isLoading || total > 0) && (
+      {isLoading && rows.length === 0 ? (
+        <div className="glass-panel loading-state">Loading contacts…</div>
+      ) : !isLoading && total === 0 ? (
+        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary-dark)' }}>
+          No contacts yet. Upload a contact list to get started.
+        </div>
+      ) : (
         <>
           <div className="table-container" style={{ overflowX: 'auto' }}>
             <table className="custom-table">
               <thead>
                 <tr>
-                  <th style={{ width: '48px', textAlign: 'center' }}>#</th>
-                  {isLoading && columns.length === 0
-                    ? <th>Loading…</th>
-                    : <>
-                        <th style={{ whiteSpace: 'nowrap' }}>Name</th>
-                        {visibleCols.map((col) => (
-                          <th key={col} style={{ whiteSpace: 'nowrap' }}>{MASTER_CONTACT_COLUMN_LABELS.get(col) ?? col}</th>
-                        ))}
-                        <th style={{ width: '56px' }} />
-                      </>
-                  }
+                  <th style={{ width: '44px', textAlign: 'center' }}>#</th>
+                  <th>Name</th>
+                  {visibleCols.map((k) => (
+                    <th key={k}>{MASTER_CONTACT_COLUMN_LABELS.get(k) ?? k}</th>
+                  ))}
+                  <th style={{ width: '56px' }} />
                 </tr>
               </thead>
               <tbody>
-                {isLoading ? (
-                  Array.from({ length: 6 }).map((_, i) => (
-                    <tr key={i}>
-                      <td>{i + 1}</td>
-                      {Array.from({ length: Math.max(visibleCols.length + 2, 4) }).map((__, j) => (
-                        <td key={j}>
-                          <div style={{ height: '12px', borderRadius: '4px', background: 'var(--border-dark)', width: '60%', animation: 'pulse 1.4s ease-in-out infinite' }} />
+                {rows.map((row, idx) => (
+                  <tr key={row.id}>
+                    <td style={{ textAlign: 'center', color: 'var(--text-secondary-dark)', fontSize: '0.8rem' }}>
+                      {(page - 1) * pageSize + idx + 1}
+                    </td>
+                    <td style={{ fontWeight: 600 }}>
+                      {row.data['name'] != null ? String(row.data['name']) : <span style={{ opacity: 0.4 }}>—</span>}
+                    </td>
+                    {visibleCols.map((k) => {
+                      const val = row.data[k];
+                      return (
+                        <td key={k} style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {val != null ? String(val) : <span style={{ opacity: 0.35 }}>—</span>}
                         </td>
-                      ))}
-                    </tr>
-                  ))
-                ) : rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={visibleCols.length + 3} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary-dark)' }}>
-                      No contacts on this page.
+                      );
+                    })}
+                    <td style={{ textAlign: 'right' }}>
+                      <TableRowActionsMenu
+                        ariaLabel={`Actions for ${row.data['name'] != null ? String(row.data['name']) : 'contact'}`}
+                        actions={[
+                          { label: 'Edit', onClick: () => setEditTarget(row) },
+                        ]}
+                      />
                     </td>
                   </tr>
-                ) : (
-                  rows.map((row) => (
-                    <tr key={row.id}>
-                      <td style={{ textAlign: 'center', color: 'var(--text-secondary-dark)', fontSize: '0.8rem' }}>{row.rowIndex}</td>
-                      <td style={{ fontWeight: 600, whiteSpace: 'nowrap', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {row.data['name'] != null ? String(row.data['name']) : <span style={{ color: 'var(--text-secondary-dark)', opacity: 0.45 }}>—</span>}
-                      </td>
-                      {visibleCols.map((col) => {
-                        const val = row.data[col];
-                        return (
-                          <td key={col} style={{ maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={val !== null && val !== undefined ? String(val) : undefined}>
-                            {val !== null && val !== undefined
-                              ? <span>{String(val)}</span>
-                              : <span style={{ color: 'var(--text-secondary-dark)', opacity: 0.45 }}>—</span>
-                            }
-                          </td>
-                        );
-                      })}
-                      <td style={{ textAlign: 'right', verticalAlign: 'middle' }}>
-                        <TableRowActionsMenu
-                          ariaLabel={`Actions for ${row.data['name'] != null ? String(row.data['name']) : 'contact'}`}
-                          actions={[{ label: 'Edit', onClick: () => setEditTarget(row) }]}
-                        />
-                      </td>
-                    </tr>
-                  ))
-                )}
+                ))}
               </tbody>
             </table>
           </div>
@@ -284,14 +272,6 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
           />
         </>
       )}
-
-      <div className="glass-panel" style={{ padding: '14px 18px', marginTop: '20px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-        <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>ℹ️</span>
-        <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)', lineHeight: 1.6 }}>
-          <strong>Sthan contact list:</strong> Upload an Excel file to populate this sthan's contact list.
-          Column headers are auto-mapped. Uploading a new file replaces the existing contact list for this sthan.
-        </div>
-      </div>
     </div>
   );
 };

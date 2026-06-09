@@ -5,6 +5,7 @@ import { SwitchToggle } from '../../components/common/SwitchToggle';
 import { PageHeader } from '../../components/common/PageHeader';
 import { FormSection } from '../../components/common/FormSection';
 import { FormActions } from '../../components/common/FormActions';
+import { useAdminDefinitions } from '../../context/admin-definitions-context';
 import {
   AdminUserApi,
   backendApi,
@@ -30,6 +31,7 @@ interface UsersFormPageProps {
 
 export const UsersFormPage: React.FC<UsersFormPageProps> = ({ editingUser, onBack, onSaved }) => {
   const { addToast } = useToast();
+  const { locationDefinitions } = useAdminDefinitions();
 
   const [roles, setRoles] = useState<RoleDefinitionApi[]>([]);
   const [locations, setLocations] = useState<LocationDefinitionApi[]>([]);
@@ -82,9 +84,6 @@ export const UsersFormPage: React.FC<UsersFormPageProps> = ({ editingUser, onBac
         backendApi.listRoleDefinitions({ pageSize: 500 })
           .then((r) => setRoles(r.items))
           .catch(() => addToast('Failed to load roles.', 'error')),
-        backendApi.listLocationDefinitions()
-          .then(setLocations)
-          .catch(() => addToast('Failed to load locations.', 'error')),
         backendApi.listPermissionSets()
           .then(setPermissionSets)
           .catch(() => addToast('Failed to load permission sets.', 'error')),
@@ -95,6 +94,10 @@ export const UsersFormPage: React.FC<UsersFormPageProps> = ({ editingUser, onBac
     };
     void loadSupport();
   }, [addToast]);
+
+  useEffect(() => {
+    setLocations(locationDefinitions);
+  }, [locationDefinitions]);
 
   useEffect(() => {
     setFormName(editingUser?.name ?? '');

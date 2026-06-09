@@ -107,7 +107,7 @@ export class CoreBusinessDbHydrationService {
         'SELECT id, code, name, created_at, updated_at FROM adwest.zones ORDER BY created_at ASC',
       ),
       this.ctx.dataSource.query(
-        'SELECT id, zone_id, name, description, code, active, is_service_sreny, join_us_visible, enrollment_scope, primary_contact_strategy, created_by, updated_by, created_at, updated_at FROM adwest.srenies ORDER BY created_at ASC',
+        'SELECT id, zone_id, name, description, code, active, is_service_sreny, join_us_visible, show_in_upload_excel, gada_assignment_enabled, enrollment_scope, primary_contact_strategy, created_by, updated_by, created_at, updated_at FROM adwest.srenies ORDER BY created_at ASC',
       ),
       Promise.resolve([] as unknown[]),
       Promise.resolve([] as unknown[]),
@@ -158,7 +158,7 @@ export class CoreBusinessDbHydrationService {
         'SELECT id, sreni_id, name, display_order, created_at, updated_at FROM adwest.sreni_divisions ORDER BY sreni_id ASC, display_order ASC, created_at ASC',
       ).catch(() => [] as unknown[]),
       this.ctx.dataSource.query(
-        'SELECT id, sreni_id, row_index, data, zone_location_id, sthan_location_id, division_location_id, division_id, sthan_id, source_file, uploaded_by, created_at, updated_at FROM adwest.sreni_contacts ORDER BY sreni_id ASC, row_index ASC',
+        'SELECT id, sreni_id, row_index, data, zone_location_id, sthan_location_id, division_location_id, division_id, sthan_id, contact_kind, parent_contact_id, sr_no, source_file, uploaded_by, created_at, updated_at FROM adwest.sreni_contacts ORDER BY sreni_id ASC, row_index ASC',
       ).catch(() => [] as unknown[]),
       this.ctx.dataSource.query(
         'SELECT id, sreni_id, title, event_date, start_time, end_time, color, notes, scope, sthan_ids, created_by, updated_by, created_at, updated_at FROM adwest.sreni_calendar_events ORDER BY event_date ASC, start_time ASC',
@@ -219,6 +219,8 @@ export class CoreBusinessDbHydrationService {
     for (const row of srenyRows as Array<{
       id: string; zone_id: string | null; name: string; description: string | null; code: string | null;
       active: boolean; is_service_sreny: boolean; join_us_visible?: boolean | null;
+      show_in_upload_excel?: boolean | null;
+      gada_assignment_enabled?: boolean | null;
       enrollment_scope?: string | null; primary_contact_strategy?: string | null;
       created_by: string | null; updated_by: string | null;
       created_at: string | Date; updated_at: string | Date;
@@ -229,6 +231,8 @@ export class CoreBusinessDbHydrationService {
         zoneId: row.zone_id ?? undefined,
         isServiceSreny: row.is_service_sreny,
         joinUsVisible: row.join_us_visible ?? false,
+        showInUploadExcel: row.show_in_upload_excel ?? false,
+        gadaAssignmentEnabled: row.gada_assignment_enabled ?? true,
         enrollmentScope: row.enrollment_scope ?? undefined,
         primaryContactStrategy: row.primary_contact_strategy ?? undefined,
         code: row.code ?? undefined,
@@ -680,6 +684,7 @@ export class CoreBusinessDbHydrationService {
       data: Record<string, string | number | boolean | null>;
       zone_location_id: string | null; sthan_location_id: string | null; division_location_id: string | null;
       division_id: string | null; sthan_id: string | null;
+      contact_kind: string | null; parent_contact_id: string | null; sr_no: number | null;
       source_file: string | null; uploaded_by: string | null;
       created_at: string | Date; updated_at: string | Date;
     }>) {
@@ -688,6 +693,9 @@ export class CoreBusinessDbHydrationService {
         sreniId: row.sreni_id,
         rowIndex: row.row_index,
         data: row.data ?? {},
+        contactKind: (row.contact_kind as 'household' | 'child' | undefined) ?? 'household',
+        parentContactId: row.parent_contact_id ?? undefined,
+        srNo: row.sr_no ?? undefined,
         zoneLocationId: row.zone_location_id ?? undefined,
         sthanLocationId: row.sthan_location_id ?? undefined,
         divisionLocationId: row.division_location_id ?? undefined,
@@ -766,12 +774,14 @@ export class CoreBusinessDbHydrationService {
 
   async mergeSreniesFromDatabase(): Promise<void> {
     const srenyRows = await this.ctx.dataSource.query(
-      'SELECT id, zone_id, name, description, code, active, is_service_sreny, join_us_visible, enrollment_scope, primary_contact_strategy, created_by, updated_by, created_at, updated_at FROM adwest.srenies ORDER BY created_at ASC',
+        'SELECT id, zone_id, name, description, code, active, is_service_sreny, join_us_visible, show_in_upload_excel, gada_assignment_enabled, enrollment_scope, primary_contact_strategy, created_by, updated_by, created_at, updated_at FROM adwest.srenies ORDER BY created_at ASC',
     ).catch(() => [] as unknown[]);
 
     for (const row of srenyRows as Array<{
       id: string; zone_id: string | null; name: string; description: string | null; code: string | null;
       active: boolean; is_service_sreny: boolean; join_us_visible?: boolean | null;
+      show_in_upload_excel?: boolean | null;
+      gada_assignment_enabled?: boolean | null;
       enrollment_scope?: string | null; primary_contact_strategy?: string | null;
       created_by: string | null; updated_by: string | null;
       created_at: string | Date; updated_at: string | Date;
@@ -782,6 +792,8 @@ export class CoreBusinessDbHydrationService {
         zoneId: row.zone_id ?? undefined,
         isServiceSreny: row.is_service_sreny,
         joinUsVisible: row.join_us_visible ?? false,
+        showInUploadExcel: row.show_in_upload_excel ?? false,
+        gadaAssignmentEnabled: row.gada_assignment_enabled ?? true,
         enrollmentScope: row.enrollment_scope ?? undefined,
         primaryContactStrategy: row.primary_contact_strategy ?? undefined,
         code: row.code ?? undefined,
