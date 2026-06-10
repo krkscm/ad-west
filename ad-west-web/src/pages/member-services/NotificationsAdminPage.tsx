@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { AppNotificationApi, NotificationTarget, backendApi } from '../../utils/backendApi'
 import { useToast } from '../../components/common/Toast'
 import { useConfirm } from '../../components/common/ConfirmDialog'
@@ -9,6 +9,13 @@ import { FormActions } from '../../components/common/FormActions'
 import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu'
 import { EmptyState } from '../../components/common/EmptyState'
 import { useEnumOptions } from '../../hooks/useEnumOptions'
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../../components/common/TableColumnFilterRow'
+import { TableColumnHeaderRow } from '../../components/common/TableColumnHeaderRow'
+import { TableNoResultsRow } from '../../components/common/TableNoResultsRow'
+import { useTableColumnFilters } from '../../hooks/useTableColumnFilters'
+import { useTableSort } from '../../hooks/useTableSort'
+import { applyClientColumnFilters, type ClientFilterAccessor } from '../../utils/clientTableFilter'
+import { applyClientColumnSort } from '../../utils/clientTableSort'
 
 type Mode = 'list' | 'create' | 'edit'
 
@@ -29,6 +36,64 @@ export function NotificationsAdminPage() {
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState(BLANK)
   const [saving, setSaving] = useState(false)
+  const { filters, debouncedFilters, setFilter, clearFilters } = useTableColumnFilters()
+  const { sortBy, sortDir, toggleSort, clearSort } = useTableSort()
+
+  const filterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: 'title', label: 'Title', filterable: true, placeholder: 'Title…' },
+    {
+      key: 'target',
+      label: 'Target',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All targets',
+      options: targetOptions.map((o) => ({ value: o.value, label: o.label })),
+    },
+    { key: 'validPeriod', label: 'Valid Period', filterable: true, placeholder: 'Valid period…' },
+    {
+      key: 'active',
+      label: 'Status',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All',
+      options: [
+        { value: 'live', label: 'Live' },
+        { value: 'scheduled', label: 'Scheduled / Expired' },
+        { value: 'inactive', label: 'Inactive' },
+      ],
+    },
+    { key: '__actions__', label: 'Actions', filterable: false, sortable: false, align: 'right' },
+  ], [targetOptions])
+
+  const accessors = useMemo<Record<string, ClientFilterAccessor<AppNotificationApi>>>(() => ({
+    title: { getValue: (n) => n.title },
+    target: { getValue: (n) => n.target, match: 'exact' },
+    validPeriod: {
+      getValue: (n) => `${new Date(n.validFrom).toLocaleDateString('en-AE')} ${new Date(n.validTo).toLocaleDateString('en-AE')}`,
+    },
+    active: {
+      getValue: (n) => {
+        if (isLive(n)) return 'live'
+        if (n.isActive) return 'scheduled'
+        return 'inactive'
+      },
+      match: 'exact',
+    },
+  }), [])
+
+  const displayedRows = useMemo(
+    () => applyClientColumnSort(
+      applyClientColumnFilters(items, debouncedFilters, accessors),
+      sortBy,
+      sortDir,
+      accessors,
+    ),
+    [items, debouncedFilters, accessors, sortBy, sortDir],
+  )
+  const clearAllFilters = () => {
+    clearFilters()
+    clearSort()
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -188,16 +253,23 @@ export function NotificationsAdminPage() {
         <div className="table-container">
           <table className="custom-table">
             <thead>
-              <tr>
-                <th>Title</th>
-                <th>Target</th>
-                <th>Valid Period</th>
-                <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
-              </tr>
+              <TableColumnHeaderRow
+                columns={filterColumns}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={toggleSort}
+              />
+              <TableColumnFilterRow
+                columns={filterColumns}
+                values={filters}
+                onChange={setFilter}
+                onClear={clearAllFilters}
+              />
             </thead>
             <tbody>
-              {items.map((n) => {
+              {displayedRows.length === 0 ? (
+                <TableNoResultsRow colSpan={5} title="No notifications match your filters" onClearFilters={clearAllFilters} />
+              ) : displayedRows.map((n) => {
                 const live = isLive(n)
                 return (
                   <tr key={n.id}>

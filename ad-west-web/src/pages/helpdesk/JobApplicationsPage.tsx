@@ -1,9 +1,17 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { backendApi, ApplicationStatus, JobApplicationApi, JobApplicationActivityApi } from '../../utils/backendApi'
 import { useToast } from '../../components/common/Toast'
 import { PageHeader } from '../../components/common/PageHeader'
 import { EmptyState } from '../../components/common/EmptyState'
 import { useEnumOptions } from '../../hooks/useEnumOptions'
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../../components/common/TableColumnFilterRow'
+import { TableColumnHeaderRow } from '../../components/common/TableColumnHeaderRow'
+import { TableNoResultsRow } from '../../components/common/TableNoResultsRow'
+import { useTableColumnFilters } from '../../hooks/useTableColumnFilters'
+import { useTableSort } from '../../hooks/useTableSort'
+import { applyClientColumnFilters, type ClientFilterAccessor } from '../../utils/clientTableFilter'
+import { applyClientColumnSort } from '../../utils/clientTableSort'
+import { isListFilterActive } from '../../utils/tableListUtils'
 
 const STATUS_BADGE: Record<ApplicationStatus, string> = {
   new: 'badge-info',
@@ -46,6 +54,31 @@ export function JobApplicationsPage() {
   const [followUpNote, setFollowUpNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>('')
+  const { filters, debouncedFilters, setFilter, clearFilters } = useTableColumnFilters()
+  const { sortBy, sortDir, toggleSort, clearSort } = useTableSort()
+
+  const filterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: 'applicantName', label: 'Applicant', filterable: true, placeholder: 'Applicant…' },
+    { key: 'jobTitle', label: 'Job', filterable: true, placeholder: 'Job…' },
+    {
+      key: 'status',
+      label: 'Status',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All statuses',
+      options: statusOptions.map((o) => ({ value: o.value, label: o.label })),
+    },
+    { key: '__resume__', label: 'Resume', filterable: false, sortable: false },
+    { key: 'appliedAt', label: 'Applied', filterable: true, placeholder: 'Applied…' },
+    { key: '__actions__', filterable: false, sortable: false, width: '56px' },
+  ], [statusOptions])
+
+  const accessors = useMemo<Record<string, ClientFilterAccessor<JobApplicationApi>>>(() => ({
+    applicantName: { getValue: (a) => a.name },
+    jobTitle: { getValue: (a) => a.jobTitle },
+    status: { getValue: (a) => a.status, match: 'exact' },
+    appliedAt: { getValue: (a) => new Date(a.createdAt).toLocaleDateString() },
+  }), [])
 
   const loadApplications = useCallback(async () => {
     setLoading(true)
@@ -82,6 +115,22 @@ export function JobApplicationsPage() {
   }, [selected, loadActivities])
 
   const filtered = filterStatus ? applications.filter((a) => a.status === filterStatus) : applications
+  const displayedRows = useMemo(
+    () => applyClientColumnSort(
+      applyClientColumnFilters(filtered, debouncedFilters, accessors),
+      sortBy,
+      sortDir,
+      accessors,
+    ),
+    [filtered, debouncedFilters, accessors, sortBy, sortDir],
+  )
+  const hasColumnFilters = Object.values(debouncedFilters).some((v) => v.trim())
+  const hasFiltersActive = isListFilterActive(hasColumnFilters, filterStatus)
+  const clearAllFilters = () => {
+    clearFilters()
+    clearSort()
+    setFilterStatus('')
+  }
 
   const openApplication = (app: JobApplicationApi) => {
     setSelected(app)
@@ -159,23 +208,30 @@ export function JobApplicationsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: selected ? 'minmax(0,1fr) 420px' : '1fr', gap: '16px', alignItems: 'start' }}>
         <div>
           {loading && <div className="loading-state">Loading applications…</div>}
-          {!loading && filtered.length === 0 && (
+          {!loading && applications.length === 0 && !hasFiltersActive && (
             <EmptyState title="No applications found" />
           )}
-          {!loading && filtered.length > 0 && (
+          {!loading && (applications.length > 0 || hasFiltersActive) && (
             <div className="table-container">
               <table className="custom-table">
                 <thead>
-                  <tr>
-                    <th>Applicant</th>
-                    <th>Job</th>
-                    <th>Status</th>
-                    <th>Resume</th>
-                    <th>Applied</th>
-                  </tr>
+                  <TableColumnHeaderRow
+                    columns={filterColumns}
+                    sortBy={sortBy}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                  />
+                  <TableColumnFilterRow
+                    columns={filterColumns}
+                    values={filters}
+                    onChange={setFilter}
+                    onClear={clearAllFilters}
+                  />
                 </thead>
                 <tbody>
-                  {filtered.map((app) => {
+                  {displayedRows.length === 0 ? (
+                    <TableNoResultsRow colSpan={6} title="No applications match your filters" onClearFilters={clearAllFilters} />
+                  ) : displayedRows.map((app) => {
                     const isActive = selected?.id === app.id
                     return (
                       <tr
@@ -201,6 +257,7 @@ export function JobApplicationsPage() {
                         <td style={{ whiteSpace: 'nowrap', fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>
                           {new Date(app.createdAt).toLocaleDateString()}
                         </td>
+                        <td />
                       </tr>
                     )
                   })}

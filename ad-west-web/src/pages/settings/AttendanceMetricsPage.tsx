@@ -5,6 +5,13 @@ import { PageHeader } from '../../components/common/PageHeader';
 import { useAdminDefinitions } from '../../context/admin-definitions-context';
 import { AttendanceMetricApi, backendApi, SreniDefinitionApi } from '../../utils/backendApi';
 import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../../components/common/TableColumnFilterRow';
+import { TableColumnHeaderRow } from '../../components/common/TableColumnHeaderRow';
+import { TableNoResultsRow } from '../../components/common/TableNoResultsRow';
+import { useTableColumnFilters } from '../../hooks/useTableColumnFilters';
+import { useTableSort } from '../../hooks/useTableSort';
+import { isListFilterActive } from '../../utils/tableListUtils';
+import type { ListSortParams } from '../../utils/backendApi';
 
 interface AttendanceMetricFormState {
   name: string;
@@ -58,12 +65,29 @@ export const AttendanceMetricsPage: React.FC = () => {
   const [form, setForm] = useState<AttendanceMetricFormState>(emptyForm());
   const [initialForm, setInitialForm] = useState<AttendanceMetricFormState>(emptyForm());
   const [formErrors, setFormErrors] = useState<AttendanceMetricFormErrors>({});
+  const { filters, debouncedFilters, setFilter, clearFilters, filtersQuery } = useTableColumnFilters();
+  const { sortBy, sortDir, toggleSort, clearSort, sortQuery } = useTableSort();
 
   const selectedSreni = useMemo(
     () => srenies.find((sreni) => sreni.id === selectedSreniId),
     [selectedSreniId, srenies],
   );
   const activeCount = useMemo(() => metrics.filter((metric) => metric.active).length, [metrics]);
+
+  const metricFilterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: '__index__', label: '#', filterable: false, sortable: false, align: 'center', width: '40px' },
+    { key: 'name', label: 'Metric Name', filterable: true, placeholder: 'Name…' },
+    { key: 'keys', label: 'Keys', filterable: true, placeholder: 'Keys…' },
+    {
+      key: 'active',
+      label: 'Status',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All',
+      options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }],
+    },
+    { key: '__actions__', label: 'Actions', filterable: false, sortable: false, align: 'right' },
+  ], []);
   const isFormOpen = isAdding || Boolean(editingId);
   const isFormDirty = useMemo(
     () => isFormOpen && JSON.stringify(form) !== JSON.stringify(initialForm),
@@ -81,7 +105,7 @@ export const AttendanceMetricsPage: React.FC = () => {
     }
   }, [sreniDefinitions]);
 
-  const loadMetrics = useCallback(async () => {
+  const loadMetrics = useCallback(async (sort: ListSortParams | undefined = sortQuery) => {
     if (!selectedSreniId) {
       setMetrics([]);
       return;
@@ -93,6 +117,8 @@ export const AttendanceMetricsPage: React.FC = () => {
         page: 1,
         pageSize: 200,
         sreniId: selectedSreniId,
+        filters: filtersQuery,
+        ...sort,
       });
       setMetrics(response.items);
     } catch (error) {
@@ -100,7 +126,7 @@ export const AttendanceMetricsPage: React.FC = () => {
     } finally {
       setIsLoadingMetrics(false);
     }
-  }, [addToast, selectedSreniId]);
+  }, [addToast, selectedSreniId, filtersQuery, sortQuery]);
 
   useEffect(() => {
     void loadSrenies();
@@ -109,6 +135,10 @@ export const AttendanceMetricsPage: React.FC = () => {
   useEffect(() => {
     void loadMetrics();
   }, [loadMetrics]);
+
+  useEffect(() => {
+    void loadMetrics(sortQuery);
+  }, [sortBy, sortDir]);
 
   useEffect(() => {
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -258,6 +288,14 @@ export const AttendanceMetricsPage: React.FC = () => {
     } catch (error) {
       addToast(toUiError(error, 'Failed to update attendance metric.'), 'error');
     }
+  };
+
+  const hasColumnFilters = Object.values(debouncedFilters).some((v) => v.trim());
+  const hasFiltersActive = isListFilterActive(hasColumnFilters);
+  const clearAllFilters = () => {
+    clearFilters();
+    clearSort();
+    void loadMetrics(undefined);
   };
 
   const handleDelete = async (metric: AttendanceMetricApi) => {
@@ -528,7 +566,7 @@ export const AttendanceMetricsPage: React.FC = () => {
             </div>
           )}
 
-          {!isLoadingMetrics && metrics.length === 0 && !isFormOpen && (
+          {!isLoadingMetrics && metrics.length === 0 && !isFormOpen && !hasFiltersActive && (
             <div style={{ padding: '40px 24px', textAlign: 'center' }}>
               <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>📋</div>
               <div style={{ fontWeight: 700, marginBottom: '6px' }}>No attendance metrics yet</div>
@@ -541,20 +579,27 @@ export const AttendanceMetricsPage: React.FC = () => {
             </div>
           )}
 
-          {!isLoadingMetrics && metrics.length > 0 && (
+          {!isLoadingMetrics && (metrics.length > 0 || hasFiltersActive) && (
             <div className="table-container">
               <table className="custom-table">
                 <thead>
-                  <tr>
-                    <th style={{ width: '40px', textAlign: 'center' }}>#</th>
-                    <th>Metric Name</th>
-                    <th>Keys</th>
-                    <th>Status</th>
-                    <th style={{ textAlign: 'right' }}>Actions</th>
-                  </tr>
+                  <TableColumnHeaderRow
+                    columns={metricFilterColumns}
+                    sortBy={sortBy}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                  />
+                  <TableColumnFilterRow
+                    columns={metricFilterColumns}
+                    values={filters}
+                    onChange={setFilter}
+                    onClear={clearAllFilters}
+                  />
                 </thead>
                 <tbody>
-                  {metrics.map((metric, idx) => (
+                  {metrics.length === 0 ? (
+                    <TableNoResultsRow colSpan={5} title="No metrics match your filters" onClearFilters={clearAllFilters} />
+                  ) : metrics.map((metric, idx) => (
                     <tr key={metric.id} style={{ opacity: metric.active ? 1 : 0.55 }}>
                       <td style={{ textAlign: 'center', color: 'var(--text-secondary-dark)', fontSize: '0.82rem' }}>{idx + 1}</td>
                       <td>

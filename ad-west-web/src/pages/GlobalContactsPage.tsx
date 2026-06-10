@@ -12,6 +12,13 @@ import { PAGE_SIZE_OPTIONS, PaginationBar } from '../components/common/Paginatio
 import { EmptyState } from '../components/common/EmptyState';
 import { TableRowActionsMenu } from '../components/common/TableRowActionsMenu';
 import { useTableLayout } from '../hooks/useTableLayout';
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../components/common/TableColumnFilterRow';
+import { TableColumnHeaderRow } from '../components/common/TableColumnHeaderRow';
+import { TableNoResultsRow } from '../components/common/TableNoResultsRow';
+import { useTableColumnFilters } from '../hooks/useTableColumnFilters';
+import { useTableSort } from '../hooks/useTableSort';
+import { isListFilterActive } from '../utils/tableListUtils';
+import type { ListSortParams } from '../utils/backendApi';
 import { useAdminDefinitions } from '../context/admin-definitions-context';
 import {
   backendApi,
@@ -256,6 +263,8 @@ export const GlobalContactsPage: React.FC = () => {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const [pageSize, setPageSize] = useState(10);
+  const { filters, debouncedFilters, setFilter, clearFilters, filtersQuery } = useTableColumnFilters();
+  const { sortBy, sortDir, toggleSort, clearSort, sortQuery } = useTableSort();
 
   // Columns available to the layout modal (excludes 'name' which is always pinned)
   const colDefs = useMemo(
@@ -288,7 +297,7 @@ export const GlobalContactsPage: React.FC = () => {
       .catch(() => {/* non-critical */});
   }, [divisionsBySreni]);
 
-  const load = useCallback((p: number, sreniId: string, sthanId: string, search: string, ps?: number) => {
+  const load = useCallback((p: number, sreniId: string, sthanId: string, search: string, ps?: number, colFilters = filtersQuery, sort: ListSortParams | undefined = sortQuery) => {
     setIsLoading(true);
     const size = ps ?? pageSize;
 
@@ -296,6 +305,8 @@ export const GlobalContactsPage: React.FC = () => {
       sreniId: sreniId || undefined,
       sthanId: sthanId || undefined,
       search: search || undefined,
+      filters: colFilters,
+      ...sort,
     })
       .then((res) => {
         setRows(res.items);
@@ -310,7 +321,7 @@ export const GlobalContactsPage: React.FC = () => {
       })
       .catch((err) => addToast(toUiError(err, 'Failed to load contacts.'), 'error'))
       .finally(() => setIsLoading(false));
-  }, [addToast, pageSize]);
+  }, [addToast, pageSize, filtersQuery, sortQuery]);
 
   useEffect(() => {
     setSrenies(sreniDefinitions);
@@ -396,8 +407,52 @@ export const GlobalContactsPage: React.FC = () => {
     setPage(1);
   }, [filterSreniId, filterSthanId, appliedSearch, load]);
 
+  useEffect(() => {
+    if (filterSreniId) loadDivisions(filterSreniId);
+  }, [filterSreniId, loadDivisions]);
+
+  useEffect(() => {
+    setPage(1);
+    load(1, filterSreniId, filterSthanId, appliedSearch, undefined, filtersQuery);
+  }, [debouncedFilters]);
+
+  useEffect(() => {
+    setPage(1);
+    load(1, filterSreniId, filterSthanId, appliedSearch, undefined, filtersQuery, sortQuery);
+  }, [sortBy, sortDir]);
+
   const sthanById = useMemo(() => new Map(sthans.map((s) => [s.id, s.name])), [sthans]);
   const sreniById = useMemo(() => new Map(srenies.map((s) => [s.id, s.name])), [srenies]);
+
+  const contactFilterColumns = useMemo<TableColumnFilterDef[]>(() => {
+    const divisionOptions = filterSreniId
+      ? (divisionsBySreni.get(filterSreniId) ?? []).map((d) => ({ value: d.id, label: d.name }))
+      : [];
+    return [
+      { key: '__index__', label: '#', filterable: false, sortable: false, align: 'center', width: '44px' },
+      { key: 'name', label: 'Name', filterable: true, placeholder: 'Name…' },
+      { key: '__primary_sreni__', label: 'Primary Sreni', filterable: false, sortable: false },
+      { key: '__additional_srenis__', label: 'Additional Srenis', filterable: false, sortable: false },
+      ...(divisionOptions.length
+        ? [{ key: 'divisionId', label: 'Division', filterable: true as const, filterType: 'select' as const, placeholder: 'All divisions', options: divisionOptions }]
+        : [{ key: '__division__', label: 'Division', filterable: false, sortable: false }]),
+      {
+        key: 'sthanId',
+        label: 'Sthan',
+        filterable: true,
+        filterType: 'select',
+        placeholder: 'All sthans',
+        options: sthans.map((s) => ({ value: s.id, label: s.name })),
+      },
+      ...visibleCols.map((col) => ({
+        key: col,
+        label: MASTER_CONTACT_COLUMN_LABELS.get(col) ?? col,
+        filterable: true,
+        placeholder: MASTER_CONTACT_COLUMN_LABELS.get(col) ?? col,
+      })),
+      { key: '__actions__', filterable: false, sortable: false, width: '56px' },
+    ];
+  }, [filterSreniId, divisionsBySreni, sthans, visibleCols]);
 
   const openEdit = useCallback((row: SreniContactRowApi) => {
     ensureLocationsLoaded();
@@ -529,6 +584,21 @@ export const GlobalContactsPage: React.FC = () => {
   };
 
   const displayedRows = showInactive ? rows : rows.filter((r) => r.active !== false);
+  const hasColumnFilters = Object.values(debouncedFilters).some((v) => v.trim());
+  const hasFiltersActive = isListFilterActive(appliedSearch, hasColumnFilters, filterSreniId, filterSthanId);
+  const showEmptyState = !isLoading && total === 0 && !hasFiltersActive;
+  const tableColSpan = 7 + visibleCols.length;
+
+  const clearAllFilters = () => {
+    clearFilters();
+    clearSort();
+    setAppliedSearch('');
+    setSearchText('');
+    setFilterSreniId('');
+    setFilterSthanId('');
+    setPage(1);
+    load(1, '', '', '', undefined, undefined, undefined);
+  };
 
   return (
     <div className="animate-slide-up">
@@ -676,7 +746,7 @@ export const GlobalContactsPage: React.FC = () => {
       {/* Table */}
       {isLoading && rows.length === 0 ? (
         <div className="glass-panel loading-state">Loading contacts…</div>
-      ) : !isLoading && total === 0 ? (
+      ) : showEmptyState ? (
         <EmptyState
           icon="📋"
           title="No contacts found"
@@ -692,18 +762,18 @@ export const GlobalContactsPage: React.FC = () => {
           <div className="table-container" style={{ overflowX: 'auto' }}>
             <table className="custom-table">
               <thead>
-                <tr>
-                  <th style={{ width: '44px', textAlign: 'center' }}>#</th>
-                  <th style={{ whiteSpace: 'nowrap' }}>Name</th>
-                  <th style={{ whiteSpace: 'nowrap' }}>Primary Sreni</th>
-                  <th style={{ whiteSpace: 'nowrap' }}>Additional Srenis</th>
-                  <th style={{ whiteSpace: 'nowrap' }}>Division</th>
-                  <th style={{ whiteSpace: 'nowrap' }}>Sthan</th>
-                  {visibleCols.map((k) => (
-                    <th key={k} style={{ whiteSpace: 'nowrap' }}>{MASTER_CONTACT_COLUMN_LABELS.get(k) ?? k}</th>
-                  ))}
-                  <th style={{ width: '56px' }} />
-                </tr>
+                <TableColumnHeaderRow
+                  columns={contactFilterColumns}
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                />
+                <TableColumnFilterRow
+                  columns={contactFilterColumns}
+                  values={filters}
+                  onChange={setFilter}
+                  onClear={clearAllFilters}
+                />
               </thead>
               <tbody>
                 {isLoading
@@ -714,7 +784,9 @@ export const GlobalContactsPage: React.FC = () => {
                         ))}
                       </tr>
                     ))
-                  : displayedRows.map((row, idx) => {
+                  : displayedRows.length === 0 ? (
+                      <TableNoResultsRow colSpan={tableColSpan} title="No contacts match your filters" onClearFilters={clearAllFilters} />
+                    ) : displayedRows.map((row, idx) => {
                       const sthanName = row.sthanId ? sthanById.get(row.sthanId) : null;
                       const sreniName = sreniById.get(row.sreniId) ?? row.sreniName ?? row.sreniId;
                       const divName = row.divisionId

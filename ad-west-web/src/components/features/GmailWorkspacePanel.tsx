@@ -1,7 +1,13 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { backendApi, GmailInboxEmailApi } from '../../utils/backendApi'
 import { useToast } from '../common/Toast'
 import { HtmlEditor } from '../common/HtmlEditor'
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../common/TableColumnFilterRow'
+import { TableColumnHeaderRow } from '../common/TableColumnHeaderRow'
+import { useTableColumnFilters } from '../../hooks/useTableColumnFilters'
+import { useTableSort } from '../../hooks/useTableSort'
+import { applyClientColumnFilters, type ClientFilterAccessor } from '../../utils/clientTableFilter'
+import { applyClientColumnSort } from '../../utils/clientTableSort'
 
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: '0.82rem', fontWeight: 600,
@@ -19,6 +25,34 @@ export const GmailWorkspacePanel: React.FC = () => {
   const [inboxError, setInboxError] = useState<string | null>(null)
   const [emails, setEmails] = useState<GmailInboxEmailApi[]>([])
   const [selectedEmail, setSelectedEmail] = useState<GmailInboxEmailApi | null>(null)
+  const { filters, debouncedFilters, setFilter, clearFilters } = useTableColumnFilters()
+  const { sortBy, sortDir, toggleSort, clearSort } = useTableSort()
+
+  const filterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: 'subject', label: 'Subject', filterable: true, placeholder: 'Subject…' },
+    { key: 'from', label: 'From', filterable: true, placeholder: 'From…' },
+    { key: 'date', label: 'Date', filterable: true, placeholder: 'Date…' },
+  ], [])
+
+  const accessors = useMemo<Record<string, ClientFilterAccessor<GmailInboxEmailApi>>>(() => ({
+    subject: { getValue: (mail) => mail.subject || '(No subject)' },
+    from: { getValue: (mail) => mail.from },
+    date: { getValue: (mail) => mail.date },
+  }), [])
+
+  const displayedEmails = useMemo(
+    () => applyClientColumnSort(
+      applyClientColumnFilters(emails, debouncedFilters, accessors),
+      sortBy,
+      sortDir,
+      accessors,
+    ),
+    [emails, debouncedFilters, accessors, sortBy, sortDir],
+  )
+  const clearAllFilters = () => {
+    clearFilters()
+    clearSort()
+  }
 
   const loadInbox = useCallback(async () => {
     setLoadingInbox(true)
@@ -170,14 +204,27 @@ export const GmailWorkspacePanel: React.FC = () => {
                 <div className="table-container">
                   <table className="custom-table">
                     <thead>
-                      <tr>
-                        <th>Subject</th>
-                        <th>From</th>
-                        <th>Date</th>
-                      </tr>
+                      <TableColumnHeaderRow
+                        columns={filterColumns}
+                        sortBy={sortBy}
+                        sortDir={sortDir}
+                        onSort={toggleSort}
+                      />
+                      <TableColumnFilterRow
+                        columns={filterColumns}
+                        values={filters}
+                        onChange={setFilter}
+                        onClear={clearAllFilters}
+                      />
                     </thead>
                     <tbody>
-                      {emails.map((mail) => (
+                      {displayedEmails.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary-dark)' }}>
+                            No inbox messages match the current filters.
+                          </td>
+                        </tr>
+                      ) : displayedEmails.map((mail) => (
                         <tr key={mail.id} onClick={() => setSelectedEmail(mail)} style={{ cursor: 'pointer' }}>
                           <td style={{ fontWeight: 600, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {mail.subject || '(No subject)'}

@@ -9,6 +9,14 @@ import { useAuth } from '../context/auth-context';
 import { useEnumOptions } from '../hooks/useEnumOptions';
 import { exportSreniReports } from '../utils/reportExport';
 import type { ExportFormat } from '../utils/tableExport';
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../components/common/TableColumnFilterRow';
+import { TableColumnHeaderRow } from '../components/common/TableColumnHeaderRow';
+import { TableNoResultsRow } from '../components/common/TableNoResultsRow';
+import { useTableColumnFilters } from '../hooks/useTableColumnFilters';
+import { useTableSort } from '../hooks/useTableSort';
+import { applyClientColumnFilters, type ClientFilterAccessor } from '../utils/clientTableFilter';
+import { applyClientColumnSort } from '../utils/clientTableSort';
+import { isListFilterActive } from '../utils/tableListUtils';
 
 interface Props {
   sreniId: string;
@@ -54,6 +62,8 @@ export const SreniReportsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
   const [formEntries, setFormEntries] = useState<Record<string, string>>({});
   const [formNotes, setFormNotes] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const { filters, debouncedFilters, setFilter, clearFilters } = useTableColumnFilters();
+  const { sortBy, sortDir, toggleSort, clearSort } = useTableSort();
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -75,6 +85,48 @@ export const SreniReportsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
 
   const typeParams = useMemo(() => allParams.filter((p) => p.submissionType === activeType), [allParams, activeType]);
   const typeReports = useMemo(() => allReports.filter((r) => r.submissionType === activeType), [allReports, activeType]);
+
+  const reportFilterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: 'period', label: 'Period', filterable: true, placeholder: 'Period…' },
+    ...(isZoneOrSuper ? [{ key: 'submittedBy', label: 'Submitted By', filterable: true as const, placeholder: 'Submitted by…' }] : []),
+    { key: 'submittedAt', label: 'Submitted At', filterable: true, placeholder: 'Submitted at…' },
+    { key: 'notes', label: 'Notes', filterable: true, placeholder: 'Notes…' },
+    ...typeParams.slice(0, 4).map((p) => ({
+      key: `metric_${p.id}`,
+      label: `${p.name}${p.unit ? ` (${p.unit})` : ''}`,
+      filterable: false as const,
+      sortable: false as const,
+    })),
+    { key: '__actions__', label: 'Actions', filterable: false, sortable: false, align: 'right' as const },
+  ], [isZoneOrSuper, typeParams]);
+
+  const reportAccessors = useMemo<Record<string, ClientFilterAccessor<SreniReportApi>>>(() => ({
+    period: { getValue: (r) => periodLabel(activeType, r.periodYear, r.periodValue) },
+    submittedBy: { getValue: (r) => r.submittedBy ?? '' },
+    submittedAt: {
+      getValue: (r) => (r.submittedAt
+        ? new Date(r.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+        : ''),
+    },
+    notes: { getValue: (r) => r.notes ?? '' },
+  }), [activeType]);
+
+  const displayedReports = useMemo(
+    () => applyClientColumnSort(
+      applyClientColumnFilters(typeReports, debouncedFilters, reportAccessors),
+      sortBy,
+      sortDir,
+      reportAccessors,
+    ),
+    [typeReports, debouncedFilters, reportAccessors, sortBy, sortDir],
+  );
+  const hasColumnFilters = Object.values(debouncedFilters).some((v) => v.trim());
+  const hasFiltersActive = isListFilterActive(hasColumnFilters);
+  const clearAllFilters = () => {
+    clearFilters();
+    clearSort();
+  };
+  const reportTableColSpan = 4 + (isZoneOrSuper ? 1 : 0) + typeParams.slice(0, 4).length;
 
   const enabledTypes = useMemo<SubmissionType[]>(() => {
     const seen = new Set(allParams.map((p) => p.submissionType as string));
@@ -317,7 +369,7 @@ export const SreniReportsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
         <div className="glass-panel" style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--text-secondary-dark)', fontSize: '0.9rem' }}>
           Loading reports…
         </div>
-      ) : typeReports.length === 0 && !isFormOpen ? (
+      ) : typeReports.length === 0 && !isFormOpen && !hasFiltersActive ? (
         <div className="glass-panel" style={{ padding: '60px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📊</div>
           <h3 style={{ fontWeight: 700, marginBottom: '8px' }}>No {submissionTypeLabel(activeType).toLowerCase()} reports yet</h3>
@@ -332,23 +384,27 @@ export const SreniReportsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
             </button>
           )}
         </div>
-      ) : typeReports.length > 0 && (
+      ) : (typeReports.length > 0 || hasFiltersActive) && (
         <div className="table-container" style={{ overflowX: 'auto' }}>
           <table className="custom-table">
             <thead>
-              <tr>
-                <th>Period</th>
-                {isZoneOrSuper && <th>Submitted By</th>}
-                <th style={{ whiteSpace: 'nowrap' }}>Submitted At</th>
-                <th>Notes</th>
-                {typeParams.slice(0, 4).map((p) => (
-                  <th key={p.id} style={{ whiteSpace: 'nowrap' }}>{p.name}{p.unit ? ` (${p.unit})` : ''}</th>
-                ))}
-                <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
-              </tr>
+              <TableColumnHeaderRow
+                columns={reportFilterColumns}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={toggleSort}
+              />
+              <TableColumnFilterRow
+                columns={reportFilterColumns}
+                values={filters}
+                onChange={setFilter}
+                onClear={clearAllFilters}
+              />
             </thead>
             <tbody>
-              {typeReports.map((report) => (
+              {displayedReports.length === 0 ? (
+                <TableNoResultsRow colSpan={reportTableColSpan} title="No reports match your filters" onClearFilters={clearAllFilters} />
+              ) : displayedReports.map((report) => (
                 <tr key={report.id}>
                   <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{periodLabel(activeType, report.periodYear, report.periodValue)}</td>
                   {isZoneOrSuper && <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary-dark)' }}>{report.submittedBy ?? '—'}</td>}

@@ -90,6 +90,7 @@ export const ExportMenu: React.FC<Props> = ({
       {open && enabledOptions.length > 0 && (
         <div
           role="menu"
+          className="dropdown-menu"
           style={{
             position: 'absolute',
             top: 'calc(100% + 6px)',
@@ -97,10 +98,7 @@ export const ExportMenu: React.FC<Props> = ({
             minWidth: '260px',
             maxHeight: '360px',
             overflowY: 'auto',
-            background: 'var(--glass-bg)',
-            border: '1px solid var(--border-dark)',
             borderRadius: '10px',
-            boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
             padding: '6px',
             zIndex: 40,
           }}
@@ -188,18 +186,16 @@ export const RowExportButton: React.FC<RowExportProps> = ({ title, disabled = fa
         ⬇
       </button>
       {open && (
-        <div style={{
-          position: 'absolute',
-          top: 'calc(100% + 4px)',
-          right: 0,
-          minWidth: '120px',
-          background: 'var(--glass-bg)',
-          border: '1px solid var(--border-dark)',
-          borderRadius: '8px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.16)',
-          padding: '4px',
-          zIndex: 30,
-        }}>
+        <div
+          className="dropdown-menu"
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            right: 0,
+            minWidth: '120px',
+            zIndex: 30,
+          }}
+        >
           {EXPORT_FORMATS.map((format) => (
             <button
               key={format}

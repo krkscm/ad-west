@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { backendApi, ReimbursementApi, ReimbursementCategory, ReimbursementStatus } from '../../utils/backendApi'
 import { useAuth } from '../../context/auth-context'
 import { useToast } from '../../components/common/Toast'
@@ -11,6 +11,14 @@ import { FormSection } from '../../components/common/FormSection'
 import { FormActions } from '../../components/common/FormActions'
 import { EmptyState } from '../../components/common/EmptyState'
 import { useEnumOptions } from '../../hooks/useEnumOptions'
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../../components/common/TableColumnFilterRow'
+import { TableColumnHeaderRow } from '../../components/common/TableColumnHeaderRow'
+import { TableNoResultsRow } from '../../components/common/TableNoResultsRow'
+import { isListFilterActive } from '../../utils/tableListUtils'
+import { useTableColumnFilters } from '../../hooks/useTableColumnFilters'
+import { useTableSort } from '../../hooks/useTableSort'
+import { applyClientColumnFilters, type ClientFilterAccessor } from '../../utils/clientTableFilter'
+import { applyClientColumnSort } from '../../utils/clientTableSort'
 
 const STATUS_COLORS: Record<ReimbursementStatus, string> = {
   draft:          'var(--text-secondary-dark)',
@@ -49,6 +57,56 @@ export function ReimbursementPage() {
   const [reviewStatus, setReviewStatus] = useState<ReimbursementStatus>('approved')
   const [reviewNotes, setReviewNotes] = useState('')
   const [reviewing, setReviewing] = useState(false)
+  const { filters, debouncedFilters, setFilter, clearFilters } = useTableColumnFilters()
+  const { sortBy, sortDir, toggleSort, clearSort } = useTableSort()
+
+  const filterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    {
+      key: 'category',
+      label: 'Category',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All categories',
+      options: categoryOptions.map((o) => ({ value: o.value, label: o.label })),
+    },
+    { key: 'description', label: 'Description', filterable: true, placeholder: 'Description…' },
+    { key: 'amount', label: 'Amount', filterable: true, placeholder: 'Amount…' },
+    {
+      key: 'status',
+      label: 'Status',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All statuses',
+      options: statusOptions.map((o) => ({ value: o.value, label: o.label })),
+    },
+    { key: 'date', label: 'Date', filterable: true, placeholder: 'Date…' },
+    { key: '__actions__', label: 'Actions', filterable: false, sortable: false, align: 'right' },
+  ], [categoryOptions, statusOptions])
+
+  const accessors = useMemo<Record<string, ClientFilterAccessor<ReimbursementApi>>>(() => ({
+    category: { getValue: (r) => r.category, match: 'exact' },
+    description: { getValue: (r) => r.description },
+    amount: { getValue: (r) => `${r.currency} ${Number(r.amount).toFixed(2)}` },
+    status: { getValue: (r) => r.status, match: 'exact' },
+    date: { getValue: (r) => new Date(r.createdAt).toLocaleDateString() },
+  }), [])
+
+  const displayedRows = useMemo(
+    () => applyClientColumnSort(
+      applyClientColumnFilters(items, debouncedFilters, accessors),
+      sortBy,
+      sortDir,
+      accessors,
+    ),
+    [items, debouncedFilters, accessors, sortBy, sortDir],
+  )
+  const hasColumnFilters = Object.values(debouncedFilters).some((v) => v.trim())
+  const hasFiltersActive = isListFilterActive(hasColumnFilters, filterStatus)
+  const clearAllFilters = () => {
+    clearFilters()
+    clearSort()
+    setFilterStatus('')
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -232,24 +290,30 @@ export function ReimbursementPage() {
       <div style={{ display: 'grid', gridTemplateColumns: selected ? 'minmax(0,1fr) 360px' : '1fr', gap: '16px', alignItems: 'start' }}>
         <div>
           {loading && <div className="loading-state">Loading…</div>}
-          {!loading && items.length === 0 && (
+          {!loading && items.length === 0 && !hasFiltersActive && (
             <EmptyState title="No reimbursement requests found" />
           )}
-          {!loading && items.length > 0 && (
+          {!loading && (items.length > 0 || hasFiltersActive) && (
             <div className="table-container">
               <table className="custom-table">
                 <thead>
-                  <tr>
-                    <th>Category</th>
-                    <th>Description</th>
-                    <th>Amount</th>
-                    <th>Status</th>
-                    <th>Date</th>
-                    <th style={{ textAlign: 'right' }}>Actions</th>
-                  </tr>
+                  <TableColumnHeaderRow
+                    columns={filterColumns}
+                    sortBy={sortBy}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                  />
+                  <TableColumnFilterRow
+                    columns={filterColumns}
+                    values={filters}
+                    onChange={setFilter}
+                    onClear={clearAllFilters}
+                  />
                 </thead>
                 <tbody>
-                  {items.map((r) => {
+                  {displayedRows.length === 0 ? (
+                    <TableNoResultsRow colSpan={6} title="No reimbursements match your filters" onClearFilters={clearAllFilters} />
+                  ) : displayedRows.map((r) => {
                     const isActive = selected?.id === r.id
                     return (
                       <tr key={r.id} onClick={() => { setSelected(r); setReviewStatus('approved'); setReviewNotes(r.reviewerNotes ?? '') }} style={{ cursor: 'pointer', background: isActive ? 'var(--primary-light)' : 'transparent' }}>

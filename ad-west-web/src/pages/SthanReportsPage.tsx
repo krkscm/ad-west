@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { backendApi, ReportMetricDefinitionApi, SthanReportApi } from '../utils/backendApi';
 import { useToast } from '../components/common/Toast';
 import { PageHeader } from '../components/common/PageHeader';
@@ -7,6 +7,14 @@ import { TableRowActionsMenu } from '../components/common/TableRowActionsMenu';
 import { formatLabels } from '../utils/tableExport';
 import { exportSthanReports } from '../utils/reportExport';
 import type { ExportFormat } from '../utils/tableExport';
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../components/common/TableColumnFilterRow';
+import { TableColumnHeaderRow } from '../components/common/TableColumnHeaderRow';
+import { TableNoResultsRow } from '../components/common/TableNoResultsRow';
+import { useTableColumnFilters } from '../hooks/useTableColumnFilters';
+import { useTableSort } from '../hooks/useTableSort';
+import { applyClientColumnFilters, type ClientFilterAccessor } from '../utils/clientTableFilter';
+import { applyClientColumnSort } from '../utils/clientTableSort';
+import { isListFilterActive } from '../utils/tableListUtils';
 
 interface Props {
   locationId: string;
@@ -30,6 +38,48 @@ export const SthanReportsPage: React.FC<Props> = ({ locationId, locationName }) 
   const [formMonth, setFormMonth] = useState(now.getMonth() + 1);
   const [formEntries, setFormEntries] = useState<Record<string, string>>({});
   const [formNotes, setFormNotes] = useState('');
+  const { filters, debouncedFilters, setFilter, clearFilters } = useTableColumnFilters();
+  const { sortBy, sortDir, toggleSort, clearSort } = useTableSort();
+
+  const reportFilterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: 'period', label: 'Period', filterable: true, placeholder: 'Period…' },
+    { key: 'submittedAt', label: 'Submitted At', filterable: true, placeholder: 'Submitted at…' },
+    { key: 'notes', label: 'Notes', filterable: true, placeholder: 'Notes…' },
+    ...metrics.slice(0, 4).map((m) => ({
+      key: `metric_${m.id}`,
+      label: `${m.name}${m.unit ? ` (${m.unit})` : ''}`,
+      filterable: false as const,
+      sortable: false as const,
+    })),
+    { key: '__actions__', label: 'Actions', filterable: false, sortable: false, align: 'right' as const },
+  ], [metrics]);
+
+  const reportAccessors = useMemo<Record<string, ClientFilterAccessor<SthanReportApi>>>(() => ({
+    period: { getValue: (r) => `${MONTHS[r.periodMonth - 1]} ${r.periodYear}` },
+    submittedAt: {
+      getValue: (r) => (r.submittedAt
+        ? new Date(r.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+        : ''),
+    },
+    notes: { getValue: (r) => r.notes ?? '' },
+  }), []);
+
+  const displayedReports = useMemo(
+    () => applyClientColumnSort(
+      applyClientColumnFilters(reports, debouncedFilters, reportAccessors),
+      sortBy,
+      sortDir,
+      reportAccessors,
+    ),
+    [reports, debouncedFilters, reportAccessors, sortBy, sortDir],
+  );
+  const hasColumnFilters = Object.values(debouncedFilters).some((v) => v.trim());
+  const hasFiltersActive = isListFilterActive(hasColumnFilters);
+  const clearAllFilters = () => {
+    clearFilters();
+    clearSort();
+  };
+  const reportTableColSpan = 4 + metrics.slice(0, 4).length;
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -217,7 +267,7 @@ export const SthanReportsPage: React.FC<Props> = ({ locationId, locationName }) 
       {/* Reports table */}
       {isLoading ? (
         <div className="glass-panel" style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--text-secondary-dark)', fontSize: '0.9rem' }}>Loading…</div>
-      ) : reports.length === 0 && !isFormOpen && metrics.length > 0 ? (
+      ) : reports.length === 0 && !isFormOpen && metrics.length > 0 && !hasFiltersActive ? (
         <div className="glass-panel" style={{ padding: '60px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📊</div>
           <h3 style={{ fontWeight: 700, marginBottom: '8px' }}>No reports yet</h3>
@@ -228,22 +278,27 @@ export const SthanReportsPage: React.FC<Props> = ({ locationId, locationName }) 
             Submit First Report
           </button>
         </div>
-      ) : reports.length > 0 && (
+      ) : (reports.length > 0 || hasFiltersActive) && (
         <div className="table-container" style={{ overflowX: 'auto' }}>
           <table className="custom-table">
             <thead>
-              <tr>
-                <th>Period</th>
-                <th>Submitted At</th>
-                <th>Notes</th>
-                {metrics.slice(0, 4).map((m) => (
-                  <th key={m.id} style={{ whiteSpace: 'nowrap' }}>{m.name}{m.unit ? ` (${m.unit})` : ''}</th>
-                ))}
-                <th style={{ textAlign: 'right' }}>Actions</th>
-              </tr>
+              <TableColumnHeaderRow
+                columns={reportFilterColumns}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={toggleSort}
+              />
+              <TableColumnFilterRow
+                columns={reportFilterColumns}
+                values={filters}
+                onChange={setFilter}
+                onClear={clearAllFilters}
+              />
             </thead>
             <tbody>
-              {reports.map((report) => (
+              {displayedReports.length === 0 ? (
+                <TableNoResultsRow colSpan={reportTableColSpan} title="No reports match your filters" onClearFilters={clearAllFilters} />
+              ) : displayedReports.map((report) => (
                 <tr key={report.id}>
                   <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{MONTHS[report.periodMonth - 1]} {report.periodYear}</td>
                   <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary-dark)', whiteSpace: 'nowrap' }}>

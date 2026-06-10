@@ -1,5 +1,13 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToast } from '../../components/common/Toast';
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../../components/common/TableColumnFilterRow';
+import { TableColumnHeaderRow } from '../../components/common/TableColumnHeaderRow';
+import { TableNoResultsRow } from '../../components/common/TableNoResultsRow';
+import { isListFilterActive } from '../../utils/tableListUtils';
+import { useTableColumnFilters } from '../../hooks/useTableColumnFilters';
+import { useTableSort } from '../../hooks/useTableSort';
+import { applyClientColumnFilters, type ClientFilterAccessor } from '../../utils/clientTableFilter';
+import { applyClientColumnSort } from '../../utils/clientTableSort';
 import { backendApi, MenuItemApi } from '../../utils/backendApi';
 
 const toUiError = (error: unknown, fallback: string): string => {
@@ -12,6 +20,60 @@ export const MenuManagementPage: React.FC = () => {
   const { addToast } = useToast();
   const [menus, setMenus] = useState<MenuItemApi[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const { filters, debouncedFilters, setFilter, clearFilters } = useTableColumnFilters();
+  const { sortBy, sortDir, toggleSort, clearSort } = useTableSort();
+
+  const menuByKey = useMemo(() => {
+    const m = new Map<string, MenuItemApi>();
+    menus.forEach((item) => m.set(item.key, item));
+    return m;
+  }, [menus]);
+
+  const filterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: 'label', label: 'Label', filterable: true, placeholder: 'Label…' },
+    { key: 'key', label: 'Key', filterable: true, placeholder: 'Key…' },
+    { key: 'parent', label: 'Parent', filterable: true, placeholder: 'Parent…' },
+    { key: 'order', label: 'Order', filterable: true, placeholder: 'Order…', align: 'center' },
+    {
+      key: 'active',
+      label: 'Status',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All',
+      options: [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }],
+      align: 'center',
+    },
+    { key: '__actions__', filterable: false, sortable: false, width: '56px' },
+  ], []);
+
+  const accessors = useMemo<Record<string, ClientFilterAccessor<MenuItemApi>>>(() => ({
+    label: { getValue: (item) => item.label },
+    key: { getValue: (item) => item.key },
+    parent: {
+      getValue: (item) => {
+        if (!item.parentKey) return '—';
+        return menuByKey.get(item.parentKey)?.label ?? item.parentKey;
+      },
+    },
+    order: { getValue: (item) => String(item.sortOrder), match: 'exact' },
+    active: { getValue: (item) => (item.active ? 'active' : 'inactive'), match: 'exact' },
+  }), [menuByKey]);
+
+  const displayedRows = useMemo(
+    () => applyClientColumnSort(
+      applyClientColumnFilters(menus, debouncedFilters, accessors),
+      sortBy,
+      sortDir,
+      accessors,
+    ),
+    [menus, debouncedFilters, accessors, sortBy, sortDir],
+  );
+  const hasColumnFilters = Object.values(debouncedFilters).some((v) => v.trim());
+  const hasFiltersActive = isListFilterActive(hasColumnFilters);
+  const clearAllFilters = () => {
+    clearFilters();
+    clearSort();
+  };
 
   const loadMenus = useCallback(async () => {
     setIsLoading(true);
@@ -47,16 +109,31 @@ export const MenuManagementPage: React.FC = () => {
         <div className="table-container">
           <table className="custom-table">
             <thead>
-              <tr>
-                <th>Label</th>
-                <th>Key</th>
-                <th>Parent</th>
-                <th style={{ textAlign: 'center' }}>Order</th>
-                <th style={{ textAlign: 'center' }}>Status</th>
-              </tr>
+              <TableColumnHeaderRow
+                columns={filterColumns}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={toggleSort}
+              />
+              <TableColumnFilterRow
+                columns={filterColumns}
+                values={filters}
+                onChange={setFilter}
+                onClear={clearAllFilters}
+              />
             </thead>
             <tbody>
-              {menus.map(item => (
+              {displayedRows.length === 0 ? (
+                hasFiltersActive ? (
+                  <TableNoResultsRow colSpan={6} title="No menu items match your filters" onClearFilters={clearAllFilters} />
+                ) : (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary-dark)' }}>
+                      No menu items found.
+                    </td>
+                  </tr>
+                )
+              ) : displayedRows.map(item => (
                 <tr key={item.id} style={{ opacity: item.active ? 1 : 0.55 }}>
                   <td style={{ fontWeight: item.parentKey ? 400 : 600, paddingLeft: item.parentKey ? '32px' : undefined }}>
                     {item.parentKey && <span style={{ color: 'var(--text-secondary-dark)', marginRight: '6px' }}>↳</span>}
@@ -77,15 +154,9 @@ export const MenuManagementPage: React.FC = () => {
                       {item.active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
+                  <td />
                 </tr>
               ))}
-              {menus.length === 0 && (
-                <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary-dark)' }}>
-                    No menu items found.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>

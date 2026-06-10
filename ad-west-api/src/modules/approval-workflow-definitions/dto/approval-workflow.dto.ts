@@ -169,6 +169,21 @@ export class ListApprovalWorkflowsQueryDto {
   @MinLength(2)
   @MaxLength(60)
   approvalMode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  filters?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  sortBy?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4)
+  sortDir?: string;
 }
 
 export class SubmitApprovalWorkflowItemDto {

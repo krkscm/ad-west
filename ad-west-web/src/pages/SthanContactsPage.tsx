@@ -11,6 +11,13 @@ import { buildContactEditFieldSections, MASTER_CONTACT_COLUMN_LABELS, orderConta
 import { useAdminDefinitions } from '../context/admin-definitions-context';
 import { backendApi, SthanContactRowApi } from '../utils/backendApi';
 import { useTableLayout } from '../hooks/useTableLayout';
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../components/common/TableColumnFilterRow';
+import { TableColumnHeaderRow } from '../components/common/TableColumnHeaderRow';
+import { TableNoResultsRow } from '../components/common/TableNoResultsRow';
+import { useTableColumnFilters } from '../hooks/useTableColumnFilters';
+import { useTableSort } from '../hooks/useTableSort';
+import { isListFilterActive } from '../utils/tableListUtils';
+import type { ListSortParams } from '../utils/backendApi';
 
 interface Props {
   locationId: string;
@@ -40,6 +47,8 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
   const [editTarget, setEditTarget] = useState<SthanContactRowApi | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [layoutEnabled, setLayoutEnabled] = useState(false);
+  const { filters, debouncedFilters, setFilter, clearFilters, filtersQuery } = useTableColumnFilters();
+  const { sortBy, sortDir, toggleSort, clearSort, sortQuery } = useTableSort();
 
   const layout = useTableLayout('sthan-contacts', { enabled: layoutEnabled });
 
@@ -49,10 +58,34 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
   );
   const visibleCols = layout.visibleKeys(colDefs);
 
-  const load = useCallback((p: number, ps?: number) => {
+  const contactFilterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: '__index__', label: '#', filterable: false, sortable: false, align: 'center', width: '44px' },
+    { key: 'name', label: 'Name', filterable: true, placeholder: 'Name…' },
+    ...visibleCols.map((col) => ({
+      key: col,
+      label: MASTER_CONTACT_COLUMN_LABELS.get(col) ?? col,
+      filterable: true,
+      placeholder: MASTER_CONTACT_COLUMN_LABELS.get(col) ?? col,
+    })),
+    { key: '__actions__', filterable: false, sortable: false, width: '56px' },
+  ], [visibleCols]);
+
+  const hasColumnFilters = Object.values(debouncedFilters).some((v) => v.trim());
+  const hasFiltersActive = isListFilterActive(hasColumnFilters);
+  const showEmptyState = !isLoading && total === 0 && !hasFiltersActive;
+  const tableColSpan = 3 + visibleCols.length;
+
+  const clearAllFilters = () => {
+    clearFilters();
+    clearSort();
+    setPage(1);
+    load(1, pageSize, undefined, undefined);
+  };
+
+  const load = useCallback((p: number, ps?: number, colFilters = filtersQuery, sort: ListSortParams | undefined = sortQuery) => {
     setIsLoading(true);
     const size = ps ?? pageSize;
-    backendApi.listSthanContacts(locationId, p, size)
+    backendApi.listSthanContacts(locationId, p, size, { filters: colFilters, ...sort })
       .then((res) => {
         setRows(res.items);
         setTotal(res.total);
@@ -66,7 +99,17 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
       })
       .catch((err) => addToast(toUiError(err, 'Failed to load contacts.'), 'error'))
       .finally(() => setIsLoading(false));
-  }, [locationId, pageSize, addToast]);
+  }, [locationId, pageSize, addToast, filtersQuery, sortQuery]);
+
+  useEffect(() => {
+    setPage(1);
+    load(1, pageSize, filtersQuery);
+  }, [debouncedFilters]);
+
+  useEffect(() => {
+    setPage(1);
+    load(1, pageSize, filtersQuery, sortQuery);
+  }, [sortBy, sortDir]);
 
   useEffect(() => {
     setPage(1);
@@ -208,7 +251,7 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
 
       {isLoading && rows.length === 0 ? (
         <div className="glass-panel loading-state">Loading contacts…</div>
-      ) : !isLoading && total === 0 ? (
+      ) : showEmptyState ? (
         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary-dark)' }}>
           No contacts yet. Upload a contact list to get started.
         </div>
@@ -217,17 +260,23 @@ export const SthanContactsPage: React.FC<Props> = ({ locationId, locationName })
           <div className="table-container" style={{ overflowX: 'auto' }}>
             <table className="custom-table">
               <thead>
-                <tr>
-                  <th style={{ width: '44px', textAlign: 'center' }}>#</th>
-                  <th>Name</th>
-                  {visibleCols.map((k) => (
-                    <th key={k}>{MASTER_CONTACT_COLUMN_LABELS.get(k) ?? k}</th>
-                  ))}
-                  <th style={{ width: '56px' }} />
-                </tr>
+                <TableColumnHeaderRow
+                  columns={contactFilterColumns}
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                />
+                <TableColumnFilterRow
+                  columns={contactFilterColumns}
+                  values={filters}
+                  onChange={setFilter}
+                  onClear={clearAllFilters}
+                />
               </thead>
               <tbody>
-                {rows.map((row, idx) => (
+                {rows.length === 0 ? (
+                  <TableNoResultsRow colSpan={tableColSpan} title="No contacts match your filters" onClearFilters={clearAllFilters} />
+                ) : rows.map((row, idx) => (
                   <tr key={row.id}>
                     <td style={{ textAlign: 'center', color: 'var(--text-secondary-dark)', fontSize: '0.8rem' }}>
                       {(page - 1) * pageSize + idx + 1}

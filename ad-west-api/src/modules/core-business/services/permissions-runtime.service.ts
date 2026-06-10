@@ -19,7 +19,7 @@ export class PermissionsRuntimeService {
     return Array.from(this.ctx.permissions.values()).sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  async listPermissionsFromDb(params: { page?: number; pageSize?: number; search?: string; locationId?: string }): Promise<{
+  async listPermissionsFromDb(params: { page?: number; pageSize?: number; search?: string; locationId?: string; columnFilters?: Record<string, string>; sortBy?: string; sortDir?: 'asc' | 'desc' }): Promise<{
     items: PermissionRecord[]; total: number; page: number; pageSize: number; totalPages: number;
   }> {
     const page = Math.max(1, params.page ?? 1);
@@ -29,20 +29,54 @@ export class PermissionsRuntimeService {
       let all = Array.from(this.ctx.permissions.values());
       if (params.locationId) all = all.filter((p) => p.locationId === params.locationId);
       if (q) all = all.filter((p) => p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q));
-      all.sort((a, b) => a.name.localeCompare(b.name));
+      const { applyInMemoryColumnSort } = await import('../utils/column-sort.util');
+      all = applyInMemoryColumnSort(all, { sortBy: params.sortBy, sortDir: params.sortDir }, {
+        code: (row) => row.code,
+        name: (row) => row.name,
+        locationId: (row) => row.locationId,
+        sreniId: (row) => row.sreniId,
+        description: (row) => row.description ?? '',
+        active: (row) => row.active,
+      }, (a, b) => a.name.localeCompare(b.name));
       const total = all.length;
       return { items: all.slice((page - 1) * pageSize, page * pageSize), total, page, pageSize, totalPages: Math.ceil(total / pageSize) || 1 };
     }
-    const searchParam = params.search?.trim() ? `%${params.search.trim()}%` : null;
+    const { appendPermissionColumnFilters } = await import('../utils/column-filter.util');
+    const { buildSqlOrderBy, PERMISSION_SORT_COLUMNS } = await import('../utils/column-sort.util');
+    const search = params.search?.trim();
     const locationParam = params.locationId ?? null;
+    const conditions: string[] = [];
+    const queryParams: unknown[] = [];
+    let paramIdx = 1;
+    if (search) {
+      conditions.push(`(name ILIKE $${paramIdx} OR code ILIKE $${paramIdx})`);
+      queryParams.push(`%${search}%`);
+      paramIdx += 1;
+    }
+    if (locationParam) {
+      conditions.push(`location_id = $${paramIdx}`);
+      queryParams.push(locationParam);
+      paramIdx += 1;
+    }
+    if (params.columnFilters && Object.keys(params.columnFilters).length > 0) {
+      paramIdx = appendPermissionColumnFilters(conditions, queryParams, paramIdx, params.columnFilters);
+    }
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const orderBy = buildSqlOrderBy(
+      { sortBy: params.sortBy, sortDir: params.sortDir },
+      PERMISSION_SORT_COLUMNS,
+      'ORDER BY name ASC',
+    );
+    const limitIdx = paramIdx;
+    const offsetIdx = paramIdx + 1;
     const [countRows, dataRows] = await Promise.all([
       this.ctx.dataSource.query(
-        `SELECT COUNT(*)::int AS total FROM adwest.permissions WHERE ($1::text IS NULL OR name ILIKE $1 OR code ILIKE $1) AND ($2::text IS NULL OR location_id = $2)`,
-        [searchParam, locationParam],
+        `SELECT COUNT(*)::int AS total FROM adwest.permissions ${whereClause}`,
+        queryParams,
       ),
       this.ctx.dataSource.query(
-        `SELECT id, location_id, sreni_id, code, name, description, active, created_at, updated_at, created_by, updated_by FROM adwest.permissions WHERE ($1::text IS NULL OR name ILIKE $1 OR code ILIKE $1) AND ($2::text IS NULL OR location_id = $2) ORDER BY name LIMIT $3 OFFSET $4`,
-        [searchParam, locationParam, pageSize, (page - 1) * pageSize],
+        `SELECT id, location_id, sreni_id, code, name, description, active, created_at, updated_at, created_by, updated_by FROM adwest.permissions ${whereClause} ${orderBy} LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+        [...queryParams, pageSize, (page - 1) * pageSize],
       ),
     ]);
     const total = (countRows as Array<{ total: number }>)[0].total;
@@ -168,7 +202,7 @@ export class PermissionsRuntimeService {
     return Array.from(this.ctx.permissionSets.values()).sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  async listPermissionSetsFromDb(params: { page?: number; pageSize?: number; search?: string }): Promise<{
+  async listPermissionSetsFromDb(params: { page?: number; pageSize?: number; search?: string; columnFilters?: Record<string, string>; sortBy?: string; sortDir?: 'asc' | 'desc' }): Promise<{
     items: PermissionSetRecord[]; total: number; page: number; pageSize: number; totalPages: number;
   }> {
     const page = Math.max(1, params.page ?? 1);
@@ -177,24 +211,50 @@ export class PermissionsRuntimeService {
       const q = (params.search ?? '').trim().toLowerCase();
       let all = Array.from(this.ctx.permissionSets.values());
       if (q) all = all.filter((s) => s.name.toLowerCase().includes(q) || s.description?.toLowerCase().includes(q));
-      all.sort((a, b) => a.name.localeCompare(b.name));
+      const { applyInMemoryColumnSort } = await import('../utils/column-sort.util');
+      all = applyInMemoryColumnSort(all, { sortBy: params.sortBy, sortDir: params.sortDir }, {
+        name: (row) => row.name,
+        description: (row) => row.description ?? '',
+        active: (row) => row.active,
+      }, (a, b) => a.name.localeCompare(b.name));
       const total = all.length;
       return { items: all.slice((page - 1) * pageSize, page * pageSize), total, page, pageSize, totalPages: Math.ceil(total / pageSize) || 1 };
     }
-    const searchParam = params.search?.trim() ? `%${params.search.trim()}%` : null;
+    const { appendPermissionSetColumnFilters } = await import('../utils/column-filter.util');
+    const { buildSqlOrderBy, PERMISSION_SET_SORT_COLUMNS } = await import('../utils/column-sort.util');
+    const search = params.search?.trim();
+    const conditions: string[] = [];
+    const queryParams: unknown[] = [];
+    let paramIdx = 1;
+    if (search) {
+      conditions.push(`(ps.name ILIKE $${paramIdx} OR ps.description ILIKE $${paramIdx})`);
+      queryParams.push(`%${search}%`);
+      paramIdx += 1;
+    }
+    if (params.columnFilters && Object.keys(params.columnFilters).length > 0) {
+      paramIdx = appendPermissionSetColumnFilters(conditions, queryParams, paramIdx, params.columnFilters, 'ps');
+    }
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const orderBy = buildSqlOrderBy(
+      { sortBy: params.sortBy, sortDir: params.sortDir },
+      PERMISSION_SET_SORT_COLUMNS,
+      'ORDER BY ps.name ASC',
+    );
+    const limitIdx = paramIdx;
+    const offsetIdx = paramIdx + 1;
     const [countRows, dataRows] = await Promise.all([
       this.ctx.dataSource.query(
-        `SELECT COUNT(*)::int AS total FROM adwest.permission_sets WHERE ($1::text IS NULL OR name ILIKE $1 OR description ILIKE $1)`,
-        [searchParam],
+        `SELECT COUNT(*)::int AS total FROM adwest.permission_sets ps ${whereClause}`,
+        queryParams,
       ),
       this.ctx.dataSource.query(
         `SELECT ps.id, ps.name, ps.description, ps.active, ps.created_at, ps.updated_at, ps.created_by, ps.updated_by,
           COALESCE(json_agg(psi.permission_id) FILTER (WHERE psi.permission_id IS NOT NULL), '[]') AS permission_ids
          FROM adwest.permission_sets ps
          LEFT JOIN adwest.permission_set_items psi ON ps.id = psi.permission_set_id
-         WHERE ($1::text IS NULL OR ps.name ILIKE $1 OR ps.description ILIKE $1)
-         GROUP BY ps.id ORDER BY ps.name LIMIT $2 OFFSET $3`,
-        [searchParam, pageSize, (page - 1) * pageSize],
+         ${whereClause}
+         GROUP BY ps.id ${orderBy} LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+        [...queryParams, pageSize, (page - 1) * pageSize],
       ),
     ]);
     const total = (countRows as Array<{ total: number }>)[0].total;

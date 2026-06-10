@@ -26,6 +26,8 @@ import {
   ApprovalWorkflowStage,
 } from '../interfaces/approval-workflow.interface';
 import { ApprovalWorkflowStore } from '../interfaces/approval-workflow-store.interface';
+import { applyInMemoryColumnFilters, parseColumnFilters } from '@modules/core-business/utils/column-filter.util';
+import { applyInMemoryColumnSort, parseSortParams } from '@modules/core-business/utils/column-sort.util';
 
 const DEFAULT_APPROVAL_MODES = new Set<string>(['sequential', 'parallel']);
 
@@ -121,6 +123,23 @@ export class ApprovalWorkflowDefinitionsService {
     if (query.approvalMode) {
       rows = rows.filter((r) => r.approvalMode === query.approvalMode);
     }
+
+    const columnFilters = parseColumnFilters(query.filters);
+    if (Object.keys(columnFilters).length > 0) {
+      rows = applyInMemoryColumnFilters(rows, columnFilters, {
+        code: (row) => row.code,
+        name: (row) => row.name,
+        approvalMode: (row) => row.approvalMode,
+        isActive: (row) => String(row.isActive),
+      });
+    }
+
+    rows = applyInMemoryColumnSort(rows, parseSortParams(query.sortBy, query.sortDir), {
+      code: (row) => row.code,
+      name: (row) => row.name,
+      approvalMode: (row) => row.approvalMode,
+      isActive: (row) => row.isActive,
+    }, (a, b) => a.name.localeCompare(b.name));
 
     const total = rows.length;
     const totalPages = total === 0 ? 1 : Math.ceil(total / pageSize);

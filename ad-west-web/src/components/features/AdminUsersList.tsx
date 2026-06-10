@@ -1,6 +1,12 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useToast } from '../common/Toast'
 import { useConfirm } from '../common/ConfirmDialog'
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../common/TableColumnFilterRow'
+import { TableColumnHeaderRow } from '../common/TableColumnHeaderRow'
+import { useTableColumnFilters } from '../../hooks/useTableColumnFilters'
+import { useTableSort } from '../../hooks/useTableSort'
+import { applyClientColumnFilters, type ClientFilterAccessor } from '../../utils/clientTableFilter'
+import { applyClientColumnSort } from '../../utils/clientTableSort'
 import { backendApi, AdminUserApi, RoleDefinitionApi } from '../../utils/backendApi'
 import { TableRowActionsMenu } from '../common/TableRowActionsMenu'
 
@@ -48,6 +54,54 @@ export const AdminUsersList: React.FC<Props> = ({ onAdd, onEdit }) => {
   const searchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
+  const { filters, debouncedFilters, setFilter, clearFilters } = useTableColumnFilters()
+  const { sortBy, sortDir, toggleSort, clearSort } = useTableSort()
+
+  const roleNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    roleDefinitions.forEach((role) => map.set(role.id, role.name))
+    return map
+  }, [roleDefinitions])
+
+  const filterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: 'code', label: 'Code', filterable: true, placeholder: 'Code…' },
+    { key: 'name', label: 'Name', filterable: true, placeholder: 'Name…' },
+    { key: 'role', label: 'Role Definition', filterable: true, placeholder: 'Role…' },
+    {
+      key: 'active',
+      label: 'Status',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All statuses',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' },
+      ],
+      align: 'center',
+    },
+    { key: '__actions__', label: 'Actions', filterable: false, sortable: false, align: 'right' },
+  ], [])
+
+  const accessors = useMemo<Record<string, ClientFilterAccessor<UiAdmin>>>(() => ({
+    code: { getValue: (admin) => admin.code },
+    name: { getValue: (admin) => admin.name },
+    role: { getValue: (admin) => roleNameById.get(admin.roleDefinitionId ?? '') ?? 'Unassigned' },
+    active: { getValue: (admin) => (admin.active ? 'active' : 'inactive'), match: 'exact' },
+  }), [roleNameById])
+
+  const displayedAdmins = useMemo(
+    () => applyClientColumnSort(
+      applyClientColumnFilters(admins, debouncedFilters, accessors),
+      sortBy,
+      sortDir,
+      accessors,
+    ),
+    [admins, debouncedFilters, accessors, sortBy, sortDir],
+  )
+  const clearAllFilters = () => {
+    clearFilters()
+    clearSort()
+  }
 
   const loadAdmins = useCallback(async () => {
     setIsLoading(true)
@@ -147,16 +201,21 @@ export const AdminUsersList: React.FC<Props> = ({ onAdd, onEdit }) => {
         <div className="table-container">
           <table className="custom-table">
             <thead>
-              <tr>
-                <th>Code</th>
-                <th>Name</th>
-                <th>Role Definition</th>
-                <th style={{ textAlign: 'center' }}>Status</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
-              </tr>
+              <TableColumnHeaderRow
+                columns={filterColumns}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={toggleSort}
+              />
+              <TableColumnFilterRow
+                columns={filterColumns}
+                values={filters}
+                onChange={setFilter}
+                onClear={clearAllFilters}
+              />
             </thead>
             <tbody>
-              {admins.map(admin => (
+              {displayedAdmins.map(admin => (
                 <tr key={admin.id} style={{ opacity: admin.active ? 1 : 0.5 }}>
                   <td>
                     <code style={{ fontSize: '0.8rem', fontWeight: 700, background: 'var(--chip-bg-soft)', color: 'var(--text-primary-dark)', padding: '3px 8px', borderRadius: '5px' }}>{admin.code}</code>
@@ -166,7 +225,7 @@ export const AdminUsersList: React.FC<Props> = ({ onAdd, onEdit }) => {
                   </td>
                   <td>
                     <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary-dark)' }}>
-                      {roleDefinitions.find((role) => role.id === admin.roleDefinitionId)?.name ?? 'Unassigned'}
+                      {roleNameById.get(admin.roleDefinitionId ?? '') ?? 'Unassigned'}
                     </span>
                   </td>
                   <td style={{ textAlign: 'center' }}>
@@ -186,10 +245,12 @@ export const AdminUsersList: React.FC<Props> = ({ onAdd, onEdit }) => {
                   </td>
                 </tr>
               ))}
-              {admins.length === 0 && (
+              {displayedAdmins.length === 0 && (
                 <tr>
                   <td colSpan={5} style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary-dark)' }}>
-                    {search ? 'No admins match your search.' : 'No administrators found.'}
+                    {search || Object.keys(debouncedFilters).length
+                      ? 'No admins match your search or filters.'
+                      : 'No administrators found.'}
                   </td>
                 </tr>
               )}
@@ -201,7 +262,7 @@ export const AdminUsersList: React.FC<Props> = ({ onAdd, onEdit }) => {
       {totalPages > 1 && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', gap: '12px', flexWrap: 'wrap' }}>
           <span style={{ color: 'var(--text-secondary-dark)', fontSize: '0.85rem' }}>
-            Showing {(page - 1) * pageSize + (admins.length ? 1 : 0)}-{(page - 1) * pageSize + admins.length} of {total}
+            Showing {(page - 1) * pageSize + (displayedAdmins.length ? 1 : 0)}-{(page - 1) * pageSize + displayedAdmins.length} of {total}
           </span>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button

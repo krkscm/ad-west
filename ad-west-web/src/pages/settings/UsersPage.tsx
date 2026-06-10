@@ -5,12 +5,19 @@ import { PageHeader } from '../../components/common/PageHeader';
 import { EmptyState } from '../../components/common/EmptyState';
 import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
 import { PaginationBar } from '../../components/common/PaginationBar';
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../../components/common/TableColumnFilterRow';
+import { TableColumnHeaderRow } from '../../components/common/TableColumnHeaderRow';
+import { TableNoResultsRow } from '../../components/common/TableNoResultsRow';
+import { useTableColumnFilters } from '../../hooks/useTableColumnFilters';
+import { useTableSort } from '../../hooks/useTableSort';
+import { isListFilterActive } from '../../utils/tableListUtils';
 import { useAdminDefinitions } from '../../context/admin-definitions-context';
 import {
   backendApi,
   LocationDefinitionApi,
   RoleDefinitionApi,
   UserApi,
+  type ListSortParams,
 } from '../../utils/backendApi';
 
 const toUiError = (error: unknown, fallback: string): string => {
@@ -43,6 +50,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onAdd, onEdit, editingUser
   const [roles, setRoles] = useState<RoleDefinitionApi[]>([]);
   const [locations, setLocations] = useState<LocationDefinitionApi[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const { filters, debouncedFilters, setFilter, clearFilters, filtersQuery } = useTableColumnFilters();
+  const { sortBy, sortDir, toggleSort, clearSort, sortQuery } = useTableSort();
 
   const loadSupport = async () => {
     try {
@@ -53,10 +62,10 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onAdd, onEdit, editingUser
     }
   };
 
-  const loadUsers = async (p = page, ps = pageSize, q = search) => {
+  const loadUsers = async (p = page, ps = pageSize, q = search, colFilters = filtersQuery, sort: ListSortParams | undefined = sortQuery) => {
     setIsLoading(true);
     try {
-      const res = await backendApi.listUsers({ page: p, pageSize: ps, search: q || undefined });
+      const res = await backendApi.listUsers({ page: p, pageSize: ps, search: q || undefined, filters: colFilters, ...sort });
       setUsers(res.items); setTotal(res.total);
       setPage(res.page); setPageSize(res.pageSize); setTotalPages(res.totalPages);
     } catch (e) { addToast(toUiError(e, 'Failed to load users.'), 'error'); }
@@ -71,6 +80,16 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onAdd, onEdit, editingUser
     void loadSupport();
     void loadUsers(1, pageSize, '');
   }, []);
+
+  useEffect(() => {
+    setPage(1);
+    void loadUsers(1, pageSize, search, filtersQuery);
+  }, [debouncedFilters]);
+
+  useEffect(() => {
+    setPage(1);
+    void loadUsers(1, pageSize, search, filtersQuery, sortQuery);
+  }, [sortBy, sortDir]);
 
   const handleSearchChange = (value: string) => {
     setSearchInput(value);
@@ -123,7 +142,51 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onAdd, onEdit, editingUser
     } catch (e) { addToast(toUiError(e, 'Failed to delete.'), 'error'); }
   };
 
-  const hasTable = !isLoading && users.length > 0;
+  const userFilterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: 'name', label: 'Name', filterable: true, placeholder: 'Name…' },
+    { key: 'gender', label: 'Gender', filterable: true, placeholder: 'Gender…' },
+    { key: 'phone', label: 'Phone', filterable: true, placeholder: 'Phone…' },
+    { key: 'email', label: 'Email', filterable: true, placeholder: 'Email…' },
+    {
+      key: 'roleId',
+      label: 'Role',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All roles',
+      options: roles.map((r) => ({ value: r.id, label: r.name })),
+    },
+    {
+      key: 'sthanId',
+      label: 'Sthan',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All sthans',
+      options: locations.filter((l) => l.level === 'STHAN' && l.active).map((l) => ({ value: l.id, label: l.name })),
+    },
+    {
+      key: 'active',
+      label: 'Active',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All',
+      options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }],
+    },
+    { key: '__actions__', label: 'Actions', filterable: false, sortable: false, align: 'right' },
+  ], [roles, locations]);
+
+  const hasColumnFilters = Object.values(debouncedFilters).some((v) => v.trim());
+  const hasFiltersActive = isListFilterActive(search, hasColumnFilters);
+  const showEmptyState = !isLoading && users.length === 0 && !hasFiltersActive;
+  const hasTable = !isLoading && (users.length > 0 || hasFiltersActive);
+
+  const clearAllFilters = () => {
+    clearFilters();
+    clearSort();
+    setSearch('');
+    setSearchInput('');
+    setPage(1);
+    void loadUsers(1, pageSize, '', undefined, undefined);
+  };
 
   return (
     <div className="animate-slide-up">
@@ -157,27 +220,36 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onAdd, onEdit, editingUser
 
       {isLoading ? (
         <div className="glass-panel loading-state">Loading users…</div>
-      ) : users.length === 0 ? (
+      ) : showEmptyState ? (
         <EmptyState
           icon="👤"
-          title={search ? 'No users match your search' : 'No users yet'}
-          copy={search ? 'Try a different search term.' : 'Click "New User" to add one.'}
-          action={!search ? (
+          title="No users yet"
+          copy="Click &quot;New User&quot; to add one."
+          action={(
             <button type="button" className="btn btn-primary" onClick={onAdd}>New User</button>
-          ) : undefined}
+          )}
         />
       ) : (
         <div className="table-container" style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
           <table className="custom-table">
             <thead>
-              <tr>
-                {['Name', 'Gender', 'Phone', 'Email', 'Role', 'Sthan', 'Active', 'Actions'].map((h) => (
-                  <th key={h}>{h}</th>
-                ))}
-              </tr>
+              <TableColumnHeaderRow
+                columns={userFilterColumns}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={toggleSort}
+              />
+              <TableColumnFilterRow
+                columns={userFilterColumns}
+                values={filters}
+                onChange={setFilter}
+                onClear={clearAllFilters}
+              />
             </thead>
             <tbody>
-              {users.map((u) => {
+              {users.length === 0 ? (
+                <TableNoResultsRow colSpan={8} title="No users match your filters" onClearFilters={clearAllFilters} />
+              ) : users.map((u) => {
                 const role = u.roleId ? roleById.get(u.roleId) : undefined;
                 const sthan = u.sthanId ? locationById.get(u.sthanId) : undefined;
                 return (

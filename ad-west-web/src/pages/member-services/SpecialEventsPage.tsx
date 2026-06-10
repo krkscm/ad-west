@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { backendApi, EventFormFieldApi, EventRegistrationApi, FormFieldType, SpecialEventApi } from '../../utils/backendApi'
 import { useToast } from '../../components/common/Toast'
 import { useConfirm } from '../../components/common/ConfirmDialog'
@@ -10,6 +10,14 @@ import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu
 import { FormActions } from '../../components/common/FormActions'
 import { EmptyState } from '../../components/common/EmptyState'
 import { useEnumOptions } from '../../hooks/useEnumOptions'
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../../components/common/TableColumnFilterRow'
+import { TableColumnHeaderRow } from '../../components/common/TableColumnHeaderRow'
+import { TableNoResultsRow } from '../../components/common/TableNoResultsRow'
+import { useTableColumnFilters } from '../../hooks/useTableColumnFilters'
+import { useTableSort } from '../../hooks/useTableSort'
+import { applyClientColumnFilters, type ClientFilterAccessor } from '../../utils/clientTableFilter'
+import { applyClientColumnSort } from '../../utils/clientTableSort'
+import { isListFilterActive } from '../../utils/tableListUtils'
 
 type Mode = 'list' | 'create' | 'edit' | 'registrations'
 
@@ -37,6 +45,94 @@ export function SpecialEventsPage() {
   const [viewingEvent, setViewingEvent] = useState<SpecialEventApi | null>(null)
   const [registrations, setRegistrations] = useState<EventRegistrationApi[]>([])
   const [regLoading, setRegLoading] = useState(false)
+  const { filters: eventFilters, debouncedFilters: eventDebouncedFilters, setFilter: setEventFilter, clearFilters: clearEventFilters } = useTableColumnFilters()
+  const { filters: regFilters, debouncedFilters: regDebouncedFilters, setFilter: setRegFilter, clearFilters: clearRegFilters } = useTableColumnFilters()
+  const { sortBy: eventSortBy, sortDir: eventSortDir, toggleSort: toggleEventSort, clearSort: clearEventSort } = useTableSort()
+  const { sortBy: regSortBy, sortDir: regSortDir, toggleSort: toggleRegSort, clearSort: clearRegSort } = useTableSort()
+
+  const eventFilterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: 'title', label: 'Title', filterable: true, placeholder: 'Title…' },
+    { key: 'date', label: 'Date & Time', filterable: true, placeholder: 'Date…' },
+    { key: 'venue', label: 'Venue', filterable: true, placeholder: 'Venue…' },
+    { key: 'flags', label: 'Flags', filterable: true, placeholder: 'Flags…' },
+    { key: '__srenis__', label: 'Srenis', filterable: false, sortable: false },
+    { key: '__actions__', label: 'Actions', filterable: false, sortable: false, align: 'right' },
+  ], [])
+
+  const eventAccessors = useMemo<Record<string, ClientFilterAccessor<SpecialEventApi>>>(() => ({
+    title: { getValue: (ev) => ev.title },
+    date: {
+      getValue: (ev) => {
+        const parts = [fmt(ev.dateTime)]
+        if (ev.endDateTime) parts.push(fmt(ev.endDateTime))
+        return parts.join(' ')
+      },
+    },
+    venue: { getValue: (ev) => ev.venue ?? '' },
+    flags: {
+      getValue: (ev) => {
+        const parts: string[] = []
+        if (ev.isPublic) parts.push('Public')
+        if (ev.registrationEnabled) parts.push('Registration')
+        return parts.join(' ')
+      },
+    },
+  }), [])
+
+  const displayedEvents = useMemo(
+    () => applyClientColumnSort(
+      applyClientColumnFilters(events, eventDebouncedFilters, eventAccessors),
+      eventSortBy,
+      eventSortDir,
+      eventAccessors,
+    ),
+    [events, eventDebouncedFilters, eventAccessors, eventSortBy, eventSortDir],
+  )
+
+  const regFormKeys = useMemo(
+    () => (registrations.length > 0 ? Object.keys(registrations[0]?.formData ?? {}) : []),
+    [registrations],
+  )
+
+  const regFilterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: '__index__', label: '#', filterable: false, sortable: false },
+    ...regFormKeys.map((k) => ({ key: `form_${k}`, label: k, filterable: true as const, placeholder: `${k}…` })),
+    { key: 'submitted', label: 'Submitted', filterable: true, placeholder: 'Submitted…' },
+    { key: '__actions__', filterable: false, sortable: false, width: '56px' },
+  ], [regFormKeys])
+
+  const regAccessors = useMemo<Record<string, ClientFilterAccessor<EventRegistrationApi>>>(() => {
+    const a: Record<string, ClientFilterAccessor<EventRegistrationApi>> = {
+      submitted: { getValue: (r) => new Date(r.submittedAt).toLocaleString() },
+    }
+    regFormKeys.forEach((k) => {
+      a[`form_${k}`] = { getValue: (r) => String(r.formData[k] ?? '') }
+    })
+    return a
+  }, [regFormKeys])
+
+  const displayedRegistrations = useMemo(
+    () => applyClientColumnSort(
+      applyClientColumnFilters(registrations, regDebouncedFilters, regAccessors),
+      regSortBy,
+      regSortDir,
+      regAccessors,
+    ),
+    [registrations, regDebouncedFilters, regAccessors, regSortBy, regSortDir],
+  )
+  const clearAllEventFilters = () => {
+    clearEventFilters()
+    clearEventSort()
+  }
+  const clearAllRegFilters = () => {
+    clearRegFilters()
+    clearRegSort()
+  }
+  const hasEventColumnFilters = Object.values(eventDebouncedFilters).some((v) => v.trim())
+  const hasEventFiltersActive = isListFilterActive(hasEventColumnFilters)
+  const hasRegColumnFilters = Object.values(regDebouncedFilters).some((v) => v.trim())
+  const hasRegFiltersActive = isListFilterActive(hasRegColumnFilters)
+  const regTableColSpan = 2 + regFormKeys.length
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -145,22 +241,32 @@ export function SpecialEventsPage() {
         {!regLoading && registrations.length === 0 && (
           <EmptyState title="No registrations yet" />
         )}
-        {!regLoading && registrations.length > 0 && (
+        {!regLoading && (registrations.length > 0 || hasRegFiltersActive) && (
           <div className="table-container">
             <table className="custom-table">
               <thead>
-                <tr>
-                  <th>#</th>
-                  {Object.keys(registrations[0]?.formData ?? {}).map((k) => <th key={k}>{k}</th>)}
-                  <th>Submitted</th>
-                </tr>
+                <TableColumnHeaderRow
+                  columns={regFilterColumns}
+                  sortBy={regSortBy}
+                  sortDir={regSortDir}
+                  onSort={toggleRegSort}
+                />
+                <TableColumnFilterRow
+                  columns={regFilterColumns}
+                  values={regFilters}
+                  onChange={setRegFilter}
+                  onClear={clearAllRegFilters}
+                />
               </thead>
               <tbody>
-                {registrations.map((reg, i) => (
+                {displayedRegistrations.length === 0 ? (
+                  <TableNoResultsRow colSpan={regTableColSpan} title="No registrations match your filters" onClearFilters={clearAllRegFilters} />
+                ) : displayedRegistrations.map((reg, i) => (
                   <tr key={reg.id}>
                     <td style={{ color: 'var(--text-secondary-dark)' }}>{i + 1}</td>
-                    {Object.values(reg.formData).map((v, j) => <td key={j}>{String(v)}</td>)}
+                    {regFormKeys.map((k) => <td key={k}>{String(reg.formData[k] ?? '')}</td>)}
                     <td style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)', whiteSpace: 'nowrap' }}>{new Date(reg.submittedAt).toLocaleString()}</td>
+                    <td />
                   </tr>
                 ))}
               </tbody>
@@ -337,21 +443,27 @@ export function SpecialEventsPage() {
           action={<button className="btn btn-primary" onClick={openCreate}>Create Event</button>}
         />
       )}
-      {!loading && events.length > 0 && (
+      {!loading && (events.length > 0 || hasEventFiltersActive) && (
         <div className="table-container">
           <table className="custom-table">
             <thead>
-              <tr>
-                <th>Title</th>
-                <th>Date &amp; Time</th>
-                <th>Venue</th>
-                <th>Srenis</th>
-                <th>Flags</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
-              </tr>
+              <TableColumnHeaderRow
+                columns={eventFilterColumns}
+                sortBy={eventSortBy}
+                sortDir={eventSortDir}
+                onSort={toggleEventSort}
+              />
+              <TableColumnFilterRow
+                columns={eventFilterColumns}
+                values={eventFilters}
+                onChange={setEventFilter}
+                onClear={clearAllEventFilters}
+              />
             </thead>
             <tbody>
-              {events.map((ev) => (
+              {displayedEvents.length === 0 ? (
+                <TableNoResultsRow colSpan={6} title="No events match your filters" onClearFilters={clearAllEventFilters} />
+              ) : displayedEvents.map((ev) => (
                 <tr key={ev.id}>
                   <td style={{ fontWeight: 600 }}>{ev.title}</td>
                   <td style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>

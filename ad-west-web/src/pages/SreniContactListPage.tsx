@@ -23,6 +23,13 @@ import {
   SthanBasicApi,
 } from '../utils/backendApi';
 import { useTableLayout } from '../hooks/useTableLayout';
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../components/common/TableColumnFilterRow';
+import { TableColumnHeaderRow } from '../components/common/TableColumnHeaderRow';
+import { TableNoResultsRow } from '../components/common/TableNoResultsRow';
+import { isListFilterActive } from '../utils/tableListUtils';
+import { useTableColumnFilters } from '../hooks/useTableColumnFilters';
+import { useTableSort } from '../hooks/useTableSort';
+import type { ListSortParams } from '../utils/backendApi';
 
 interface Props {
   sreniId: string;
@@ -1150,6 +1157,8 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
   const [editTarget, setEditTarget] = useState<SreniContactRowApi | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [femaleGenderLoaded, setFemaleGenderLoaded] = useState(false);
+  const { filters, debouncedFilters, setFilter, clearFilters, filtersQuery } = useTableColumnFilters();
+  const { sortBy, sortDir, toggleSort, clearSort, sortQuery } = useTableSort();
 
   const memberEnrollment = enrollmentScope === 'MEMBER' || resolverKey === 'enrolled_children';
   const femaleParticipantsMode = resolverKey === 'female_participants';
@@ -1167,6 +1176,54 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
     return active.columns.filter((sc) => sc.visible && defKeys.has(sc.key)).map((sc) => sc.key);
   }, [sreniLayout.activeId, sreniLayout.layouts, sreniColDefs]);
 
+  const contactFilterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: '__index__', label: '#', filterable: false, sortable: false, align: 'center', width: '48px' },
+    { key: 'name', label: 'Name', filterable: true, placeholder: 'Name…' },
+    ...(memberEnrollment
+      ? [{ key: '__children__', label: 'Children', filterable: false, sortable: false }]
+      : femaleParticipantsMode
+        ? [{ key: '__participants__', label: 'Participants', filterable: false, sortable: false }]
+        : [{
+            key: 'divisionId',
+            label: 'Division',
+            filterable: true,
+            filterType: 'select' as const,
+            placeholder: 'All divisions',
+            options: divisions.map((d) => ({ value: d.id, label: d.name })),
+          }]),
+    {
+      key: 'sthanId',
+      label: 'Sthan',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All sthans',
+      options: sthans.map((s) => ({ value: s.id, label: s.name })),
+    },
+    ...(isSevaSamithiSreni ? [{ key: '__member_srenis__', label: 'Member Srenis', filterable: false, sortable: false }] : []),
+    ...(gadaAssignmentEnabled ? [{ key: '__gadanayak__', label: 'Gadanayak', filterable: false, sortable: false }] : []),
+    ...visibleSreniCols.map((col) => ({
+      key: col,
+      label: MASTER_CONTACT_COLUMN_LABELS.get(col) ?? col,
+      filterable: true,
+      placeholder: MASTER_CONTACT_COLUMN_LABELS.get(col) ?? col,
+    })),
+    { key: '__actions__', filterable: false, sortable: false, width: '56px' },
+  ], [memberEnrollment, femaleParticipantsMode, divisions, sthans, isSevaSamithiSreni, gadaAssignmentEnabled, visibleSreniCols]);
+
+  const hasColumnFilters = Object.values(debouncedFilters).some((v) => v.trim());
+  const hasFiltersActive = isListFilterActive(hasColumnFilters, gadaFilter !== 'all', gadanayakFilterUserId);
+  const showEmptyState = !isLoading && total === 0 && !hasFiltersActive;
+  const tableColSpan = contactFilterColumns.length;
+
+  const clearAllFilters = () => {
+    clearFilters();
+    clearSort();
+    setGadaFilter('all');
+    setGadanayakFilterUserId('');
+    setPage(1);
+    load(1, pageSize, 'all', '', undefined, undefined);
+  };
+
   const loadDivisions = useCallback(() => {
     backendApi.listSreniDivisions(sreniId)
       .then(setDivisions)
@@ -1180,7 +1237,7 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
       .catch(() => {/* non-critical */});
   }, [sreniId, gadaAssignmentEnabled, canManageGadaAssignments]);
 
-  const load = useCallback((p: number, ps?: number, filterOverride?: GadaContactListFilter, gadanayakUserOverride?: string) => {
+  const load = useCallback((p: number, ps?: number, filterOverride?: GadaContactListFilter, gadanayakUserOverride?: string, colFilters = filtersQuery, sort: ListSortParams | undefined = sortQuery) => {
     setIsLoading(true);
     const size = ps ?? pageSize;
     const activeFilter = filterOverride ?? gadaFilter;
@@ -1188,6 +1245,8 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
     const gadaOptions = {
       filter: activeFilter,
       gadanayakUserId: activeFilter === 'all' && activeGadanayakUserId ? activeGadanayakUserId : undefined,
+      filters: colFilters,
+      ...sort,
     };
     backendApi.listSreniContacts(sreniId, p, size, gadaOptions)
       .then((res) => {
@@ -1208,7 +1267,17 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
       })
       .catch((err) => addToast(toUiError(err, 'Failed to load contacts.'), 'error'))
       .finally(() => setIsLoading(false));
-  }, [sreniId, pageSize, gadaFilter, gadanayakFilterUserId, addToast]);
+  }, [sreniId, pageSize, gadaFilter, gadanayakFilterUserId, addToast, filtersQuery, sortQuery]);
+
+  useEffect(() => {
+    setPage(1);
+    load(1, pageSize, gadaFilter, gadanayakFilterUserId, filtersQuery);
+  }, [debouncedFilters]);
+
+  useEffect(() => {
+    setPage(1);
+    load(1, pageSize, gadaFilter, gadanayakFilterUserId, filtersQuery, sortQuery);
+  }, [sortBy, sortDir]);
 
   useEffect(() => {
     setSthans(contextSthans);
@@ -1550,7 +1619,7 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
         <div className="glass-panel" style={{ padding: '60px 24px', textAlign: 'center', color: 'var(--text-secondary-dark)' }}>
           Loading contacts…
         </div>
-      ) : !isLoading && total === 0 ? (
+      ) : showEmptyState ? (
         <div className="glass-panel" style={{ padding: '60px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📋</div>
           <h3 style={{ fontWeight: 700, marginBottom: '8px' }}>No contacts yet</h3>
@@ -1567,24 +1636,18 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
           <div className="table-container" style={{ overflowX: 'auto' }}>
             <table className="custom-table">
               <thead>
-                <tr>
-                  <th style={{ width: '48px', textAlign: 'center' }}>#</th>
-                  <th style={{ whiteSpace: 'nowrap' }}>Name</th>
-                  {memberEnrollment ? (
-                    <th style={{ whiteSpace: 'nowrap' }}>Children</th>
-                  ) : femaleParticipantsMode ? (
-                    <th style={{ whiteSpace: 'nowrap' }}>Participants</th>
-                  ) : (
-                    <th style={{ whiteSpace: 'nowrap' }}>Division</th>
-                  )}
-                  <th style={{ whiteSpace: 'nowrap' }}>Sthan</th>
-                  {isSevaSamithiSreni && <th style={{ whiteSpace: 'nowrap' }}>Member Srenis</th>}
-                  {gadaAssignmentEnabled && <th style={{ whiteSpace: 'nowrap' }}>Gadanayak</th>}
-                  {isLoading && columns.length === 0 ? <th>Loading…</th> : visibleSreniCols.map((col) => (
-                    <th key={col} style={{ whiteSpace: 'nowrap' }}>{MASTER_CONTACT_COLUMN_LABELS.get(col) ?? col}</th>
-                  ))}
-                  <th style={{ width: '56px' }} />
-                </tr>
+                <TableColumnHeaderRow
+                  columns={contactFilterColumns}
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                />
+                <TableColumnFilterRow
+                  columns={contactFilterColumns}
+                  values={filters}
+                  onChange={setFilter}
+                  onClear={clearAllFilters}
+                />
               </thead>
               <tbody>
                 {isLoading ? (
@@ -1596,6 +1659,8 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
                       ))}
                     </tr>
                   ))
+                ) : rows.length === 0 ? (
+                  <TableNoResultsRow colSpan={tableColSpan} title="No contacts match your filters" onClearFilters={clearAllFilters} />
                 ) : rows.map((row) => {
                   const divName = row.divisionId ? divisions.find((d) => d.id === row.divisionId)?.name : null;
                   const sthanName = row.sthanId ? sthans.find((s) => s.id === row.sthanId)?.name : null;

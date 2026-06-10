@@ -1,10 +1,18 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { backendApi, DocumentFileApi } from '../utils/backendApi';
 import { useToast } from '../components/common/Toast';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { PageHeader } from '../components/common/PageHeader';
 import { TableRowActionsMenu } from '../components/common/TableRowActionsMenu';
 import { useAuth } from '../context/auth-context';
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../components/common/TableColumnFilterRow';
+import { TableColumnHeaderRow } from '../components/common/TableColumnHeaderRow';
+import { TableNoResultsRow } from '../components/common/TableNoResultsRow';
+import { isListFilterActive } from '../utils/tableListUtils';
+import { useTableColumnFilters } from '../hooks/useTableColumnFilters';
+import { useTableSort } from '../hooks/useTableSort';
+import { applyClientColumnFilters, type ClientFilterAccessor } from '../utils/clientTableFilter';
+import { applyClientColumnSort } from '../utils/clientTableSort';
 
 interface Props {
   sreniId: string;
@@ -34,6 +42,39 @@ export const SreniDocumentsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
   const [description, setDescription] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { filters, debouncedFilters, setFilter, clearFilters } = useTableColumnFilters();
+  const { sortBy, sortDir, toggleSort, clearSort } = useTableSort();
+
+  const filterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: 'fileName', label: 'File Name', filterable: true, placeholder: 'File name…' },
+    { key: 'size', label: 'Size', filterable: true, placeholder: 'Size…' },
+    { key: 'description', label: 'Description', filterable: true, placeholder: 'Description…' },
+    { key: 'uploaded', label: 'Uploaded', filterable: true, placeholder: 'Uploaded…' },
+    { key: '__actions__', label: 'Actions', filterable: false, sortable: false, align: 'right' },
+  ], []);
+
+  const accessors = useMemo<Record<string, ClientFilterAccessor<DocumentFileApi>>>(() => ({
+    fileName: { getValue: (doc) => doc.fileName },
+    size: { getValue: (doc) => (doc.fileSize ? formatBytes(doc.fileSize) : '') },
+    description: { getValue: (doc) => doc.description ?? '' },
+    uploaded: { getValue: (doc) => formatDate(doc.createdAt) },
+  }), []);
+
+  const displayedRows = useMemo(
+    () => applyClientColumnSort(
+      applyClientColumnFilters(docs, debouncedFilters, accessors),
+      sortBy,
+      sortDir,
+      accessors,
+    ),
+    [docs, debouncedFilters, accessors, sortBy, sortDir],
+  );
+  const hasColumnFilters = Object.values(debouncedFilters).some((v) => v.trim());
+  const hasFiltersActive = isListFilterActive(hasColumnFilters);
+  const clearAllFilters = () => {
+    clearFilters();
+    clearSort();
+  };
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -153,7 +194,7 @@ export const SreniDocumentsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
       />
 
       {/* Empty state */}
-      {!isLoading && docs.length === 0 && (
+      {!isLoading && docs.length === 0 && !hasFiltersActive && (
         <div className="glass-panel" style={{ padding: '60px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📂</div>
           <h3 style={{ fontWeight: 700, marginBottom: '8px' }}>No documents yet</h3>
@@ -179,20 +220,27 @@ export const SreniDocumentsPage: React.FC<Props> = ({ sreniId, sreniName }) => {
       )}
 
       {/* Document table */}
-      {!isLoading && docs.length > 0 && (
+      {!isLoading && (docs.length > 0 || hasFiltersActive) && (
         <div className="table-container" style={{ overflowX: 'auto' }}>
           <table className="custom-table">
             <thead>
-              <tr>
-                <th>File Name</th>
-                <th style={{ whiteSpace: 'nowrap' }}>Size</th>
-                <th>Description</th>
-                <th style={{ whiteSpace: 'nowrap' }}>Uploaded</th>
-                <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
-              </tr>
+              <TableColumnHeaderRow
+                columns={filterColumns}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={toggleSort}
+              />
+              <TableColumnFilterRow
+                columns={filterColumns}
+                values={filters}
+                onChange={setFilter}
+                onClear={clearAllFilters}
+              />
             </thead>
             <tbody>
-              {docs.map(doc => (
+              {displayedRows.length === 0 ? (
+                <TableNoResultsRow colSpan={5} title="No documents match your filters" onClearFilters={clearAllFilters} />
+              ) : displayedRows.map(doc => (
                 <tr key={doc.id}>
                   <td>
                     <span style={{ fontWeight: 600 }}>📄 {doc.fileName}</span>

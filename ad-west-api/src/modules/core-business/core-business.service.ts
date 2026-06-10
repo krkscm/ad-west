@@ -475,7 +475,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getOrgRuntime().updateZone(zoneId, dto);
   }
 
-  async listLocationsFromDb(params: { page?: number; pageSize?: number; search?: string; level?: string }): Promise<{
+  async listLocationsFromDb(params: { page?: number; pageSize?: number; search?: string; level?: string; columnFilters?: Record<string, string> }): Promise<{
     items: LocationRecord[]; total: number; page: number; pageSize: number; totalPages: number;
   }> {
     return this.getOrgRuntime().listLocationsFromDb(params);
@@ -509,7 +509,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getOrgRuntime().listSreniDefinitions();
   }
 
-  async listSreniDefinitionsFromDb(params: { page?: number; pageSize?: number; search?: string }): Promise<{
+  async listSreniDefinitionsFromDb(params: { page?: number; pageSize?: number; search?: string; columnFilters?: Record<string, string> }): Promise<{
     items: SrenyRecord[]; total: number; page: number; pageSize: number; totalPages: number;
   }> {
     return this.getOrgRuntime().listSreniDefinitionsFromDb(params);
@@ -1163,7 +1163,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getPermissionsRuntime().listPermissions();
   }
 
-  async listPermissionsFromDb(params: { page?: number; pageSize?: number; search?: string; locationId?: string }): Promise<{
+  async listPermissionsFromDb(params: { page?: number; pageSize?: number; search?: string; locationId?: string; columnFilters?: Record<string, string> }): Promise<{
     items: PermissionRecord[]; total: number; page: number; pageSize: number; totalPages: number;
   }> {
     return this.getPermissionsRuntime().listPermissionsFromDb(params);
@@ -1187,7 +1187,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getPermissionsRuntime().listPermissionSets();
   }
 
-  async listPermissionSetsFromDb(params: { page?: number; pageSize?: number; search?: string }): Promise<{
+  async listPermissionSetsFromDb(params: { page?: number; pageSize?: number; search?: string; columnFilters?: Record<string, string> }): Promise<{
     items: PermissionSetRecord[]; total: number; page: number; pageSize: number; totalPages: number;
   }> {
     return this.getPermissionsRuntime().listPermissionSetsFromDb(params);
@@ -1217,7 +1217,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getUserAdminRuntime().listUsers(params);
   }
 
-  async listUsersFromDb(params: { page?: number; pageSize?: number; search?: string }): Promise<{
+  async listUsersFromDb(params: { page?: number; pageSize?: number; search?: string; columnFilters?: Record<string, string> }): Promise<{
     items: UserRecord[]; total: number; page: number; pageSize: number; totalPages: number;
   }> {
     return this.getUserAdminRuntime().listUsersFromDb(params);
@@ -1302,7 +1302,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async listAttendanceMetricsFromDb(params: { page?: number; pageSize?: number; search?: string; sreniId?: string }): Promise<{
+  async listAttendanceMetricsFromDb(params: { page?: number; pageSize?: number; search?: string; sreniId?: string; columnFilters?: Record<string, string> }): Promise<{
     items: AttendanceMetricRecord[];
     total: number;
     page: number;
@@ -1674,7 +1674,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   }
 
   async listJoinUsSubmissions(
-    params: { page?: number; pageSize?: number; status?: 'pending' | 'completed' | 'all'; sreniId?: string; search?: string },
+    params: { page?: number; pageSize?: number; status?: 'pending' | 'completed' | 'all'; sreniId?: string; search?: string; columnFilters?: Record<string, string> },
     actor: AuthPrincipal,
   ): Promise<{
     items: JoinUsSubmissionRecord[];
@@ -1712,6 +1712,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     pageSize = 10,
     actor?: AuthPrincipal,
     gadaOptions?: GadaListQueryOptions,
+    listFilters?: { search?: string; columnFilters?: Record<string, string> },
   ): Promise<{
     items: SreniContactRecord[];
     total: number;
@@ -1727,7 +1728,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   }> {
     const scope = await this.resolveContactScope(this.requireContactActor(actor));
     this.getContactAccessScopeService().assertCanAccessSreni(scope, sreniId);
-    return this.getSreniAdminRuntime().listSreniContacts(sreniId, page, pageSize, scope, gadaOptions);
+    return this.getSreniAdminRuntime().listSreniContacts(sreniId, page, pageSize, scope, gadaOptions, listFilters);
   }
 
   async listSreniGadanayaks(
@@ -1897,7 +1898,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   async listAllContacts(
     page = 1,
     pageSize = 10,
-    filters?: { sreniId?: string; sthanId?: string; search?: string },
+    filters?: { sreniId?: string; sthanId?: string; search?: string; columnFilters?: Record<string, string>; sortBy?: string; sortDir?: 'asc' | 'desc' },
     actor?: AuthPrincipal,
   ): Promise<{ items: (SreniContactRecord & { sreniName: string })[]; total: number; page: number; pageSize: number; totalPages: number }> {
     const scope = await this.resolveContactScope(this.requireContactActor(actor));
@@ -2259,8 +2260,13 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getSthanRuntime().deleteSthanExpense(locationId, expenseId);
   }
 
-  async listSthanContacts(locationId: string, page = 1, pageSize = 10): Promise<{ items: SthanContactRecord[]; total: number; totalPages: number }> {
-    return this.getSthanRuntime().listSthanContacts(locationId, page, pageSize);
+  async listSthanContacts(
+    locationId: string,
+    page = 1,
+    pageSize = 10,
+    listFilters?: { search?: string; columnFilters?: Record<string, string> },
+  ): Promise<{ items: SthanContactRecord[]; total: number; totalPages: number }> {
+    return this.getSthanRuntime().listSthanContacts(locationId, page, pageSize, listFilters);
   }
 
 

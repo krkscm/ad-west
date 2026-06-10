@@ -7,6 +7,14 @@ import { useConfirm } from '../components/common/ConfirmDialog';
 import { SwitchToggle } from '../components/common/SwitchToggle';
 import { useEnumOptions } from '../hooks/useEnumOptions';
 import { PageHeader } from '../components/common/PageHeader';
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../components/common/TableColumnFilterRow';
+import { TableColumnHeaderRow } from '../components/common/TableColumnHeaderRow';
+import { TableNoResultsRow } from '../components/common/TableNoResultsRow';
+import { useTableColumnFilters } from '../hooks/useTableColumnFilters';
+import { useTableSort } from '../hooks/useTableSort';
+import { applyClientColumnFilters, type ClientFilterAccessor } from '../utils/clientTableFilter';
+import { applyClientColumnSort } from '../utils/clientTableSort';
+import { isListFilterActive } from '../utils/tableListUtils';
 
 interface Props {
   locationId: string;
@@ -51,6 +59,62 @@ export const SthanExpensesPage: React.FC<Props> = ({ locationId, locationName })
     () => [{ label: 'All', value: '' }, ...statusOptions.map((o) => ({ label: o.label, value: o.value }))],
     [statusOptions],
   );
+
+  const { filters, debouncedFilters, setFilter, clearFilters } = useTableColumnFilters();
+  const { sortBy, sortDir, toggleSort, clearSort } = useTableSort();
+
+  const filterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    {
+      key: 'category',
+      label: 'Category',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All categories',
+      options: categoryOptions.map((o) => ({ value: o.value, label: o.label })),
+    },
+    { key: 'description', label: 'Description', filterable: true, placeholder: 'Description…' },
+    { key: 'amount', label: 'Amount', filterable: true, placeholder: 'Amount…' },
+    ...(isSuperAdmin ? [{ key: 'submittedBy', label: 'Submitted By', filterable: true as const, placeholder: 'Submitted by…' }] : []),
+    {
+      key: 'status',
+      label: 'Status',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All statuses',
+      options: statusOptions.map((o) => ({ value: o.value, label: o.label })),
+    },
+    { key: 'created', label: 'Created', filterable: true, placeholder: 'Created…' },
+    { key: '__actions__', label: 'Actions', filterable: false, sortable: false, align: 'right' },
+  ], [categoryOptions, statusOptions, isSuperAdmin]);
+
+  const accessors = useMemo<Record<string, ClientFilterAccessor<SthanExpenseApi>>>(() => ({
+    category: { getValue: (item) => item.category, match: 'exact' },
+    description: { getValue: (item) => item.description },
+    amount: { getValue: (item) => `${item.currency} ${Number(item.amount).toFixed(2)}` },
+    submittedBy: { getValue: (item) => item.submittedBy ?? '' },
+    status: { getValue: (item) => item.status, match: 'exact' },
+    created: {
+      getValue: (item) => new Date(item.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+    },
+  }), []);
+
+  const displayedRows = useMemo(
+    () => applyClientColumnSort(
+      applyClientColumnFilters(items, debouncedFilters, accessors),
+      sortBy,
+      sortDir,
+      accessors,
+    ),
+    [items, debouncedFilters, accessors, sortBy, sortDir],
+  );
+  const hasColumnFilters = Object.values(debouncedFilters).some((v) => v.trim());
+  const hasFiltersActive = isListFilterActive(hasColumnFilters, filterStatus);
+  const clearAllFilters = () => {
+    clearFilters();
+    clearSort();
+    setFilterStatus('');
+  };
+  const tableColSpan = isSuperAdmin ? 7 : 6;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -229,30 +293,35 @@ export const SthanExpensesPage: React.FC<Props> = ({ locationId, locationName })
       {/* Table */}
       {loading ? (
         <div className="glass-panel" style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--text-secondary-dark)', fontSize: '0.9rem' }}>Loading…</div>
-      ) : items.length === 0 ? (
+      ) : items.length === 0 && !hasFiltersActive ? (
         <div className="glass-panel" style={{ padding: '60px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: '3rem', marginBottom: '16px' }}>💰</div>
           <h3 style={{ fontWeight: 700, marginBottom: '8px' }}>No expenses yet</h3>
           <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem', maxWidth: '400px', margin: '0 auto 24px' }}>
-            {filterStatus ? 'No records with this status.' : 'Submit the first expense request using the button above.'}
+            Submit the first expense request using the button above.
           </p>
         </div>
       ) : (
         <div className="table-container" style={{ overflowX: 'auto' }}>
           <table className="custom-table">
             <thead>
-              <tr>
-                <th>Category</th>
-                <th>Description</th>
-                <th>Amount</th>
-                {isSuperAdmin && <th>Submitted By</th>}
-                <th>Status</th>
-                <th>Created</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
-              </tr>
+              <TableColumnHeaderRow
+                columns={filterColumns}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={toggleSort}
+              />
+              <TableColumnFilterRow
+                columns={filterColumns}
+                values={filters}
+                onChange={setFilter}
+                onClear={clearAllFilters}
+              />
             </thead>
             <tbody>
-              {items.map((item) => (
+              {displayedRows.length === 0 ? (
+                <TableNoResultsRow colSpan={tableColSpan} title="No expenses match your filters" onClearFilters={clearAllFilters} />
+              ) : displayedRows.map((item) => (
                 <tr key={item.id}>
                   <td style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{categoryLabel(item.category)}</td>
                   <td style={{ fontSize: '0.85rem', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</td>

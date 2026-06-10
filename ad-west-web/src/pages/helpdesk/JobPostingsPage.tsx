@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { backendApi, JobPostingApi, JobType } from '../../utils/backendApi'
 import { useToast } from '../../components/common/Toast'
 import { useConfirm } from '../../components/common/ConfirmDialog'
@@ -9,6 +9,14 @@ import { FormActions } from '../../components/common/FormActions'
 import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu'
 import { EmptyState } from '../../components/common/EmptyState'
 import { useEnumOptions } from '../../hooks/useEnumOptions'
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../../components/common/TableColumnFilterRow'
+import { TableColumnHeaderRow } from '../../components/common/TableColumnHeaderRow'
+import { TableNoResultsRow } from '../../components/common/TableNoResultsRow'
+import { useTableColumnFilters } from '../../hooks/useTableColumnFilters'
+import { useTableSort } from '../../hooks/useTableSort'
+import { applyClientColumnFilters, type ClientFilterAccessor } from '../../utils/clientTableFilter'
+import { applyClientColumnSort } from '../../utils/clientTableSort'
+import { isListFilterActive } from '../../utils/tableListUtils'
 
 type FormMode = 'list' | 'create' | 'edit'
 
@@ -25,6 +33,61 @@ export function JobPostingsPage() {
   const [editId, setEditId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const { filters, debouncedFilters, setFilter, clearFilters } = useTableColumnFilters()
+  const { sortBy, sortDir, toggleSort, clearSort } = useTableSort()
+
+  const filterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: 'title', label: 'Title', filterable: true, placeholder: 'Title…' },
+    {
+      key: 'type',
+      label: 'Type',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All types',
+      options: jobTypeOptions.map((o) => ({ value: o.value, label: o.label })),
+    },
+    { key: 'location', label: 'Location', filterable: true, placeholder: 'Location…' },
+    {
+      key: 'status',
+      label: 'Status',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All',
+      options: [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }],
+    },
+    { key: 'dates', label: 'Dates', filterable: true, placeholder: 'Dates…' },
+    { key: '__actions__', label: 'Actions', filterable: false, sortable: false, align: 'right' },
+  ], [jobTypeOptions])
+
+  const accessors = useMemo<Record<string, ClientFilterAccessor<JobPostingApi>>>(() => ({
+    title: { getValue: (j) => j.title },
+    type: { getValue: (j) => j.type, match: 'exact' },
+    location: { getValue: (j) => j.location ?? '' },
+    status: { getValue: (j) => (j.isActive ? 'active' : 'inactive'), match: 'exact' },
+    dates: {
+      getValue: (j) => {
+        const parts = [`Created ${new Date(j.createdAt).toLocaleDateString()}`]
+        if (j.expiresAt) parts.push(`Closes ${new Date(j.expiresAt).toLocaleDateString()}`)
+        return parts.join(' ')
+      },
+    },
+  }), [])
+
+  const displayedRows = useMemo(
+    () => applyClientColumnSort(
+      applyClientColumnFilters(jobs, debouncedFilters, accessors),
+      sortBy,
+      sortDir,
+      accessors,
+    ),
+    [jobs, debouncedFilters, accessors, sortBy, sortDir],
+  )
+  const hasColumnFilters = Object.values(debouncedFilters).some((v) => v.trim())
+  const hasFiltersActive = isListFilterActive(hasColumnFilters)
+  const clearAllFilters = () => {
+    clearFilters()
+    clearSort()
+  }
 
   const loadJobs = useCallback(async () => {
     setLoading(true)
@@ -197,7 +260,7 @@ export function JobPostingsPage() {
       />
 
       {loading && <div className="loading-state">Loading job postings…</div>}
-      {!loading && jobs.length === 0 && (
+      {!loading && jobs.length === 0 && !hasFiltersActive && (
         <EmptyState
           icon="💼"
           title="No job postings yet"
@@ -205,21 +268,27 @@ export function JobPostingsPage() {
           action={<button type="button" className="btn btn-primary" onClick={openCreate}>New Posting</button>}
         />
       )}
-      {!loading && jobs.length > 0 && (
+      {!loading && (jobs.length > 0 || hasFiltersActive) && (
         <div className="table-container">
           <table className="custom-table">
             <thead>
-              <tr>
-                <th>Title</th>
-                <th>Type</th>
-                <th>Location</th>
-                <th>Status</th>
-                <th>Dates</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
-              </tr>
+              <TableColumnHeaderRow
+                columns={filterColumns}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={toggleSort}
+              />
+              <TableColumnFilterRow
+                columns={filterColumns}
+                values={filters}
+                onChange={setFilter}
+                onClear={clearAllFilters}
+              />
             </thead>
             <tbody>
-              {jobs.map((job) => (
+              {displayedRows.length === 0 ? (
+                <TableNoResultsRow colSpan={6} title="No postings match your filters" onClearFilters={clearAllFilters} />
+              ) : displayedRows.map((job) => (
                 <tr key={job.id}>
                   <td style={{ fontWeight: 600 }}>{job.title}</td>
                   <td>{jobTypeLabel(job.type)}</td>

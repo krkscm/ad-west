@@ -10,6 +10,7 @@ import {
   SubmitSthanReportDto,
   UpdateSthanCalendarEventDto,
 } from '../dto/core-business.dto';
+import { applyContactListSqlFilters, type ContactListQueryOptions } from '../utils/column-filter.util';
 import type {
   SthanCalendarEventRecord,
   SthanContactRecord,
@@ -172,25 +173,40 @@ export class SthanRuntimeService {
 
   // ── Contacts (sthan rows in sreni_contacts filtered by location_id) ──────────
 
-  async listSthanContacts(locationId: string, page = 1, pageSize = 10): Promise<{ items: SthanContactRecord[]; total: number; totalPages: number }> {
+  async listSthanContacts(
+    locationId: string,
+    page = 1,
+    pageSize = 10,
+    listFilters?: ContactListQueryOptions,
+  ): Promise<{ items: SthanContactRecord[]; total: number; totalPages: number }> {
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
       const offset = (page - 1) * pageSize;
+      const conditions = [
+        `c.contact_kind = 'household'`,
+        `(c.sthan_location_id = $1::uuid OR c.location_id = $1::uuid)`,
+      ];
+      const params: unknown[] = [locationId];
+      let paramIdx = 2;
+      paramIdx = applyContactListSqlFilters(conditions, params, paramIdx, listFilters, 'c');
+      const whereClause = `WHERE ${conditions.join(' AND ')}`;
+      const { buildContactOrderBy } = await import('../utils/column-sort.util');
+      const orderBy = buildContactOrderBy(listFilters, 'c', 'ORDER BY c.row_index ASC');
+      const limitIdx = paramIdx;
+      const offsetIdx = paramIdx + 1;
       const [countRows, dataRows] = await Promise.all([
         this.ctx.dataSource.query(
-          `SELECT COUNT(*)::int AS total FROM adwest.sreni_contacts
-           WHERE contact_kind = 'household'
-             AND (sthan_location_id = $1::uuid OR location_id = $1::uuid)`,
-          [locationId],
+          `SELECT COUNT(*)::int AS total FROM adwest.sreni_contacts c ${whereClause}`,
+          params,
         ),
         this.ctx.dataSource.query(
-          `SELECT id::text, location_id::text, row_index, data,
-                  zone_location_id::text, sthan_location_id::text, division_location_id::text,
-                  source_file, uploaded_by, created_at, updated_at
-           FROM adwest.sreni_contacts
-           WHERE contact_kind = 'household'
-             AND (sthan_location_id = $1::uuid OR location_id = $1::uuid)
-           ORDER BY row_index LIMIT $2 OFFSET $3`,
-          [locationId, pageSize, offset],
+          `SELECT c.id::text, c.location_id::text, c.row_index, c.data,
+                  c.zone_location_id::text, c.sthan_location_id::text, c.division_location_id::text,
+                  c.source_file, c.uploaded_by, c.created_at, c.updated_at
+           FROM adwest.sreni_contacts c
+           ${whereClause}
+           ${orderBy}
+           LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+          [...params, pageSize, offset],
         ),
       ]);
       const total = (countRows as Array<{ total: number }>)[0].total;

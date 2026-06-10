@@ -2,10 +2,17 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal } from '../components/common/Modal';
 import { PageHeader } from '../components/common/PageHeader';
 import { PaginationBar } from '../components/common/PaginationBar';
+import { EmptyState } from '../components/common/EmptyState';
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../components/common/TableColumnFilterRow';
+import { TableColumnHeaderRow } from '../components/common/TableColumnHeaderRow';
+import { TableNoResultsRow } from '../components/common/TableNoResultsRow';
+import { useTableColumnFilters } from '../hooks/useTableColumnFilters';
+import { useTableSort } from '../hooks/useTableSort';
+import { isListFilterActive } from '../utils/tableListUtils';
 import { useToast } from '../components/common/Toast';
 import { useAdminDefinitions } from '../context/admin-definitions-context';
 import { useEnumOptions } from '../hooks/useEnumOptions';
-import { backendApi, JoinUsSubmissionApi, SreniDivisionApi } from '../utils/backendApi';
+import { backendApi, JoinUsSubmissionApi, SreniDivisionApi, type ListSortParams } from '../utils/backendApi';
 
 const toUiError = (error: unknown, fallback: string): string => {
   if (!(error instanceof Error)) return fallback;
@@ -39,6 +46,8 @@ export const JoinUsReviewPage: React.FC = () => {
   const [sreniFilter, setSreniFilter] = useState('');
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const { filters, debouncedFilters, setFilter, clearFilters, filtersQuery } = useTableColumnFilters();
+  const { sortBy, sortDir, toggleSort, clearSort, sortQuery } = useTableSort();
 
   const [reviewTarget, setReviewTarget] = useState<JoinUsSubmissionApi | null>(null);
   const [zoneId, setZoneId] = useState('');
@@ -60,7 +69,7 @@ export const JoinUsReviewPage: React.FC = () => {
     return locationDefinitions.filter((l) => l.level === 'STHAN' && l.active && l.parentId === zoneId);
   }, [locationDefinitions, zoneId]);
 
-  const load = useCallback((p: number, ps: number) => {
+  const load = useCallback((p: number, ps: number, colFilters = filtersQuery, sort: ListSortParams | undefined = sortQuery) => {
     setIsLoading(true);
     backendApi.listJoinUsSubmissions({
       page: p,
@@ -68,6 +77,8 @@ export const JoinUsReviewPage: React.FC = () => {
       status,
       sreniId: sreniFilter || undefined,
       search: search || undefined,
+      filters: colFilters,
+      ...sort,
     })
       .then((res) => {
         setItems(res.items);
@@ -77,7 +88,7 @@ export const JoinUsReviewPage: React.FC = () => {
       })
       .catch((err) => addToast(toUiError(err, 'Failed to load Join Us submissions.'), 'error'))
       .finally(() => setIsLoading(false));
-  }, [status, sreniFilter, search, addToast]);
+  }, [status, sreniFilter, search, filtersQuery, sortQuery, addToast]);
 
   useEffect(() => {
     load(page, pageSize);
@@ -86,6 +97,57 @@ export const JoinUsReviewPage: React.FC = () => {
   useEffect(() => {
     setPage(1);
   }, [status, sreniFilter, search]);
+
+  useEffect(() => {
+    setPage(1);
+    load(1, pageSize, filtersQuery);
+  }, [debouncedFilters]);
+
+  useEffect(() => {
+    setPage(1);
+    load(1, pageSize, filtersQuery, sortQuery);
+  }, [sortBy, sortDir]);
+
+  const joinUsFilterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: 'name', label: 'Name', filterable: true, placeholder: 'Name…' },
+    { key: 'mobileNo', label: 'Mobile', filterable: true, placeholder: 'Mobile…' },
+    {
+      key: 'interestedSreniId',
+      label: 'Interested Sreni',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All srenies',
+      options: sreniDefinitions.map((s) => ({ value: s.id, label: s.name })),
+    },
+    { key: 'familyOrBachelor', label: 'Type', filterable: true, placeholder: 'Type…' },
+    {
+      key: 'reviewStatus',
+      label: 'Status',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All',
+      options: [
+        { value: 'pending', label: 'Pending' },
+        { value: 'completed', label: 'Completed' },
+      ],
+    },
+    { key: '__submitted__', label: 'Submitted', filterable: false, sortable: false },
+    { key: '__actions__', filterable: false, sortable: false },
+  ], [sreniDefinitions]);
+
+  const hasColumnFilters = Object.values(debouncedFilters).some((v) => v.trim());
+  const hasFiltersActive = isListFilterActive(search, hasColumnFilters, sreniFilter, status !== 'pending');
+  const showEmptyState = !isLoading && items.length === 0 && !hasFiltersActive;
+
+  const clearAllFilters = () => {
+    clearFilters();
+    clearSort();
+    setSearch('');
+    setSreniFilter('');
+    setStatus('pending');
+    setPage(1);
+    load(1, pageSize, undefined, undefined);
+  };
 
   const openReview = (row: JoinUsSubmissionApi) => {
     ensureSthansLoaded();
@@ -173,29 +235,32 @@ export const JoinUsReviewPage: React.FC = () => {
         </div>
       </div>
 
-      {isLoading && items.length === 0 ? (
+      {isLoading && items.length === 0 && !hasFiltersActive ? (
         <div className="glass-panel loading-state">Loading submissions…</div>
-      ) : items.length === 0 ? (
-        <div className="glass-panel" style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--text-secondary-dark)' }}>
-          {status === 'pending' ? 'No pending Join Us submissions.' : 'No submissions match your filters.'}
-        </div>
+      ) : showEmptyState ? (
+        <EmptyState title="No pending Join Us submissions" copy="New registrations will appear here for review." />
       ) : (
         <>
           <div className="table-container">
             <table className="custom-table">
               <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Mobile</th>
-                  <th>Interested Sreni</th>
-                  <th>Type</th>
-                  <th>Submitted</th>
-                  <th>Status</th>
-                  <th style={{ width: '100px' }} />
-                </tr>
+                <TableColumnHeaderRow
+                  columns={joinUsFilterColumns}
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                />
+                <TableColumnFilterRow
+                  columns={joinUsFilterColumns}
+                  values={filters}
+                  onChange={setFilter}
+                  onClear={clearAllFilters}
+                />
               </thead>
               <tbody>
-                {items.map((row) => (
+                {items.length === 0 ? (
+                  <TableNoResultsRow colSpan={7} title="No submissions match your filters" onClearFilters={clearAllFilters} />
+                ) : items.map((row) => (
                   <tr key={row.id}>
                     <td style={{ fontWeight: 600 }}>{row.name}</td>
                     <td>{row.mobileNo ?? '—'}</td>

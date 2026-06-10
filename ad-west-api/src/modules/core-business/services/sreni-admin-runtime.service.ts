@@ -15,6 +15,7 @@ import { HouseholdEnumConfigService, type HouseholdResolverKey } from './househo
 import { ContactAccessScope, ContactAccessScopeService } from './contact-access-scope.service';
 import { GadaAssignmentService, type GadaListQueryOptions } from './gada-assignment.service';
 import { MemberSreniRef, SevaSamithiContactService } from './seva-samithi-contact.service';
+import { applyContactListSqlFilters, type ContactListQueryOptions } from '../utils/column-filter.util';
 
 export interface SreniAdminRuntimeContext {
   srenies: Map<string, SrenyRecord>;
@@ -352,6 +353,7 @@ export class SreniAdminRuntimeService {
     pageSize = 10,
     scope?: ContactAccessScope,
     gadaOptions?: GadaListQueryOptions,
+    listFilters?: ContactListQueryOptions,
   ): Promise<{
     items: (SreniContactRecord & { sreniName: string; isTagged: boolean })[];
     total: number;
@@ -389,8 +391,14 @@ export class SreniAdminRuntimeService {
           primaryContactStrategy,
           resolverKey,
           participantTotal,
+          listFilters,
         );
       }
+
+      const { buildContactOrderBy } = await import('../utils/column-sort.util');
+      const contactOrderBy = (filters: ContactListQueryOptions | undefined, defaultOrder: string) => (
+        filters?.sortBy ? buildContactOrderBy(filters, 'c', defaultOrder) : defaultOrder
+      );
 
       const offset = (page - 1) * pageSize;
 
@@ -411,6 +419,7 @@ export class SreniAdminRuntimeService {
             sreniId, scope, gadaEnabled, gadaOptions, childConditions, childParams, childParamIdx,
           );
         }
+        childParamIdx = applyContactListSqlFilters(childConditions, childParams, childParamIdx, listFilters, 'c');
         const childJoinSql = gadaJoins.length ? ` ${gadaJoins.join(' ')}` : '';
         const childWhere = `WHERE ${childConditions.join(' AND ')}`;
         const childLimitIdx = childParamIdx;
@@ -438,7 +447,7 @@ export class SreniAdminRuntimeService {
              LEFT JOIN adwest.srenies s ON s.id::text = c.sreni_id
              ${childJoinSql}
              ${childWhere}
-             ORDER BY c.row_index ASC
+             ${contactOrderBy(listFilters, 'ORDER BY c.row_index ASC')}
              LIMIT $${childLimitIdx} OFFSET $${childOffsetIdx}`,
             [...childParams, pageSize, offset],
           ) as Promise<Array<{
@@ -516,6 +525,7 @@ export class SreniAdminRuntimeService {
           sreniId, scope, gadaEnabled, gadaOptions, householdConditions, householdParams, householdParamIdx,
         );
       }
+      householdParamIdx = applyContactListSqlFilters(householdConditions, householdParams, householdParamIdx, listFilters, 'c');
       const householdJoinSql = gadaJoins.length ? ` ${gadaJoins.join(' ')}` : '';
       const femaleGendersParamIdx = householdParamIdx;
       const participantCountSelect = femaleGenders
@@ -575,7 +585,7 @@ export class SreniAdminRuntimeService {
            LEFT JOIN adwest.srenies s ON s.id::text = c.sreni_id
            ${householdJoinSql}
            ${householdWhere}
-           ORDER BY (c.sreni_id = $1) DESC, c.row_index ASC
+           ${contactOrderBy(listFilters, 'ORDER BY (c.sreni_id = $1) DESC, c.row_index ASC')}
            LIMIT $${householdLimitIdx} OFFSET $${householdOffsetIdx}`,
           householdListParams,
         ) as Promise<Array<{
@@ -673,6 +683,7 @@ export class SreniAdminRuntimeService {
     primaryContactStrategy: string,
     resolverKey: HouseholdResolverKey,
     participantTotal: number,
+    listFilters?: ContactListQueryOptions,
   ): Promise<{
     items: (SreniContactRecord & { sreniName: string; isTagged: boolean; memberSrenis?: MemberSreniRef[] })[];
     total: number;
@@ -712,7 +723,10 @@ export class SreniAdminRuntimeService {
     if (scope) {
       paramIdx = this.contactScopeHelper.appendStahanSql('c', scope, conditions, params, paramIdx);
     }
+    paramIdx = applyContactListSqlFilters(conditions, params, paramIdx, listFilters, 'c');
     const whereClause = `WHERE ${conditions.join(' AND ')}`;
+    const { buildContactOrderBy } = await import('../utils/column-sort.util');
+    const sevaOrderBy = buildContactOrderBy(listFilters, 'c', 'ORDER BY c.sr_no ASC NULLS LAST, c.row_index ASC');
     const limitIdx = paramIdx;
     const offsetIdx = paramIdx + 1;
     const sreniName = this.ctx.srenies.get(sreniId)?.name ?? sreniId;
@@ -739,7 +753,7 @@ export class SreniAdminRuntimeService {
          FROM adwest.seva_samithi_contacts ssc
          INNER JOIN adwest.sreni_contacts c ON c.id = ssc.contact_id
          ${whereClause}
-         ORDER BY c.sr_no ASC NULLS LAST, c.row_index ASC
+         ${sevaOrderBy}
          LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
         [...params, pageSize, offset],
       ) as Promise<Array<{
@@ -842,7 +856,7 @@ export class SreniAdminRuntimeService {
   async listAllContacts(
     page = 1,
     pageSize = 10,
-    filters?: { sreniId?: string; sthanId?: string; search?: string },
+    filters?: { sreniId?: string; sthanId?: string; search?: string; columnFilters?: ContactListQueryOptions['columnFilters']; sortBy?: string; sortDir?: 'asc' | 'desc' },
     scope?: ContactAccessScope,
   ): Promise<{ items: (SreniContactRecord & { sreniName: string })[]; total: number; page: number; pageSize: number; totalPages: number }> {
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
@@ -870,16 +884,19 @@ export class SreniAdminRuntimeService {
         params.push(filters.sthanId);
         paramIdx += 1;
       }
-      if (filters?.search?.trim()) {
-        conditions.push(
-          `(COALESCE(c.data->>'name', '') ILIKE $${paramIdx}
-            OR COALESCE(c.data->>'mobileNo', '') ILIKE $${paramIdx})`,
-        );
-        params.push(`%${filters.search.trim()}%`);
-        paramIdx += 1;
-      }
+      paramIdx = applyContactListSqlFilters(conditions, params, paramIdx, {
+        search: filters?.search,
+        columnFilters: filters?.columnFilters,
+      }, 'c');
 
       const whereClause = `WHERE ${conditions.join(' AND ')}`;
+      const { buildContactOrderBy } = await import('../utils/column-sort.util');
+      const globalContactOrderBy = buildContactOrderBy(
+        { sortBy: filters?.sortBy, sortDir: filters?.sortDir },
+        'c',
+        'ORDER BY c.sr_no ASC NULLS LAST, c.row_index ASC',
+        { sreniName: 'COALESCE(s.name, c.sreni_id)' },
+      );
 
       const countRows = await this.ctx.dataSource.query(
         `SELECT COUNT(*)::int AS total FROM adwest.sreni_contacts c ${whereClause}`,
@@ -900,7 +917,7 @@ export class SreniAdminRuntimeService {
          FROM adwest.sreni_contacts c
          LEFT JOIN adwest.srenies s ON s.id::text = c.sreni_id
          ${whereClause}
-         ORDER BY c.sr_no ASC NULLS LAST, c.row_index ASC
+         ${globalContactOrderBy}
          LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
         [...params, pageSize, offset],
       ) as Array<{

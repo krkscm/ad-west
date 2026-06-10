@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { backendApi, ReportMetricDefinitionApi } from '../../utils/backendApi';
 import { useToast } from '../../components/common/Toast';
 import { useConfirm } from '../../components/common/ConfirmDialog';
@@ -8,6 +8,14 @@ import { FormSection } from '../../components/common/FormSection';
 import { FormActions } from '../../components/common/FormActions';
 import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
 import { EmptyState } from '../../components/common/EmptyState';
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../../components/common/TableColumnFilterRow';
+import { TableColumnHeaderRow } from '../../components/common/TableColumnHeaderRow';
+import { TableNoResultsRow } from '../../components/common/TableNoResultsRow';
+import { isListFilterActive } from '../../utils/tableListUtils';
+import { useTableColumnFilters } from '../../hooks/useTableColumnFilters';
+import { useTableSort } from '../../hooks/useTableSort';
+import { applyClientColumnFilters, type ClientFilterAccessor } from '../../utils/clientTableFilter';
+import { applyClientColumnSort } from '../../utils/clientTableSort';
 
 const toUiError = (error: unknown, fallback: string): string => {
   if (!(error instanceof Error)) return fallback;
@@ -39,6 +47,67 @@ export const ReportMetricsPage: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
+  const { filters, debouncedFilters, setFilter, clearFilters } = useTableColumnFilters();
+  const { sortBy, sortDir, toggleSort, clearSort } = useTableSort();
+
+  const filterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: '__index__', label: '#', filterable: false, sortable: false, width: '48px', align: 'center' },
+    { key: 'name', label: 'Metric Name', filterable: true, placeholder: 'Name…' },
+    {
+      key: 'inputType',
+      label: 'Type',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All types',
+      options: [{ value: 'number', label: 'Number' }, { value: 'text', label: 'Text' }],
+    },
+    { key: 'unit', label: 'Unit', filterable: true, placeholder: 'Unit…' },
+    { key: 'target', label: 'Target', filterable: true, placeholder: 'Target…' },
+    {
+      key: 'isRequired',
+      label: 'Required',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All',
+      options: [{ value: 'required', label: 'Required' }, { value: 'optional', label: 'Optional' }],
+    },
+    {
+      key: 'active',
+      label: 'Status',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All',
+      options: [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }],
+    },
+    { key: '__actions__', label: 'Actions', filterable: false, sortable: false, align: 'right' },
+  ], []);
+
+  const accessors = useMemo<Record<string, ClientFilterAccessor<ReportMetricDefinitionApi>>>(() => ({
+    name: { getValue: (m) => m.name },
+    inputType: { getValue: (m) => m.inputType, match: 'exact' },
+    unit: { getValue: (m) => m.unit ?? '' },
+    target: {
+      getValue: (m) => (m.target != null && m.inputType === 'number' ? String(m.target) : ''),
+    },
+    isRequired: { getValue: (m) => (m.isRequired ? 'required' : 'optional'), match: 'exact' },
+    active: { getValue: (m) => (m.active ? 'active' : 'inactive'), match: 'exact' },
+  }), []);
+
+  const displayedRows = useMemo(
+    () => applyClientColumnSort(
+      applyClientColumnFilters(metrics, debouncedFilters, accessors),
+      sortBy,
+      sortDir,
+      accessors,
+    ),
+    [metrics, debouncedFilters, accessors, sortBy, sortDir],
+  );
+  const hasColumnFilters = Object.values(debouncedFilters).some((v) => v.trim());
+  const hasFiltersActive = isListFilterActive(hasColumnFilters);
+  const clearAllFilters = () => {
+    clearFilters();
+    clearSort();
+  };
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -192,7 +261,7 @@ export const ReportMetricsPage: React.FC = () => {
         </FormSection>
       )}
 
-      {!isLoading && metrics.length === 0 && !isAdding && (
+      {!isLoading && metrics.length === 0 && !isAdding && !hasFiltersActive && (
         <EmptyState
           icon="📋"
           title="No metrics defined"
@@ -202,23 +271,27 @@ export const ReportMetricsPage: React.FC = () => {
       )}
 
       {/* Metrics table */}
-      {!isLoading && metrics.length > 0 && (
+      {!isLoading && (metrics.length > 0 || hasFiltersActive) && (
         <div className="table-container">
           <table className="custom-table">
             <thead>
-              <tr>
-                <th style={{ width: '48px', textAlign: 'center' }}>#</th>
-                <th>Metric Name</th>
-                <th>Type</th>
-                <th>Unit</th>
-                <th>Target</th>
-                <th>Required</th>
-                <th>Status</th>
-                <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
-              </tr>
+              <TableColumnHeaderRow
+                columns={filterColumns}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={toggleSort}
+              />
+              <TableColumnFilterRow
+                columns={filterColumns}
+                values={filters}
+                onChange={setFilter}
+                onClear={clearAllFilters}
+              />
             </thead>
             <tbody>
-              {metrics.map((m, idx) => (
+              {displayedRows.length === 0 ? (
+                <TableNoResultsRow colSpan={8} title="No metrics match your filters" onClearFilters={clearAllFilters} />
+              ) : displayedRows.map((m, idx) => (
                 <tr key={m.id} style={{ opacity: m.active ? 1 : 0.55 }}>
                   <td style={{ textAlign: 'center', color: 'var(--text-secondary-dark)', fontSize: '0.82rem' }}>{idx + 1}</td>
                   <td>

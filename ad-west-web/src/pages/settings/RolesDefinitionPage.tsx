@@ -5,7 +5,13 @@ import { PageHeader } from '../../components/common/PageHeader';
 import { EmptyState } from '../../components/common/EmptyState';
 import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
 import { PaginationBar } from '../../components/common/PaginationBar';
-import { backendApi, RoleDefinitionApi } from '../../utils/backendApi';
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../../components/common/TableColumnFilterRow';
+import { TableColumnHeaderRow } from '../../components/common/TableColumnHeaderRow';
+import { TableNoResultsRow } from '../../components/common/TableNoResultsRow';
+import { useTableColumnFilters } from '../../hooks/useTableColumnFilters';
+import { useTableSort } from '../../hooks/useTableSort';
+import { isListFilterActive } from '../../utils/tableListUtils';
+import { backendApi, RoleDefinitionApi, type ListSortParams } from '../../utils/backendApi';
 
 type RoleLevel = RoleDefinitionApi['level'];
 
@@ -53,6 +59,8 @@ export const RolesDefinitionPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const { filters, debouncedFilters, setFilter, clearFilters, filtersQuery } = useTableColumnFilters();
+  const { sortBy, sortDir, toggleSort, clearSort, sortQuery } = useTableSort();
 
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -73,16 +81,14 @@ export const RolesDefinitionPage: React.FC = () => {
     setFormOpen(false);
   };
 
-  const loadRoles = async () => {
+  const loadRoles = async (p = page, ps = pageSize, q = search, colFilters = filtersQuery, sort: ListSortParams | undefined = sortQuery) => {
     setIsLoading(true);
     try {
-      const response = await backendApi.listRoleDefinitions({ page, pageSize, search });
+      const response = await backendApi.listRoleDefinitions({ page: p, pageSize: ps, search: q, filters: colFilters, ...sort });
       setRoles(response.items);
       setTotal(response.total);
       setTotalPages(response.totalPages);
-      if (response.page !== page) {
-        setPage(response.page);
-      }
+      setPage(response.page);
     } catch (error) {
       addToast(toUiError(error, 'Failed to load role definitions.'), 'error');
     } finally {
@@ -93,6 +99,41 @@ export const RolesDefinitionPage: React.FC = () => {
   useEffect(() => {
     void loadRoles();
   }, [page, pageSize, search]);
+
+  useEffect(() => {
+    setPage(1);
+    void loadRoles(1, pageSize, search, filtersQuery);
+  }, [debouncedFilters]);
+
+  useEffect(() => {
+    setPage(1);
+    void loadRoles(1, pageSize, search, filtersQuery, sortQuery);
+  }, [sortBy, sortDir]);
+
+  const roleFilterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: 'code', label: 'Code', filterable: true, placeholder: 'Code…' },
+    { key: 'name', label: 'Name', filterable: true, placeholder: 'Name…' },
+    {
+      key: 'level',
+      label: 'Level',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All levels',
+      options: [
+        { value: 'ZONE', label: 'Zone' },
+        { value: 'STHAN', label: 'Sthan' },
+      ],
+    },
+    {
+      key: 'active',
+      label: 'Status',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All',
+      options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }],
+    },
+    { key: '__actions__', label: 'Actions', filterable: false, sortable: false, align: 'right' },
+  ], []);
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -173,7 +214,18 @@ export const RolesDefinitionPage: React.FC = () => {
     }
   };
 
-  const hasTable = !isLoading && sortedRoles.length > 0;
+  const hasColumnFilters = Object.values(debouncedFilters).some((v) => v.trim());
+  const hasFiltersActive = isListFilterActive(search, hasColumnFilters);
+  const showEmptyState = !isLoading && sortedRoles.length === 0 && !hasFiltersActive;
+  const hasTable = !isLoading && (sortedRoles.length > 0 || hasFiltersActive);
+
+  const clearAllFilters = () => {
+    clearFilters();
+    clearSort();
+    setSearch('');
+    setPage(1);
+    void loadRoles(1, pageSize, '', undefined, undefined);
+  };
 
   return (
     <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
@@ -320,11 +372,11 @@ export const RolesDefinitionPage: React.FC = () => {
 
       {isLoading ? (
         <div className="glass-panel loading-state">Loading roles…</div>
-      ) : sortedRoles.length === 0 ? (
+      ) : showEmptyState ? (
         <EmptyState
           icon="🗂️"
           title="No roles found"
-          copy={search ? 'Try a different search term.' : 'Click "New Role" to create the first one.'}
+          copy="Click &quot;New Role&quot; to create the first one."
         />
       ) : (
       <div
@@ -337,21 +389,23 @@ export const RolesDefinitionPage: React.FC = () => {
       >
         <table className="custom-table">
           <thead>
-            <tr>
-              {['Code', 'Name', 'Level', 'Status', 'Actions'].map((col) => (
-                <th
-                  key={col}
-                  style={{
-                    textAlign: col === 'Actions' ? 'right' : 'left',
-                  }}
-                >
-                  {col}
-                </th>
-              ))}
-            </tr>
+            <TableColumnHeaderRow
+              columns={roleFilterColumns}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSort={toggleSort}
+            />
+            <TableColumnFilterRow
+              columns={roleFilterColumns}
+              values={filters}
+              onChange={setFilter}
+              onClear={clearAllFilters}
+            />
           </thead>
           <tbody>
-            {sortedRoles.map((role) => (
+            {sortedRoles.length === 0 ? (
+              <TableNoResultsRow colSpan={5} title="No roles match your filters" onClearFilters={clearAllFilters} />
+            ) : sortedRoles.map((role) => (
                 <tr
                   key={role.id}
                   style={{ opacity: role.active ? 1 : 0.55 }}

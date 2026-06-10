@@ -13,6 +13,8 @@ import { AuthPrincipal } from '../interfaces/auth-principal.interface';
 import { RoleDefinition } from '../interfaces/role-definition.interface';
 import { RoleDefinitionStore } from '../interfaces/role-definition-store.interface';
 import { CryptoService } from './crypto.service';
+import { applyInMemoryColumnFilters, parseColumnFilters } from '@modules/core-business/utils/column-filter.util';
+import { applyInMemoryColumnSort, parseSortParams } from '@modules/core-business/utils/column-sort.util';
 
 export interface PaginatedRoleDefinitionsResponse {
   items: RoleDefinition[];
@@ -50,6 +52,23 @@ export class RoleDefinitionsService {
     if (typeof query.active === 'boolean') {
       rows = rows.filter((row) => row.active === query.active);
     }
+
+    const columnFilters = parseColumnFilters(query.filters);
+    if (Object.keys(columnFilters).length > 0) {
+      rows = applyInMemoryColumnFilters(rows, columnFilters, {
+        code: (row) => row.code,
+        name: (row) => row.name,
+        level: (row) => row.level,
+        active: (row) => String(row.active),
+      });
+    }
+
+    rows = applyInMemoryColumnSort(rows, parseSortParams(query.sortBy, query.sortDir), {
+      code: (row) => row.code,
+      name: (row) => row.name,
+      level: (row) => row.level,
+      active: (row) => row.active,
+    }, (a, b) => a.name.localeCompare(b.name));
 
     const total = rows.length;
     const totalPages = total === 0 ? 1 : Math.ceil(total / pageSize);

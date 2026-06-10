@@ -35,4 +35,19 @@ export class ListRoleDefinitionsQueryDto {
   @IsOptional()
   @IsEnum(RoleLevel)
   level?: RoleLevel;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  filters?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  sortBy?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4)
+  sortDir?: string;
 }

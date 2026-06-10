@@ -1,10 +1,18 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { backendApi, SreniReportParameterApi } from '../utils/backendApi';
 import { useToast } from '../components/common/Toast';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { PageHeader } from '../components/common/PageHeader';
 import { useEnumOptions } from '../hooks/useEnumOptions';
 import { TableRowActionsMenu } from '../components/common/TableRowActionsMenu';
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../components/common/TableColumnFilterRow';
+import { TableColumnHeaderRow } from '../components/common/TableColumnHeaderRow';
+import { TableNoResultsRow } from '../components/common/TableNoResultsRow';
+import { isListFilterActive } from '../utils/tableListUtils';
+import { useTableColumnFilters } from '../hooks/useTableColumnFilters';
+import { useTableSort } from '../hooks/useTableSort';
+import { applyClientColumnFilters, type ClientFilterAccessor } from '../utils/clientTableFilter';
+import { applyClientColumnSort } from '../utils/clientTableSort';
 
 interface Props {
   sreniId: string;
@@ -53,6 +61,47 @@ export const SreniReportConfigPage: React.FC<Props> = ({ sreniId, sreniName }) =
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
+  const { filters, debouncedFilters, setFilter, clearFilters } = useTableColumnFilters();
+  const { sortBy, sortDir, toggleSort, clearSort } = useTableSort();
+
+  const filterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: '__index__', label: '#', filterable: false, sortable: false, width: '40px', align: 'center' },
+    { key: 'name', label: 'Parameter Name', filterable: true, placeholder: 'Name…' },
+    {
+      key: 'inputType',
+      label: 'Type',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All types',
+      options: inputTypeOptions.map((o) => ({ value: o.value, label: o.label })),
+    },
+    { key: 'unit', label: 'Unit', filterable: true, placeholder: 'Unit…' },
+    {
+      key: 'isRequired',
+      label: 'Required',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All',
+      options: [{ value: 'required', label: 'Required' }, { value: 'optional', label: 'Optional' }],
+    },
+    {
+      key: 'active',
+      label: 'Status',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All',
+      options: [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }],
+    },
+    { key: '__actions__', label: 'Actions', filterable: false, sortable: false, align: 'right' },
+  ], [inputTypeOptions]);
+
+  const accessors = useMemo<Record<string, ClientFilterAccessor<SreniReportParameterApi>>>(() => ({
+    name: { getValue: (p) => p.name },
+    inputType: { getValue: (p) => p.inputType, match: 'exact' },
+    unit: { getValue: (p) => p.unit ?? '' },
+    isRequired: { getValue: (p) => (p.isRequired ? 'required' : 'optional'), match: 'exact' },
+    active: { getValue: (p) => (p.active ? 'active' : 'inactive'), match: 'exact' },
+  }), []);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -71,6 +120,22 @@ export const SreniReportConfigPage: React.FC<Props> = ({ sreniId, sreniName }) =
   useEffect(() => { void load(); }, [load]);
 
   const params = paramsByType[activeType];
+
+  const displayedRows = useMemo(
+    () => applyClientColumnSort(
+      applyClientColumnFilters(params, debouncedFilters, accessors),
+      sortBy,
+      sortDir,
+      accessors,
+    ),
+    [params, debouncedFilters, accessors, sortBy, sortDir],
+  );
+  const hasColumnFilters = Object.values(debouncedFilters).some((v) => v.trim());
+  const hasFiltersActive = isListFilterActive(hasColumnFilters);
+  const clearAllFilters = () => {
+    clearFilters();
+    clearSort();
+  };
 
   const openAdd = () => { setForm(emptyForm()); setEditingId(null); setIsAdding(true); };
   const openEdit = (p: SreniReportParameterApi) => {
@@ -259,7 +324,7 @@ export const SreniReportConfigPage: React.FC<Props> = ({ sreniId, sreniName }) =
         )}
 
         {/* Empty state */}
-        {!isLoading && params.length === 0 && !isAdding && (
+        {!isLoading && params.length === 0 && !isAdding && !hasFiltersActive && (
           <div style={{ padding: '40px 24px', textAlign: 'center' }}>
             <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>📋</div>
             <div style={{ fontWeight: 700, marginBottom: '6px' }}>No parameters yet</div>
@@ -271,22 +336,27 @@ export const SreniReportConfigPage: React.FC<Props> = ({ sreniId, sreniName }) =
         )}
 
         {/* Parameters table */}
-        {!isLoading && params.length > 0 && (
+        {!isLoading && (params.length > 0 || hasFiltersActive) && (
           <div className="table-container">
             <table className="custom-table">
               <thead>
-                <tr>
-                  <th style={{ width: '40px', textAlign: 'center' }}>#</th>
-                  <th>Parameter Name</th>
-                  <th>Type</th>
-                  <th>Unit</th>
-                  <th>Required</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
-                </tr>
+                <TableColumnHeaderRow
+                  columns={filterColumns}
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                />
+                <TableColumnFilterRow
+                  columns={filterColumns}
+                  values={filters}
+                  onChange={setFilter}
+                  onClear={clearAllFilters}
+                />
               </thead>
               <tbody>
-                {params.map((p, idx) => (
+                {displayedRows.length === 0 ? (
+                  <TableNoResultsRow colSpan={7} title="No parameters match your filters" onClearFilters={clearAllFilters} />
+                ) : displayedRows.map((p, idx) => (
                   <tr key={p.id} style={{ opacity: p.active ? 1 : 0.55 }}>
                     <td style={{ textAlign: 'center', color: 'var(--text-secondary-dark)', fontSize: '0.82rem' }}>{idx + 1}</td>
                     <td>

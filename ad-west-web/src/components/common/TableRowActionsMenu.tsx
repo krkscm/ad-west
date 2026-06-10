@@ -107,14 +107,8 @@ export const TableRowActionsMenu: React.FC<Props> = ({ actions, ariaLabel = 'Row
         <div
           ref={menuRef}
           role="menu"
-          style={{
-            ...menuStyle,
-            background: 'var(--glass-bg)',
-            border: '1px solid var(--border-dark)',
-            borderRadius: '8px',
-            boxShadow: '0 10px 28px rgba(0,0,0,0.16)',
-            padding: '4px',
-          }}
+          className="dropdown-menu"
+          style={menuStyle}
         >
           {enabledActions.map((action) => {
             const tone = action.tone ?? 'default';

@@ -2,6 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { ApprovalWorkflowRuntimeItemApi, backendApi } from '../../utils/backendApi'
 import { useToast } from '../common/Toast'
 import { TableRowActionsMenu } from '../common/TableRowActionsMenu'
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../common/TableColumnFilterRow'
+import { TableColumnHeaderRow } from '../common/TableColumnHeaderRow'
+import { useTableColumnFilters } from '../../hooks/useTableColumnFilters'
+import { useTableSort } from '../../hooks/useTableSort'
+import { applyClientColumnFilters, type ClientFilterAccessor } from '../../utils/clientTableFilter'
+import { applyClientColumnSort } from '../../utils/clientTableSort'
 
 const statusLabel: Record<string, string> = {
   pending: 'Pending Review',
@@ -15,6 +21,47 @@ export const ApprovalActionsPanel: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [notes, setNotes] = useState<Record<string, string>>({})
+  const { filters, debouncedFilters, setFilter, clearFilters } = useTableColumnFilters()
+  const { sortBy, sortDir, toggleSort, clearSort } = useTableSort()
+
+  const filterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: 'summary', label: 'Summary', filterable: true, placeholder: 'Summary…' },
+    {
+      key: 'status',
+      label: 'Status',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All statuses',
+      options: [
+        { value: 'pending', label: statusLabel.pending },
+        { value: 'approved', label: statusLabel.approved },
+        { value: 'rejected', label: statusLabel.rejected },
+      ],
+    },
+    { key: 'updated', label: 'Updated', filterable: true, placeholder: 'Updated…' },
+    { key: 'note', label: 'Note', filterable: false, sortable: false },
+    { key: '__actions__', filterable: false, sortable: false, width: '56px' },
+  ], [])
+
+  const accessors = useMemo<Record<string, ClientFilterAccessor<ApprovalWorkflowRuntimeItemApi>>>(() => ({
+    summary: { getValue: (item) => item.summary || item.targetId },
+    status: { getValue: (item) => item.status, match: 'exact' },
+    updated: { getValue: (item) => new Date(item.updatedAt).toLocaleString() },
+  }), [])
+
+  const displayedItems = useMemo(
+    () => applyClientColumnSort(
+      applyClientColumnFilters(items, debouncedFilters, accessors),
+      sortBy,
+      sortDir,
+      accessors,
+    ),
+    [items, debouncedFilters, accessors, sortBy, sortDir],
+  )
+  const clearAllFilters = () => {
+    clearFilters()
+    clearSort()
+  }
 
   const load = async () => {
     setLoading(true)
@@ -88,16 +135,27 @@ export const ApprovalActionsPanel: React.FC = () => {
         <div className="table-container" style={{ overflowX: 'auto' }}>
           <table className="custom-table">
             <thead>
-              <tr>
-                <th style={{ minWidth: '200px' }}>Summary</th>
-                <th>Status</th>
-                <th>Updated</th>
-                <th style={{ minWidth: '280px' }}>Note</th>
-                <th style={{ width: '56px' }} />
-              </tr>
+              <TableColumnHeaderRow
+                columns={filterColumns}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={toggleSort}
+              />
+              <TableColumnFilterRow
+                columns={filterColumns}
+                values={filters}
+                onChange={setFilter}
+                onClear={clearAllFilters}
+              />
             </thead>
             <tbody>
-              {items.map((item) => {
+              {displayedItems.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary-dark)' }}>
+                    No approval actions match the current filters.
+                  </td>
+                </tr>
+              ) : displayedItems.map((item) => {
                 const busy = busyId === item.id
                 const isPending = item.status === 'pending'
                 return (

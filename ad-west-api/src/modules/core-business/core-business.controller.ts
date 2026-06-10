@@ -93,6 +93,8 @@ import {
   MemberContactCommitDto,
 } from './dto/core-business.dto';
 import { CoreBusinessService } from './core-business.service';
+import { parseColumnFilters } from './utils/column-filter.util';
+import { parseSortParams } from './utils/column-sort.util';
 
 @Controller()
 export class CoreBusinessController {
@@ -129,12 +131,17 @@ export class CoreBusinessController {
     @Query('pageSize') pageSize?: string,
     @Query('search') search?: string,
     @Query('level') level?: string,
+    @Query('filters') filtersJson?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDir') sortDir?: string,
   ) {
     return this.service.listLocationsFromDb({
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 10,
       search,
       level,
+      columnFilters: parseColumnFilters(filtersJson),
+      ...parseSortParams(sortBy, sortDir),
     });
   }
 
@@ -162,11 +169,16 @@ export class CoreBusinessController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Query('search') search?: string,
+    @Query('filters') filtersJson?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDir') sortDir?: string,
   ) {
     return this.service.listSreniDefinitionsFromDb({
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 10,
       search,
+      columnFilters: parseColumnFilters(filtersJson),
+      ...parseSortParams(sortBy, sortDir),
     });
   }
 
@@ -204,12 +216,17 @@ export class CoreBusinessController {
     @Query('pageSize') pageSize?: string,
     @Query('search') search?: string,
     @Query('sreniId') sreniId?: string,
+    @Query('filters') filtersJson?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDir') sortDir?: string,
   ) {
     return this.service.listAttendanceMetricsFromDb({
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 10,
       search,
       sreniId,
+      columnFilters: parseColumnFilters(filtersJson),
+      ...parseSortParams(sortBy, sortDir),
     });
   }
 
@@ -247,12 +264,17 @@ export class CoreBusinessController {
     @Query('pageSize') pageSize?: string,
     @Query('search') search?: string,
     @Query('locationId') locationId?: string,
+    @Query('filters') filtersJson?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDir') sortDir?: string,
   ) {
     return this.service.listPermissionsFromDb({
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 10,
       search,
       locationId,
+      columnFilters: parseColumnFilters(filtersJson),
+      ...parseSortParams(sortBy, sortDir),
     });
   }
 
@@ -282,11 +304,16 @@ export class CoreBusinessController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Query('search') search?: string,
+    @Query('filters') filtersJson?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDir') sortDir?: string,
   ) {
     return this.service.listPermissionSetsFromDb({
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 10,
       search,
+      columnFilters: parseColumnFilters(filtersJson),
+      ...parseSortParams(sortBy, sortDir),
     });
   }
 
@@ -322,11 +349,16 @@ export class CoreBusinessController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Query('search') search?: string,
+    @Query('filters') filtersJson?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDir') sortDir?: string,
   ) {
     return this.service.listUsersFromDb({
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 10,
       search,
+      columnFilters: parseColumnFilters(filtersJson),
+      ...parseSortParams(sortBy, sortDir),
     });
   }
 
@@ -765,6 +797,10 @@ export class CoreBusinessController {
     @Param('sreniId') sreniId: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @Query('search') search?: string,
+    @Query('filters') filtersJson?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDir') sortDir?: string,
     @Query('gadaFilter') gadaFilter?: 'all' | 'unassigned' | 'mine',
     @Query('gadanayakUserId') gadanayakUserId?: string,
     @CurrentUser() actor?: AuthPrincipal,
@@ -777,6 +813,11 @@ export class CoreBusinessController {
       {
         filter: gadaFilter,
         gadanayakUserId,
+      },
+      {
+        search: search?.trim() || undefined,
+        columnFilters: parseColumnFilters(filtersJson),
+        ...parseSortParams(sortBy, sortDir),
       },
     );
   }
@@ -938,6 +979,9 @@ export class CoreBusinessController {
     @Query('status') status?: 'pending' | 'completed' | 'all',
     @Query('sreniId') sreniId?: string,
     @Query('search') search?: string,
+    @Query('filters') filtersJson?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDir') sortDir?: string,
     @CurrentUser() actor?: AuthPrincipal,
   ) {
     return this.service.listJoinUsSubmissions(
@@ -947,6 +991,8 @@ export class CoreBusinessController {
         status: status ?? 'pending',
         sreniId: sreniId?.trim() || undefined,
         search: search?.trim() || undefined,
+        columnFilters: parseColumnFilters(filtersJson),
+        ...parseSortParams(sortBy, sortDir),
       },
       actor!,
     );
@@ -970,6 +1016,9 @@ export class CoreBusinessController {
     @Query('sreniId') sreniId?: string,
     @Query('sthanId') sthanId?: string,
     @Query('search') search?: string,
+    @Query('filters') filtersJson?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDir') sortDir?: string,
     @CurrentUser() actor?: AuthPrincipal,
   ) {
     return this.service.listAllContacts(
@@ -979,6 +1028,8 @@ export class CoreBusinessController {
         sreniId: sreniId?.trim() || undefined,
         sthanId: sthanId?.trim() || undefined,
         search: search?.trim() || undefined,
+        columnFilters: parseColumnFilters(filtersJson),
+        ...parseSortParams(sortBy, sortDir),
       },
       actor,
     );
@@ -1474,11 +1525,20 @@ export class CoreBusinessController {
     @Param('locationId') locationId: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @Query('search') search?: string,
+    @Query('filters') filtersJson?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDir') sortDir?: string,
   ) {
     return this.service.listSthanContacts(
       locationId,
       page ? parseInt(page, 10) : 1,
       pageSize ? parseInt(pageSize, 10) : 10,
+      {
+        search: search?.trim() || undefined,
+        columnFilters: parseColumnFilters(filtersJson),
+        ...parseSortParams(sortBy, sortDir),
+      },
     );
   }
 

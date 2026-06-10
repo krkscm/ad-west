@@ -164,8 +164,8 @@ export class ContactAccessScopeService {
 
   clampListFilters(
     scope: ContactAccessScope,
-    filters?: { sreniId?: string; sthanId?: string; search?: string },
-  ): { sreniId?: string; sthanId?: string; search?: string } {
+    filters?: { sreniId?: string; sthanId?: string; search?: string; columnFilters?: Record<string, string> },
+  ): { sreniId?: string; sthanId?: string; search?: string; columnFilters?: Record<string, string> } {
     if (scope.unrestricted) {
       return filters ?? {};
     }

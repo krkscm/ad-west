@@ -12,9 +12,13 @@ import { AdminUserForm } from '../components/features/AdminUserForm';
 import { AuditLogTable } from '../components/features/AuditLogTable';
 import { RolesDefinitionPage } from './settings/RolesDefinitionPage';
 import { LocationDefinitionPage } from './settings/LocationDefinitionPage';
+import { LocationDefinitionFormPage } from './settings/LocationDefinitionFormPage';
 import { SreniDefinitionPage } from './settings/SreniDefinitionPage';
+import { SreniDefinitionFormPage } from './settings/SreniDefinitionFormPage';
 import { PermissionDefinitionsPage } from './settings/PermissionDefinitionsPage';
+import { PermissionDefinitionFormPage } from './settings/PermissionDefinitionFormPage';
 import { PermissionSetsPage } from './settings/PermissionSetsPage';
+import { PermissionSetFormPage } from './settings/PermissionSetFormPage';
 import { UsersPage } from './settings/UsersPage';
 import { UsersFormPage } from './settings/UsersFormPage';
 import { ApprovalWorkflowPage } from './settings/ApprovalWorkflowPage';
@@ -49,6 +53,8 @@ import {
   backendApi,
   LocationDefinitionApi,
   MenuItemApi,
+  PermissionApi,
+  PermissionSetApi,
   SreniDefinitionApi,
   UserApi,
 } from '../utils/backendApi';
@@ -116,6 +122,7 @@ type ActiveTab =
   | 'logs'
   | 'ops'
   | 'settings-permission-sets'
+  | 'settings-permission-sets-form'
   | 'settings-enum-values'
   | 'settings-users'
   | 'settings-users-form'
@@ -124,8 +131,11 @@ type ActiveTab =
   | 'settings-approval-workflows-form'
   | 'settings-roles-definition'
   | 'settings-location-definition'
+  | 'settings-location-definition-form'
   | 'settings-sreni-definition'
+  | 'settings-sreni-definition-form'
   | 'settings-permissions'
+  | 'settings-permissions-form'
   | 'settings-approval-workflows'
   | 'settings-attendance-metrics'
   | 'settings-responsibility-chart'
@@ -165,6 +175,7 @@ const TAB_METADATA: { [key: string]: { label: string; parent?: 'settings' | 'gov
   ops: { label: 'Ops Coverage' },
   'my-approvals': { label: 'My Approvals', parent: 'governance' },
   'settings-permission-sets': { label: 'Permission Sets', parent: 'settings' },
+  'settings-permission-sets-form': { label: 'Permission Set Form', parent: 'settings' },
   'settings-enum-values': { label: 'Reference Data', parent: 'settings' },
   'settings-users': { label: 'Users', parent: 'settings' },
   'settings-users-form': { label: 'User Form', parent: 'settings' },
@@ -173,8 +184,11 @@ const TAB_METADATA: { [key: string]: { label: string; parent?: 'settings' | 'gov
   'settings-approval-workflows-form': { label: 'Approval Workflow Form', parent: 'settings' },
   'settings-roles-definition': { label: 'Roles Definition', parent: 'settings' },
   'settings-location-definition': { label: 'Location Definition', parent: 'settings' },
+  'settings-location-definition-form': { label: 'Location Form', parent: 'settings' },
   'settings-sreni-definition': { label: 'Sreni Definition', parent: 'settings' },
+  'settings-sreni-definition-form': { label: 'Sreni Form', parent: 'settings' },
   'settings-permissions': { label: 'Permissions', parent: 'settings' },
+  'settings-permissions-form': { label: 'Permission Form', parent: 'settings' },
   'settings-approval-workflows': { label: 'Approval Workflows', parent: 'settings' },
   'settings-attendance-metrics': { label: 'Attendance Metrics', parent: 'settings' },
   'settings-responsibility-chart': { label: 'Responsibility Chart', parent: 'governance' },
@@ -197,6 +211,10 @@ const SETTINGS_TABS: ActiveTab[] = Object.entries(TAB_METADATA)
   .filter(([tab, meta]) => meta.parent === 'settings'
     && tab !== 'settings-admins-form'
     && tab !== 'settings-users-form'
+    && tab !== 'settings-permission-sets-form'
+    && tab !== 'settings-permissions-form'
+    && tab !== 'settings-location-definition-form'
+    && tab !== 'settings-sreni-definition-form'
     && tab !== 'settings-approval-workflows-form'
     && (SHOW_APPROVAL_WORKFLOWS_TAB || tab !== 'settings-approval-workflows'))
   .map(([tab]) => tab as ActiveTab);
@@ -207,7 +225,17 @@ const GOVERNANCE_TABS: ActiveTab[] = Object.entries(TAB_METADATA)
 
 const buildBreadcrumbItems = (
   activeTab: ActiveTab,
-  options?: { formLabel?: string; usersFormLabel?: string; approvalWorkflowFormLabel?: string; sreniName?: string; sthanName?: string },
+  options?: {
+    formLabel?: string;
+    usersFormLabel?: string;
+    permissionSetFormLabel?: string;
+    permissionFormLabel?: string;
+    locationFormLabel?: string;
+    sreniFormLabel?: string;
+    approvalWorkflowFormLabel?: string;
+    sreniName?: string;
+    sthanName?: string;
+  },
 ): Array<{ label: string; targetTab?: ActiveTab }> => {
   const items: Array<{ label: string; targetTab?: ActiveTab }> = [{ label: 'Home', targetTab: 'dashboard' }];
   const tabStr = activeTab as string;
@@ -220,6 +248,22 @@ const buildBreadcrumbItems = (
     items.push({ label: 'Settings', targetTab: SETTINGS_ROOT_TAB });
     items.push({ label: 'Users', targetTab: 'settings-users' });
     items.push({ label: options?.usersFormLabel ?? 'New User' });
+  } else if (activeTab === 'settings-permission-sets-form') {
+    items.push({ label: 'Settings', targetTab: SETTINGS_ROOT_TAB });
+    items.push({ label: 'Permission Sets', targetTab: 'settings-permission-sets' });
+    items.push({ label: options?.permissionSetFormLabel ?? 'New Permission Set' });
+  } else if (activeTab === 'settings-permissions-form') {
+    items.push({ label: 'Settings', targetTab: SETTINGS_ROOT_TAB });
+    items.push({ label: 'Permissions', targetTab: 'settings-permissions' });
+    items.push({ label: options?.permissionFormLabel ?? 'New Permission' });
+  } else if (activeTab === 'settings-location-definition-form') {
+    items.push({ label: 'Settings', targetTab: SETTINGS_ROOT_TAB });
+    items.push({ label: 'Location Definition', targetTab: 'settings-location-definition' });
+    items.push({ label: options?.locationFormLabel ?? 'New Location' });
+  } else if (activeTab === 'settings-sreni-definition-form') {
+    items.push({ label: 'Settings', targetTab: SETTINGS_ROOT_TAB });
+    items.push({ label: 'Sreni Definition', targetTab: 'settings-sreni-definition' });
+    items.push({ label: options?.sreniFormLabel ?? 'New Sreni' });
   } else if (activeTab === 'settings-approval-workflows-form') {
     items.push({ label: 'Settings', targetTab: SETTINGS_ROOT_TAB });
     items.push({ label: 'Approval Workflows', targetTab: 'settings-approval-workflows' });
@@ -275,6 +319,10 @@ export const AdminDashboardPage: React.FC = () => {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [adminFormEditId, setAdminFormEditId] = useState<string | null>(null);
   const [usersFormEdit, setUsersFormEdit] = useState<UserApi | null>(null);
+  const [permissionSetFormEdit, setPermissionSetFormEdit] = useState<PermissionSetApi | null>(null);
+  const [permissionFormEdit, setPermissionFormEdit] = useState<PermissionApi | null>(null);
+  const [locationFormEdit, setLocationFormEdit] = useState<LocationDefinitionApi | null>(null);
+  const [sreniFormEdit, setSreniFormEdit] = useState<SreniDefinitionApi | null>(null);
   const [approvalWorkflowFormEdit, setApprovalWorkflowFormEdit] = useState<ApprovalWorkflowDefinitionApi | null>(null);
   const [sidebarMenuItems, setSidebarMenuItems] = useState<MenuItemApi[]>([]);
   const [sreniDefinitions, setSreniDefinitions] = useState<SreniDefinitionApi[]>([]);
@@ -363,6 +411,46 @@ export const AdminDashboardPage: React.FC = () => {
   const closeUsersForm = useCallback(() => {
     setUsersFormEdit(null);
     setActiveTab('settings-users');
+  }, [setActiveTab]);
+
+  const openPermissionSetForm = useCallback((set: PermissionSetApi | null) => {
+    setPermissionSetFormEdit(set);
+    setActiveTab('settings-permission-sets-form');
+  }, [setActiveTab]);
+
+  const closePermissionSetForm = useCallback(() => {
+    setPermissionSetFormEdit(null);
+    setActiveTab('settings-permission-sets');
+  }, [setActiveTab]);
+
+  const openPermissionForm = useCallback((permission: PermissionApi | null) => {
+    setPermissionFormEdit(permission);
+    setActiveTab('settings-permissions-form');
+  }, [setActiveTab]);
+
+  const closePermissionForm = useCallback(() => {
+    setPermissionFormEdit(null);
+    setActiveTab('settings-permissions');
+  }, [setActiveTab]);
+
+  const openLocationForm = useCallback((location: LocationDefinitionApi | null) => {
+    setLocationFormEdit(location);
+    setActiveTab('settings-location-definition-form');
+  }, [setActiveTab]);
+
+  const closeLocationForm = useCallback(() => {
+    setLocationFormEdit(null);
+    setActiveTab('settings-location-definition');
+  }, [setActiveTab]);
+
+  const openSreniForm = useCallback((sreni: SreniDefinitionApi | null) => {
+    setSreniFormEdit(sreni);
+    setActiveTab('settings-sreni-definition-form');
+  }, [setActiveTab]);
+
+  const closeSreniForm = useCallback(() => {
+    setSreniFormEdit(null);
+    setActiveTab('settings-sreni-definition');
   }, [setActiveTab]);
 
   const openApprovalWorkflowForm = useCallback((workflow: ApprovalWorkflowDefinitionApi | null) => {
@@ -710,6 +798,10 @@ export const AdminDashboardPage: React.FC = () => {
   const isSettingsTabActive = SETTINGS_TABS.includes(activeTab)
     || activeTab === 'settings-admins-form'
     || activeTab === 'settings-users-form'
+    || activeTab === 'settings-permission-sets-form'
+    || activeTab === 'settings-permissions-form'
+    || activeTab === 'settings-location-definition-form'
+    || activeTab === 'settings-sreni-definition-form'
     || (SHOW_APPROVAL_WORKFLOWS_TAB && activeTab === 'settings-approval-workflows-form');
   const hasMenuKey = (key: string) => sidebarMenuItems.some((item) => item.active && item.key === key);
 
@@ -797,6 +889,10 @@ export const AdminDashboardPage: React.FC = () => {
   const breadcrumbItems = buildBreadcrumbItems(activeTab, {
     formLabel: activeTab === 'settings-admins-form' ? (adminFormEditId ? 'Edit Administrator' : 'New Administrator') : undefined,
     usersFormLabel: activeTab === 'settings-users-form' ? (usersFormEdit ? 'Edit User' : 'New User') : undefined,
+    permissionSetFormLabel: activeTab === 'settings-permission-sets-form' ? (permissionSetFormEdit ? 'Edit Permission Set' : 'New Permission Set') : undefined,
+    permissionFormLabel: activeTab === 'settings-permissions-form' ? (permissionFormEdit ? 'Edit Permission' : 'New Permission') : undefined,
+    locationFormLabel: activeTab === 'settings-location-definition-form' ? (locationFormEdit ? 'Edit Location' : 'New Location') : undefined,
+    sreniFormLabel: activeTab === 'settings-sreni-definition-form' ? (sreniFormEdit ? 'Edit Sreni' : 'New Sreni') : undefined,
     approvalWorkflowFormLabel: activeTab === 'settings-approval-workflows-form' ? (approvalWorkflowFormEdit ? 'Edit Approval Workflow' : 'New Approval Workflow') : undefined,
     sreniName: activeSreniMenuLabel,
     sthanName: activeSthanMenuLabel ?? activeSthanKey ?? undefined,
@@ -1860,15 +1956,70 @@ export const AdminDashboardPage: React.FC = () => {
 
           {activeTab === 'settings-roles-definition' && <RolesDefinitionPage />}
 
-          {activeTab === 'settings-location-definition' && <LocationDefinitionPage />}
-
-          {activeTab === 'settings-sreni-definition' && (
-            <SreniDefinitionPage onSreniChange={loadSidebarMenus} />
+          {activeTab === 'settings-location-definition' && (
+            <LocationDefinitionPage
+              onAdd={() => openLocationForm(null)}
+              onEdit={(location) => openLocationForm(location)}
+              editingLocationId={locationFormEdit?.id ?? null}
+            />
           )}
 
-          {activeTab === 'settings-permissions' && <PermissionDefinitionsPage />}
+          {activeTab === 'settings-location-definition-form' && (
+            <LocationDefinitionFormPage
+              editingLocation={locationFormEdit}
+              onBack={closeLocationForm}
+              onSaved={closeLocationForm}
+            />
+          )}
 
-          {activeTab === 'settings-permission-sets' && <PermissionSetsPage />}
+          {activeTab === 'settings-sreni-definition' && (
+            <SreniDefinitionPage
+              onAdd={() => openSreniForm(null)}
+              onEdit={(sreni) => openSreniForm(sreni)}
+              editingSreniId={sreniFormEdit?.id ?? null}
+              onSreniChange={loadSidebarMenus}
+            />
+          )}
+
+          {activeTab === 'settings-sreni-definition-form' && (
+            <SreniDefinitionFormPage
+              editingSreni={sreniFormEdit}
+              onBack={closeSreniForm}
+              onSaved={() => { loadSidebarMenus(); closeSreniForm(); }}
+            />
+          )}
+
+          {activeTab === 'settings-permissions' && (
+            <PermissionDefinitionsPage
+              onAdd={() => openPermissionForm(null)}
+              onEdit={(permission) => openPermissionForm(permission)}
+              editingPermissionId={permissionFormEdit?.id ?? null}
+            />
+          )}
+
+          {activeTab === 'settings-permissions-form' && (
+            <PermissionDefinitionFormPage
+              editingPermission={permissionFormEdit}
+              onBack={closePermissionForm}
+              onSaved={closePermissionForm}
+            />
+          )}
+
+          {activeTab === 'settings-permission-sets' && (
+            <PermissionSetsPage
+              onAdd={() => openPermissionSetForm(null)}
+              onEdit={(set) => openPermissionSetForm(set)}
+              editingSetId={permissionSetFormEdit?.id ?? null}
+            />
+          )}
+
+          {activeTab === 'settings-permission-sets-form' && (
+            <PermissionSetFormPage
+              editingSet={permissionSetFormEdit}
+              onBack={closePermissionSetForm}
+              onSaved={closePermissionSetForm}
+            />
+          )}
 
           {activeTab === 'settings-enum-values' && <EnumValuesPage />}
 

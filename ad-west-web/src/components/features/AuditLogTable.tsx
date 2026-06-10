@@ -1,4 +1,10 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../common/TableColumnFilterRow'
+import { TableColumnHeaderRow } from '../common/TableColumnHeaderRow'
+import { useTableColumnFilters } from '../../hooks/useTableColumnFilters'
+import { useTableSort } from '../../hooks/useTableSort'
+import { applyClientColumnFilters, type ClientFilterAccessor } from '../../utils/clientTableFilter'
+import { applyClientColumnSort } from '../../utils/clientTableSort'
 import { backendApi } from '../../utils/backendApi'
 
 interface UiAuditLog {
@@ -15,9 +21,9 @@ interface UiAuditLog {
 
 export const AuditLogTable: React.FC = () => {
   const [logs, setLogs] = useState<UiAuditLog[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
-  const [actionFilter, setActionFilter] = useState('')
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
+  const { filters, debouncedFilters, setFilter, clearFilters } = useTableColumnFilters()
+  const { sortBy, sortDir, toggleSort, clearSort } = useTableSort()
 
   useEffect(() => {
     const load = async () => {
@@ -44,21 +50,51 @@ export const AuditLogTable: React.FC = () => {
     void load()
   }, [])
 
-  const filteredLogs = logs.filter((log) => {
-    const term = searchQuery.toLowerCase()
-    const matchesSearch =
-      log.actorName.toLowerCase().includes(term) ||
-      log.actorId.toLowerCase().includes(term) ||
-      log.action.toLowerCase().includes(term) ||
-      (log.entityType && log.entityType.toLowerCase().includes(term))
+  const uniqueActions = useMemo(
+    () => Array.from(new Set(logs.map((l) => l.action))).sort(),
+    [logs],
+  )
 
-    const matchesAction = actionFilter ? log.action === actionFilter : true
+  const filterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: '__expand__', filterable: false, sortable: false, width: '48px' },
+    { key: 'timestamp', label: 'Timestamp', filterable: true, placeholder: 'Timestamp…' },
+    { key: 'actor', label: 'Actor', filterable: true, placeholder: 'Actor…' },
+    {
+      key: 'action',
+      label: 'Action Triggered',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All actions',
+      options: uniqueActions.map((action) => ({
+        value: action,
+        label: action.replace(/_/g, ' '),
+      })),
+    },
+    { key: 'entityType', label: 'Entity Modified', filterable: true, placeholder: 'Entity type…' },
+    { key: 'entityId', label: 'Entity ID', filterable: true, placeholder: 'Entity ID…' },
+  ], [uniqueActions])
 
-    return matchesSearch && matchesAction
-  })
+  const accessors = useMemo<Record<string, ClientFilterAccessor<UiAuditLog>>>(() => ({
+    timestamp: { getValue: (log) => new Date(log.timestamp).toLocaleString() },
+    actor: { getValue: (log) => `${log.actorName} ${log.actorId}`.trim() },
+    action: { getValue: (log) => log.action, match: 'exact' },
+    entityType: { getValue: (log) => log.entityType },
+    entityId: { getValue: (log) => log.entityId },
+  }), [])
 
-  const uniqueActions = Array.from(new Set(logs.map((l) => l.action)))
-
+  const displayedLogs = useMemo(
+    () => applyClientColumnSort(
+      applyClientColumnFilters(logs, debouncedFilters, accessors),
+      sortBy,
+      sortDir,
+      accessors,
+    ),
+    [logs, debouncedFilters, accessors, sortBy, sortDir],
+  )
+  const clearAllFilters = () => {
+    clearFilters()
+    clearSort()
+  }
   const toggleRow = (id: string) => {
     setExpandedLogId(expandedLogId === id ? null : id)
   }
@@ -103,61 +139,31 @@ export const AuditLogTable: React.FC = () => {
         </p>
       </div>
 
-      <div
-        className="glass-panel"
-        style={{
-          padding: '18px 24px',
-          marginBottom: '20px',
-          display: 'grid',
-          gridTemplateColumns: '2fr 1fr',
-          gap: '16px',
-          backgroundColor: 'var(--panel-soft-bg)',
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary-dark)' }}>Search Log Records</label>
-          <input
-            type="text"
-            className="form-input"
-            placeholder="Search by Actor, Entity ID, Action..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary-dark)' }}>Filter by Action Type</label>
-          <select className="form-input" value={actionFilter} onChange={(e) => setActionFilter(e.target.value)} style={{ cursor: 'pointer' }}>
-            <option value="">All Action Types</option>
-            {uniqueActions.map((action) => (
-              <option key={action} value={action}>
-                {action.replace(/_/g, ' ')}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
       <div className="table-container">
         <table className="custom-table">
           <thead>
-            <tr>
-              <th style={{ width: '48px' }}></th>
-              <th>Timestamp</th>
-              <th>Actor</th>
-              <th>Action Triggered</th>
-              <th>Entity Modified</th>
-              <th>Entity ID</th>
-            </tr>
+            <TableColumnHeaderRow
+              columns={filterColumns}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSort={toggleSort}
+            />
+            <TableColumnFilterRow
+              columns={filterColumns}
+              values={filters}
+              onChange={setFilter}
+              onClear={clearAllFilters}
+            />
           </thead>
           <tbody>
-            {filteredLogs.length === 0 ? (
+            {displayedLogs.length === 0 ? (
               <tr>
                 <td colSpan={6} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-secondary-dark)' }}>
                   No audit logs found matching criteria.
                 </td>
               </tr>
             ) : (
-              filteredLogs.map((log) => {
+              displayedLogs.map((log) => {
                 const isExpanded = expandedLogId === log.id
                 const formattedDate = new Date(log.timestamp).toLocaleString()
 

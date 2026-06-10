@@ -8,6 +8,7 @@ import { EnumConfigService } from '../../enum-values/services/enum-config.servic
 import type { SreniContactRecord } from '../core-business.types';
 import type { ContactAccessScope } from './contact-access-scope.service';
 import { ContactAccessScopeService } from './contact-access-scope.service';
+import { appendJoinUsColumnFilters } from '../utils/column-filter.util';
 
 export type JoinUsReviewStatus = 'pending' | 'completed';
 
@@ -57,7 +58,7 @@ export class JoinUsReviewService {
 
   async listSubmissions(
     scope: ContactAccessScope,
-    params: { page?: number; pageSize?: number; status?: JoinUsReviewStatus | 'all'; sreniId?: string; search?: string },
+    params: { page?: number; pageSize?: number; status?: JoinUsReviewStatus | 'all'; sreniId?: string; search?: string; columnFilters?: Record<string, string>; sortBy?: string; sortDir?: 'asc' | 'desc' },
   ): Promise<{
     items: JoinUsSubmissionRecord[];
     total: number;
@@ -73,7 +74,7 @@ export class JoinUsReviewService {
     const page = Math.max(1, params.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 10));
     const status = params.status ?? 'pending';
-    const { whereSql, params: whereParams, paramIdx } = this.buildListWhere(scope, status, params.sreniId, params.search);
+    const { whereSql, params: whereParams, paramIdx } = this.buildListWhere(scope, status, params.sreniId, params.search, params.columnFilters);
 
     const pendingCount = await this.countPending(scope);
 
@@ -85,6 +86,16 @@ export class JoinUsReviewService {
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     const offset = (page - 1) * pageSize;
 
+    const { buildSqlOrderBy, JOIN_US_SORT_COLUMNS } = await import('../utils/column-sort.util');
+    const joinUsSortColumns = {
+      ...JOIN_US_SORT_COLUMNS,
+      interestedSreniId: 'COALESCE(s.name, tag.sreni_id)',
+    };
+    const orderBy = buildSqlOrderBy(
+      { sortBy: params.sortBy, sortDir: params.sortDir },
+      joinUsSortColumns,
+      'ORDER BY c.created_at DESC',
+    );
     const rows = await this.dataSource.query(
       `SELECT c.id, c.data, c.sthan_id, c.division_id, c.review_status, c.reviewed_at, c.created_at,
               tag.sreni_id AS interested_sreni_id,
@@ -99,7 +110,7 @@ export class JoinUsReviewService {
        ) tag ON true
        LEFT JOIN adwest.srenies s ON s.id::text = tag.sreni_id
        ${whereSql}
-       ORDER BY c.created_at DESC
+       ${orderBy}
        LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
       [...whereParams, pageSize, offset],
     ) as Array<{
@@ -349,6 +360,7 @@ export class JoinUsReviewService {
     status: JoinUsReviewStatus | 'all',
     sreniIdFilter?: string,
     search?: string,
+    columnFilters?: Record<string, string>,
   ): { whereSql: string; params: unknown[]; paramIdx: number } {
     const conditions = [
       `c.contact_kind = 'household'`,
@@ -404,6 +416,10 @@ export class JoinUsReviewService {
         params.push(scope.sthanLocationId);
         paramIdx += 1;
       }
+    }
+
+    if (columnFilters && Object.keys(columnFilters).length > 0) {
+      paramIdx = appendJoinUsColumnFilters(conditions, params, paramIdx, columnFilters, 'c');
     }
 
     return {

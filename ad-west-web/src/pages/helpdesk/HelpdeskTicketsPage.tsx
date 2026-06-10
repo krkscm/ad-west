@@ -1,9 +1,17 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { backendApi, HelpdeskTicketApi, TicketStatus } from '../../utils/backendApi'
 import { useToast } from '../../components/common/Toast'
 import { useEnumOptions } from '../../hooks/useEnumOptions'
 import { PageHeader } from '../../components/common/PageHeader'
 import { EmptyState } from '../../components/common/EmptyState'
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../../components/common/TableColumnFilterRow'
+import { TableColumnHeaderRow } from '../../components/common/TableColumnHeaderRow'
+import { TableNoResultsRow } from '../../components/common/TableNoResultsRow'
+import { useTableColumnFilters } from '../../hooks/useTableColumnFilters'
+import { useTableSort } from '../../hooks/useTableSort'
+import { applyClientColumnFilters, type ClientFilterAccessor } from '../../utils/clientTableFilter'
+import { applyClientColumnSort } from '../../utils/clientTableSort'
+import { isListFilterActive } from '../../utils/tableListUtils'
 
 const STATUS_BADGE: Record<TicketStatus, string> = {
   open: 'badge-error',
@@ -23,6 +31,42 @@ export function HelpdeskTicketsPage() {
   const [editNotes, setEditNotes] = useState('')
   const [editStatus, setEditStatus] = useState<TicketStatus>('open')
   const [saving, setSaving] = useState(false)
+  const { filters, debouncedFilters, setFilter, clearFilters } = useTableColumnFilters()
+  const { sortBy, sortDir, toggleSort, clearSort } = useTableSort()
+
+  const filterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: 'subject', label: 'Subject', filterable: true, placeholder: 'Subject…' },
+    { key: 'contactName', label: 'Contact', filterable: true, placeholder: 'Contact…' },
+    { key: 'category', label: 'Category', filterable: true, placeholder: 'Category…' },
+    {
+      key: 'status',
+      label: 'Status',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All statuses',
+      options: statusOptions.map((o) => ({ value: o.value, label: o.label })),
+    },
+    { key: 'submittedAt', label: 'Submitted', filterable: true, placeholder: 'Submitted…' },
+    { key: '__actions__', filterable: false, sortable: false, width: '56px' },
+  ], [statusOptions])
+
+  const accessors = useMemo<Record<string, ClientFilterAccessor<HelpdeskTicketApi>>>(() => ({
+    subject: { getValue: (t) => t.subject },
+    contactName: { getValue: (t) => t.name },
+    category: { getValue: (t) => categoryLabel(t.category) },
+    status: { getValue: (t) => t.status, match: 'exact' },
+    submittedAt: { getValue: (t) => new Date(t.createdAt).toLocaleString() },
+  }), [categoryLabel])
+
+  const displayedRows = useMemo(
+    () => applyClientColumnSort(
+      applyClientColumnFilters(tickets, debouncedFilters, accessors),
+      sortBy,
+      sortDir,
+      accessors,
+    ),
+    [tickets, debouncedFilters, accessors, sortBy, sortDir],
+  )
 
   const loadTickets = useCallback(async () => {
     setLoading(true)
@@ -61,6 +105,13 @@ export function HelpdeskTicketsPage() {
 
   const openCount = tickets.filter((ticket) => ticket.status === 'open').length
   const resolvedCount = tickets.filter((ticket) => ticket.status === 'resolved').length
+  const hasColumnFilters = Object.values(debouncedFilters).some((v) => v.trim())
+  const hasFiltersActive = isListFilterActive(hasColumnFilters, filterStatus)
+  const clearAllFilters = () => {
+    clearFilters()
+    clearSort()
+    setFilterStatus('')
+  }
 
   return (
     <div className="animate-slide-up" style={{ width: '100%' }}>
@@ -105,27 +156,34 @@ export function HelpdeskTicketsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: selected ? 'minmax(0,1fr) 360px' : '1fr', gap: '16px', alignItems: 'start' }}>
         <div>
           {loading && <div className="loading-state">Loading…</div>}
-          {!loading && tickets.length === 0 && (
+          {!loading && tickets.length === 0 && !hasFiltersActive && (
             <EmptyState
               icon="🎫"
               title="No tickets found"
-              copy={filterStatus ? 'Try changing the status filter.' : 'Support requests will appear here once submitted.'}
+              copy="Support requests will appear here once submitted."
             />
           )}
-          {!loading && tickets.length > 0 && (
+          {!loading && (tickets.length > 0 || hasFiltersActive) && (
             <div className="table-container">
               <table className="custom-table">
                 <thead>
-                  <tr>
-                    <th>Subject</th>
-                    <th>Contact</th>
-                    <th>Category</th>
-                    <th>Status</th>
-                    <th>Submitted</th>
-                  </tr>
+                  <TableColumnHeaderRow
+                    columns={filterColumns}
+                    sortBy={sortBy}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                  />
+                  <TableColumnFilterRow
+                    columns={filterColumns}
+                    values={filters}
+                    onChange={setFilter}
+                    onClear={clearAllFilters}
+                  />
                 </thead>
                 <tbody>
-                  {tickets.map((ticket) => {
+                  {displayedRows.length === 0 ? (
+                    <TableNoResultsRow colSpan={6} title="No tickets match your filters" onClearFilters={clearAllFilters} />
+                  ) : displayedRows.map((ticket) => {
                     const isActive = selected?.id === ticket.id
                     return (
                       <tr
@@ -149,6 +207,7 @@ export function HelpdeskTicketsPage() {
                         <td style={{ whiteSpace: 'nowrap', fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>
                           {new Date(ticket.createdAt).toLocaleString()}
                         </td>
+                        <td />
                       </tr>
                     )
                   })}

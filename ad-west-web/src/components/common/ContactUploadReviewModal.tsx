@@ -1,5 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal } from './Modal';
+import { TableColumnFilterRow, type TableColumnFilterDef } from './TableColumnFilterRow';
+import { TableColumnHeaderRow } from './TableColumnHeaderRow';
+import { useTableColumnFilters } from '../../hooks/useTableColumnFilters';
+import { useTableSort } from '../../hooks/useTableSort';
+import { applyClientColumnFilters, type ClientFilterAccessor } from '../../utils/clientTableFilter';
+import { applyClientColumnSort } from '../../utils/clientTableSort';
 import type {
   MemberContactCommitDecisionApi,
   MemberContactDuplicateMatchApi,
@@ -37,6 +43,21 @@ function defaultAction(
   return dup ? 'update' : 'insert';
 }
 
+function getRowStatusText(
+  row: MemberContactParsedRowApi,
+  duplicates: MemberContactDuplicateMatchApi[],
+  withinFileSet: Set<number>,
+  childDupsByRow: Map<number, MemberContactDuplicateMatchApi[]>,
+): string {
+  if (row.errors.length) return row.errors.join('; ');
+  const householdDup = duplicates.find((d) => d.rowIndex === row.rowIndex && d.kind === 'household');
+  const childDups = childDupsByRow.get(row.rowIndex) ?? [];
+  if (householdDup) return 'Matches existing family contact';
+  if (childDups.length > 0) return `New family contact; ${childDups.length} child match(es) need Update after insert`;
+  if (withinFileSet.has(row.rowIndex)) return 'Duplicate within file';
+  return 'OK';
+}
+
 export const ContactUploadReviewModal: React.FC<ContactUploadReviewModalProps> = ({
   isOpen,
   onClose,
@@ -45,6 +66,8 @@ export const ContactUploadReviewModal: React.FC<ContactUploadReviewModalProps> =
   onCommit,
 }) => {
   const [decisions, setDecisions] = useState<Record<number, RowDecision>>({});
+  const { filters, debouncedFilters, setFilter, clearFilters } = useTableColumnFilters();
+  const { sortBy, sortDir, toggleSort, clearSort } = useTableSort();
 
   const withinFileSet = useMemo(() => {
     const set = new Set<number>();
@@ -79,6 +102,39 @@ export const ContactUploadReviewModal: React.FC<ContactUploadReviewModalProps> =
     }
     setDecisions(initial);
   }, [review, withinFileSet]);
+
+  const filterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: 'row', label: 'Row', filterable: true, placeholder: 'Row…' },
+    { key: 'name', label: 'Name', filterable: true, placeholder: 'Name…' },
+    { key: 'mobile', label: 'Mobile', filterable: true, placeholder: 'Mobile…' },
+    { key: 'status', label: 'Status', filterable: true, placeholder: 'Status…' },
+    { key: 'action', label: 'Action', filterable: false, sortable: false },
+  ], []);
+
+  const accessors = useMemo<Record<string, ClientFilterAccessor<MemberContactParsedRowApi>>>(() => ({
+    row: { getValue: (row) => String(row.rowIndex), match: 'exact' },
+    name: { getValue: (row) => String(row.data.name ?? '') },
+    mobile: { getValue: (row) => String(row.data.mobileNo ?? '') },
+    status: {
+      getValue: (row) => getRowStatusText(row, review?.duplicates ?? [], withinFileSet, childDupsByRow),
+    },
+  }), [review?.duplicates, withinFileSet, childDupsByRow]);
+
+  const displayedRows = useMemo(
+    () => (review
+      ? applyClientColumnSort(
+        applyClientColumnFilters(review.rows, debouncedFilters, accessors),
+        sortBy,
+        sortDir,
+        accessors,
+      )
+      : []),
+    [review, debouncedFilters, accessors, sortBy, sortDir],
+  );
+  const clearAllFilters = () => {
+    clearFilters();
+    clearSort();
+  };
 
   if (!review) return null;
 
@@ -132,16 +188,28 @@ export const ContactUploadReviewModal: React.FC<ContactUploadReviewModalProps> =
         <div className="contact-upload-modal__duplicate-table-wrap" style={{ maxHeight: '420px', overflow: 'auto' }}>
           <table className="custom-table contact-upload-modal__duplicate-table">
             <thead>
-              <tr>
-                <th>Row</th>
-                <th>Name</th>
-                <th>Mobile</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
+              <TableColumnHeaderRow
+                columns={filterColumns}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={toggleSort}
+              />
+              <TableColumnFilterRow
+                columns={filterColumns}
+                values={filters}
+                onChange={setFilter}
+                onClear={clearAllFilters}
+              />
             </thead>
             <tbody>
-              {review.rows.map((row) => {
+              {displayedRows.length === 0 && (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-secondary-dark)' }}>
+                    No rows match the current filters.
+                  </td>
+                </tr>
+              )}
+              {displayedRows.map((row) => {
                 const householdDup = review.duplicates.find(
                   (d) => d.rowIndex === row.rowIndex && d.kind === 'household',
                 );

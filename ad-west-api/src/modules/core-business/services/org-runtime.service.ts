@@ -150,7 +150,7 @@ export class OrgRuntimeService {
     return updated;
   }
 
-  async listLocationsFromDb(params: { page?: number; pageSize?: number; search?: string; level?: string }): Promise<{
+  async listLocationsFromDb(params: { page?: number; pageSize?: number; search?: string; level?: string; columnFilters?: Record<string, string>; sortBy?: string; sortDir?: 'asc' | 'desc' }): Promise<{
     items: LocationRecord[]; total: number; page: number; pageSize: number; totalPages: number;
   }> {
     const page = Math.max(1, params.page ?? 1);
@@ -160,20 +160,52 @@ export class OrgRuntimeService {
       let all = Array.from(this.ctx.locations.values());
       if (params.level) all = all.filter((l) => l.level === params.level);
       if (q) all = all.filter((l) => l.name.toLowerCase().includes(q) || l.code?.toLowerCase().includes(q));
-      all.sort((a, b) => a.name.localeCompare(b.name));
+      const { applyInMemoryColumnSort } = await import('../utils/column-sort.util');
+      all = applyInMemoryColumnSort(all, { sortBy: params.sortBy, sortDir: params.sortDir }, {
+        code: (row) => row.code ?? '',
+        name: (row) => row.name,
+        level: (row) => row.level,
+        active: (row) => row.active,
+      }, (a, b) => a.name.localeCompare(b.name));
       const total = all.length;
       return { items: all.slice((page - 1) * pageSize, page * pageSize), total, page, pageSize, totalPages: Math.ceil(total / pageSize) || 1 };
     }
-    const searchParam = params.search?.trim() ? `%${params.search.trim()}%` : null;
+    const { appendLocationColumnFilters } = await import('../utils/column-filter.util');
+    const { buildSqlOrderBy, LOCATION_SORT_COLUMNS } = await import('../utils/column-sort.util');
+    const search = params.search?.trim();
     const levelParam = params.level ?? null;
+    const conditions: string[] = [];
+    const queryParams: unknown[] = [];
+    let paramIdx = 1;
+    if (search) {
+      conditions.push(`(name ILIKE $${paramIdx} OR code ILIKE $${paramIdx})`);
+      queryParams.push(`%${search}%`);
+      paramIdx += 1;
+    }
+    if (levelParam) {
+      conditions.push(`level = $${paramIdx}`);
+      queryParams.push(levelParam);
+      paramIdx += 1;
+    }
+    if (params.columnFilters && Object.keys(params.columnFilters).length > 0) {
+      paramIdx = appendLocationColumnFilters(conditions, queryParams, paramIdx, params.columnFilters);
+    }
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const orderBy = buildSqlOrderBy(
+      { sortBy: params.sortBy, sortDir: params.sortDir },
+      LOCATION_SORT_COLUMNS,
+      'ORDER BY name ASC',
+    );
+    const limitIdx = paramIdx;
+    const offsetIdx = paramIdx + 1;
     const [countRows, dataRows] = await Promise.all([
       this.ctx.dataSource.query(
-        `SELECT COUNT(*)::int AS total FROM adwest.locations WHERE ($1::text IS NULL OR name ILIKE $1 OR code ILIKE $1) AND ($2::text IS NULL OR level = $2)`,
-        [searchParam, levelParam],
+        `SELECT COUNT(*)::int AS total FROM adwest.locations ${whereClause}`,
+        queryParams,
       ),
       this.ctx.dataSource.query(
-        `SELECT id, code, name, level, parent_id, active, created_at, updated_at FROM adwest.locations WHERE ($1::text IS NULL OR name ILIKE $1 OR code ILIKE $1) AND ($2::text IS NULL OR level = $2) ORDER BY name LIMIT $3 OFFSET $4`,
-        [searchParam, levelParam, pageSize, (page - 1) * pageSize],
+        `SELECT id, code, name, level, parent_id, active, created_at, updated_at FROM adwest.locations ${whereClause} ${orderBy} LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+        [...queryParams, pageSize, (page - 1) * pageSize],
       ),
     ]);
     const total = (countRows as Array<{ total: number }>)[0].total;
@@ -456,7 +488,7 @@ export class OrgRuntimeService {
     return Array.from(this.ctx.srenies.values()).sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  async listSreniDefinitionsFromDb(params: { page?: number; pageSize?: number; search?: string }): Promise<{
+  async listSreniDefinitionsFromDb(params: { page?: number; pageSize?: number; search?: string; columnFilters?: Record<string, string>; sortBy?: string; sortDir?: 'asc' | 'desc' }): Promise<{
     items: SrenyRecord[]; total: number; page: number; pageSize: number; totalPages: number;
   }> {
     const page = Math.max(1, params.page ?? 1);
@@ -465,24 +497,55 @@ export class OrgRuntimeService {
       const q = (params.search ?? '').trim().toLowerCase();
       let all = Array.from(this.ctx.srenies.values()).filter((s) => !s.zoneId);
       if (q) all = all.filter((s) => s.name.toLowerCase().includes(q) || s.code?.toLowerCase().includes(q) || s.description?.toLowerCase().includes(q));
-      all.sort((a, b) => a.name.localeCompare(b.name));
+      const { applyInMemoryColumnSort } = await import('../utils/column-sort.util');
+      all = applyInMemoryColumnSort(all, { sortBy: params.sortBy, sortDir: params.sortDir }, {
+        code: (row) => row.code ?? '',
+        name: (row) => row.name,
+        description: (row) => row.description ?? '',
+        enrollmentScope: (row) => row.enrollmentScope ?? '',
+        primaryContactStrategy: (row) => row.primaryContactStrategy ?? '',
+        joinUsVisible: (row) => row.joinUsVisible ?? false,
+        active: (row) => row.active,
+        createdBy: (row) => row.createdBy ?? '',
+      }, (a, b) => a.name.localeCompare(b.name));
       const total = all.length;
       return { items: all.slice((page - 1) * pageSize, page * pageSize), total, page, pageSize, totalPages: Math.ceil(total / pageSize) || 1 };
     }
-    const searchParam = params.search?.trim() ? `%${params.search.trim()}%` : null;
+    const { appendSreniDefinitionColumnFilters } = await import('../utils/column-filter.util');
+    const { buildSqlOrderBy, SRENI_DEFINITION_SORT_COLUMNS } = await import('../utils/column-sort.util');
+    const search = params.search?.trim();
+    const conditions = [`zone_id IS NULL`];
+    const queryParams: unknown[] = [];
+    let paramIdx = 1;
+    if (search) {
+      conditions.push(`(name ILIKE $${paramIdx} OR code ILIKE $${paramIdx} OR description ILIKE $${paramIdx})`);
+      queryParams.push(`%${search}%`);
+      paramIdx += 1;
+    }
+    if (params.columnFilters && Object.keys(params.columnFilters).length > 0) {
+      paramIdx = appendSreniDefinitionColumnFilters(conditions, queryParams, paramIdx, params.columnFilters);
+    }
+    const whereClause = `WHERE ${conditions.join(' AND ')}`;
+    const orderBy = buildSqlOrderBy(
+      { sortBy: params.sortBy, sortDir: params.sortDir },
+      SRENI_DEFINITION_SORT_COLUMNS,
+      'ORDER BY name ASC',
+    );
+    const limitIdx = paramIdx;
+    const offsetIdx = paramIdx + 1;
     const [countRows, dataRows] = await Promise.all([
       this.ctx.dataSource.query(
-        `SELECT COUNT(*)::int AS total FROM adwest.srenies WHERE zone_id IS NULL AND ($1::text IS NULL OR name ILIKE $1 OR code ILIKE $1 OR description ILIKE $1)`,
-        [searchParam],
+        `SELECT COUNT(*)::int AS total FROM adwest.srenies ${whereClause}`,
+        queryParams,
       ),
       this.ctx.dataSource.query(
         `SELECT id, name, description, code, active, is_service_sreny, join_us_visible, show_in_upload_excel,
                 gada_assignment_enabled, enrollment_scope, primary_contact_strategy,
                 created_by, updated_by, created_at, updated_at
          FROM adwest.srenies
-         WHERE zone_id IS NULL AND ($1::text IS NULL OR name ILIKE $1 OR code ILIKE $1 OR description ILIKE $1)
-         ORDER BY name LIMIT $2 OFFSET $3`,
-        [searchParam, pageSize, (page - 1) * pageSize],
+         ${whereClause}
+         ${orderBy} LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+        [...queryParams, pageSize, (page - 1) * pageSize],
       ),
     ]);
     const total = (countRows as Array<{ total: number }>)[0].total;

@@ -37,7 +37,13 @@ import { SwitchToggle } from '../components/common/SwitchToggle';
 import { DateField } from '../components/common/DateFields';
 import { TableLayoutModal } from '../components/common/TableLayoutModal';
 import { PAGE_SIZE_OPTIONS, PaginationBar } from '../components/common/PaginationBar';
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../components/common/TableColumnFilterRow';
+import { TableColumnHeaderRow } from '../components/common/TableColumnHeaderRow';
 import { ColumnItem, buildColumnItems, useTableLayout } from '../hooks/useTableLayout';
+import { useTableColumnFilters } from '../hooks/useTableColumnFilters';
+import { useTableSort } from '../hooks/useTableSort';
+import { applyClientColumnFilters, type ClientFilterAccessor } from '../utils/clientTableFilter';
+import { applyClientColumnSort } from '../utils/clientTableSort';
 
 interface Props {
   sreniId: string;
@@ -133,8 +139,6 @@ const parseNumberSafe = (value: ScalarValue): number | null => {
 
 const isDatasetKey = (value: unknown): value is DatasetKey =>
   value === 'all' || value === 'contacts' || value === 'participants' || value === 'events' || value === 'attendance';
-
-const isSortDirection = (value: unknown): value is SortDirection => value === 'asc' || value === 'desc';
 
 const isAggregation = (value: unknown): value is Aggregation =>
   value === 'sum' || value === 'avg' || value === 'min' || value === 'max' || value === 'count';
@@ -257,8 +261,6 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
   const [dateTo, setDateTo] = useState('');
 
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
-  const [sortKey, setSortKey] = useState('recorded_at');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -273,6 +275,8 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
   const [graphAggregation, setGraphAggregation] = useState<Aggregation>('sum');
   const [graphStacked, setGraphStacked] = useState(false);
   const [showTableLayoutModal, setShowTableLayoutModal] = useState(false);
+  const { filters, debouncedFilters, setFilter, clearFilters } = useTableColumnFilters();
+  const { sortBy, sortDir, toggleSort, clearSort } = useTableSort();
 
   useEffect(() => {
     let cancelled = false;
@@ -542,10 +546,7 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
       return defaults;
     });
 
-    if (!allColumns.includes(sortKey)) {
-      setSortKey(allColumns[0] || 'recorded_at');
-    }
-  }, [allColumns, sortKey]);
+  }, [allColumns]);
 
   useEffect(() => {
     if (!allColumns.length) return;
@@ -583,32 +584,52 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
     });
   }, [activeRecords, dateFrom, dateTo, searchText]);
 
-  const sortedRecords = useMemo(() => {
-    const next = [...filteredRecords];
-    next.sort((left, right) => {
-      const a = left[sortKey];
-      const b = right[sortKey];
-      const aNum = parseNumberSafe(a);
-      const bNum = parseNumberSafe(b);
+  const visibleDetailColumns = useMemo(
+    () => (selectedColumns.length ? selectedColumns : allColumns),
+    [selectedColumns, allColumns],
+  );
 
-      if (aNum !== null && bNum !== null) {
-        return sortDirection === 'asc' ? aNum - bNum : bNum - aNum;
-      }
+  const detailFilterColumns = useMemo<TableColumnFilterDef[]>(
+    () => visibleDetailColumns.map((key) => ({
+      key,
+      label: prettyLabel(key),
+      filterable: true,
+      placeholder: `${prettyLabel(key)}…`,
+    })),
+    [visibleDetailColumns],
+  );
 
-      const aMs = tryParseDateMs(a);
-      const bMs = tryParseDateMs(b);
-      if (aMs !== null && bMs !== null) {
-        return sortDirection === 'asc' ? aMs - bMs : bMs - aMs;
-      }
+  const detailColumnAccessors = useMemo(() => {
+    const accessors: Record<string, ClientFilterAccessor<StudioRecord>> = {};
+    for (const column of visibleDetailColumns) {
+      accessors[column] = {
+        getValue: (record) =>
+          column.includes('at') || column.includes('date')
+            ? formatDateCell(record[column])
+            : toText(record[column]),
+      };
+    }
+    return accessors;
+  }, [visibleDetailColumns]);
 
-      const aText = toText(a).toLowerCase();
-      const bText = toText(b).toLowerCase();
-      if (aText === bText) return 0;
-      if (sortDirection === 'asc') return aText < bText ? -1 : 1;
-      return aText > bText ? -1 : 1;
-    });
-    return next;
-  }, [filteredRecords, sortKey, sortDirection]);
+  const sortedRecords = useMemo(
+    () => applyClientColumnSort(
+      applyClientColumnFilters(filteredRecords, debouncedFilters, detailColumnAccessors),
+      sortBy,
+      sortDir,
+      detailColumnAccessors,
+    ),
+    [filteredRecords, debouncedFilters, detailColumnAccessors, sortBy, sortDir],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedFilters]);
+
+  const clearAllDetailFilters = () => {
+    clearFilters();
+    clearSort();
+  };
 
   const totalPages = Math.max(1, Math.ceil(sortedRecords.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -767,8 +788,8 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
     dateFrom,
     dateTo,
     selectedColumns,
-    sortKey,
-    sortDirection,
+    sortKey: sortBy,
+    sortDirection: sortDir,
     pageSize,
   });
 
@@ -789,10 +810,9 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
     if (Array.isArray(config.selectedColumns)) {
       setSelectedColumns(config.selectedColumns.filter((value): value is string => typeof value === 'string'));
     }
-    if (typeof config.sortKey === 'string') setSortKey(config.sortKey);
-    if (isSortDirection(config.sortDirection)) setSortDirection(config.sortDirection);
-    if (typeof config.pageSize === 'number' && PAGE_SIZE_OPTIONS.includes(config.pageSize)) {
-      setPageSize(config.pageSize);
+    clearSort();
+    if (typeof config.pageSize === 'number' && (PAGE_SIZE_OPTIONS as readonly number[]).includes(config.pageSize)) {
+      setPageSize(config.pageSize as (typeof PAGE_SIZE_OPTIONS)[number]);
     }
     setSelectedDetailsLayoutId(layout.id);
     setDetailsLayoutName(layout.name);
@@ -1113,41 +1133,35 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
                     ))}
                   </div>
                 </div>
-                <label style={{ display: 'grid', gap: '4px' }}>
-                  <span className="form-label" style={{ margin: 0 }}>Sort By</span>
-                  <select className="form-input" value={sortKey} onChange={(event) => setSortKey(event.target.value)}>
-                    {allColumns.map((column) => <option key={column} value={column}>{prettyLabel(column)}</option>)}
-                  </select>
-                </label>
-                <label style={{ display: 'grid', gap: '4px' }}>
-                  <span className="form-label" style={{ margin: 0 }}>Direction</span>
-                  <select className="form-input" value={sortDirection} onChange={(event) => setSortDirection(event.target.value as SortDirection)}>
-                    <option value="desc">Descending</option>
-                    <option value="asc">Ascending</option>
-                  </select>
-                </label>
               </div>
 
               <div className="table-container" style={{ overflowX: 'auto' }}>
                 <table className="custom-table">
                   <thead>
-                    <tr>
-                      {(selectedColumns.length ? selectedColumns : allColumns).map((column) => (
-                        <th key={column}>{prettyLabel(column)}</th>
-                      ))}
-                    </tr>
+                    <TableColumnHeaderRow
+                      columns={detailFilterColumns}
+                      sortBy={sortBy}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                    />
+                    <TableColumnFilterRow
+                      columns={detailFilterColumns}
+                      values={filters}
+                      onChange={setFilter}
+                      onClear={clearAllDetailFilters}
+                    />
                   </thead>
                   <tbody>
                     {!pagedRecords.length && (
                       <tr>
-                        <td colSpan={Math.max(1, selectedColumns.length || allColumns.length)} style={{ textAlign: 'center', color: 'var(--text-secondary-dark)' }}>
+                        <td colSpan={Math.max(1, visibleDetailColumns.length)} style={{ textAlign: 'center', color: 'var(--text-secondary-dark)' }}>
                           No records found for the current filters.
                         </td>
                       </tr>
                     )}
                     {pagedRecords.map((record) => (
                       <tr key={record.id}>
-                        {(selectedColumns.length ? selectedColumns : allColumns).map((column) => (
+                        {visibleDetailColumns.map((column) => (
                           <td key={`${record.id}:${column}`}>{column.includes('at') || column.includes('date') ? formatDateCell(record[column]) : toText(record[column]) || '-'}</td>
                         ))}
                       </tr>

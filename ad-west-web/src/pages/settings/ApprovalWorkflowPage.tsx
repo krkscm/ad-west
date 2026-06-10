@@ -5,10 +5,17 @@ import { PageHeader } from '../../components/common/PageHeader';
 import { PaginationBar } from '../../components/common/PaginationBar';
 import { EmptyState } from '../../components/common/EmptyState';
 import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
+import { TableColumnFilterRow, type TableColumnFilterDef } from '../../components/common/TableColumnFilterRow';
+import { TableColumnHeaderRow } from '../../components/common/TableColumnHeaderRow';
+import { TableNoResultsRow } from '../../components/common/TableNoResultsRow';
+import { useTableColumnFilters } from '../../hooks/useTableColumnFilters';
+import { useTableSort } from '../../hooks/useTableSort';
+import { isListFilterActive } from '../../utils/tableListUtils';
 import {
   ApprovalWorkflowDefinitionApi,
   RoleDefinitionApi,
   backendApi,
+  type ListSortParams,
 } from '../../utils/backendApi';
 
 const toUiError = (error: unknown, fallback: string): string => {
@@ -51,12 +58,14 @@ export const ApprovalWorkflowPage: React.FC<ApprovalWorkflowPageProps> = ({
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { filters, debouncedFilters, setFilter, clearFilters, filtersQuery } = useTableColumnFilters();
+  const { sortBy, sortDir, toggleSort, clearSort, sortQuery } = useTableSort();
 
   const [roleDefinitions, setRoleDefinitions] = useState<RoleDefinitionApi[]>([]);
-  const loadWorkflows = (p: number, ps: number, q: string) => {
+  const loadWorkflows = (p: number, ps: number, q: string, colFilters = filtersQuery, sort: ListSortParams | undefined = sortQuery) => {
     setIsLoading(true);
     backendApi
-      .listApprovalWorkflowDefinitions({ page: p, pageSize: ps, search: q })
+      .listApprovalWorkflowDefinitions({ page: p, pageSize: ps, search: q, filters: colFilters, ...sort })
       .then((res) => {
         setItems(res.items);
         setTotal(res.total);
@@ -73,6 +82,16 @@ export const ApprovalWorkflowPage: React.FC<ApprovalWorkflowPageProps> = ({
   useEffect(() => {
     loadWorkflows(page, pageSize, search);
   }, [page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+    loadWorkflows(1, pageSize, search, filtersQuery);
+  }, [debouncedFilters]);
+
+  useEffect(() => {
+    setPage(1);
+    loadWorkflows(1, pageSize, search, filtersQuery, sortQuery);
+  }, [sortBy, sortDir]);
 
   const handleSearchChange = (q: string) => {
     setSearch(q);
@@ -134,7 +153,34 @@ export const ApprovalWorkflowPage: React.FC<ApprovalWorkflowPageProps> = ({
     }
   };
 
-  const hasTable = !isLoading && items.length > 0;
+  const workflowFilterColumns = useMemo<TableColumnFilterDef[]>(() => [
+    { key: 'code', label: 'Code', filterable: true, placeholder: 'Code…' },
+    { key: 'name', label: 'Name', filterable: true, placeholder: 'Name…' },
+    { key: 'approvalMode', label: 'Mode', filterable: true, placeholder: 'Mode…' },
+    { key: '__stages__', label: 'Stages', filterable: false, sortable: false, align: 'center' },
+    {
+      key: 'isActive',
+      label: 'Status',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All',
+      options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }],
+    },
+    { key: '__actions__', label: 'Actions', filterable: false, sortable: false, align: 'right' },
+  ], []);
+
+  const hasColumnFilters = Object.values(debouncedFilters).some((v) => v.trim());
+  const hasFiltersActive = isListFilterActive(search, hasColumnFilters);
+  const showEmptyState = !isLoading && items.length === 0 && !hasFiltersActive;
+  const hasTable = !isLoading && (items.length > 0 || hasFiltersActive);
+
+  const clearAllFilters = () => {
+    clearFilters();
+    clearSort();
+    setSearch('');
+    setPage(1);
+    loadWorkflows(1, pageSize, '', undefined, undefined);
+  };
 
   return (
     <div className="animate-slide-up">
@@ -162,23 +208,32 @@ export const ApprovalWorkflowPage: React.FC<ApprovalWorkflowPageProps> = ({
 
       {isLoading ? (
         <div className="glass-panel loading-state">Loading workflows…</div>
-      ) : items.length === 0 ? (
+      ) : showEmptyState ? (
         <EmptyState
-          title={search ? 'No workflows match your search' : 'No approval workflows defined yet'}
-          copy={search ? 'Try a different search term.' : 'Click "New Workflow" to add one.'}
+          title="No approval workflows defined yet"
+          copy="Click &quot;New Workflow&quot; to add one."
         />
       ) : (
       <div className="table-container" style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0, boxShadow: 'none' }}>
         <table className="custom-table">
           <thead>
-            <tr>
-              {['Code', 'Name', 'Mode', 'Stages', 'Status', 'Actions'].map((col) => (
-                <th key={col} style={{ textAlign: col === 'Stages' ? 'center' : 'left' }}>{col}</th>
-              ))}
-            </tr>
+            <TableColumnHeaderRow
+              columns={workflowFilterColumns}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSort={toggleSort}
+            />
+            <TableColumnFilterRow
+              columns={workflowFilterColumns}
+              values={filters}
+              onChange={setFilter}
+              onClear={clearAllFilters}
+            />
           </thead>
           <tbody>
-            {items.map((w) => {
+            {items.length === 0 ? (
+              <TableNoResultsRow colSpan={6} title="No workflows match your filters" onClearFilters={clearAllFilters} />
+            ) : items.map((w) => {
                 const sortedStages = [...w.stages].sort((a, b) => a.stageOrder - b.stageOrder);
                 const wModeMeta = MODE_META[w.approvalMode] ?? { label: w.approvalMode, description: 'Configured via enum values.', color: '#0ea5e9' };
                 const isBeingEdited = editingWorkflowId === w.id;

@@ -29,7 +29,7 @@ export interface AttendanceRuntimeContext {
 export class AttendanceRuntimeService {
   constructor(private readonly ctx: AttendanceRuntimeContext) {}
 
-  async listAttendanceMetricsFromDb(params: { page?: number; pageSize?: number; search?: string; sreniId?: string }): Promise<{
+  async listAttendanceMetricsFromDb(params: { page?: number; pageSize?: number; search?: string; sreniId?: string; columnFilters?: Record<string, string>; sortBy?: string; sortDir?: 'asc' | 'desc' }): Promise<{
     items: AttendanceMetricRecord[];
     total: number;
     page: number;
@@ -44,29 +44,58 @@ export class AttendanceRuntimeService {
       let all = Array.from(this.ctx.attendanceMetrics.values());
       if (params.sreniId) all = all.filter((item) => item.sreniId === params.sreniId);
       if (search) all = all.filter((item) => item.name.toLowerCase().includes(search) || (item.description ?? '').toLowerCase().includes(search));
-      all.sort((a, b) => a.name.localeCompare(b.name));
+      const { applyInMemoryColumnSort } = await import('../utils/column-sort.util');
+      all = applyInMemoryColumnSort(all, { sortBy: params.sortBy, sortDir: params.sortDir }, {
+        name: (row) => row.name,
+        description: (row) => row.description ?? '',
+        sreniId: (row) => row.sreniId,
+        keys: (row) => row.keys.join(', '),
+        active: (row) => row.active,
+      }, (a, b) => a.name.localeCompare(b.name));
       const total = all.length;
       return { items: all.slice((page - 1) * pageSize, page * pageSize), total, page, pageSize, totalPages: Math.ceil(total / pageSize) || 1 };
     }
 
-    const searchParam = params.search?.trim() ? `%${params.search.trim()}%` : null;
+    const { appendAttendanceMetricColumnFilters } = await import('../utils/column-filter.util');
+    const { buildSqlOrderBy, ATTENDANCE_METRIC_SORT_COLUMNS } = await import('../utils/column-sort.util');
+    const search = params.search?.trim();
     const sreniFilter = params.sreniId?.trim() ? params.sreniId.trim() : null;
+    const conditions: string[] = [];
+    const queryParams: unknown[] = [];
+    let paramIdx = 1;
+    if (sreniFilter) {
+      conditions.push(`sreni_id = $${paramIdx}`);
+      queryParams.push(sreniFilter);
+      paramIdx += 1;
+    }
+    if (search) {
+      conditions.push(`(name ILIKE $${paramIdx} OR description ILIKE $${paramIdx})`);
+      queryParams.push(`%${search}%`);
+      paramIdx += 1;
+    }
+    if (params.columnFilters && Object.keys(params.columnFilters).length > 0) {
+      paramIdx = appendAttendanceMetricColumnFilters(conditions, queryParams, paramIdx, params.columnFilters);
+    }
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const orderBy = buildSqlOrderBy(
+      { sortBy: params.sortBy, sortDir: params.sortDir },
+      ATTENDANCE_METRIC_SORT_COLUMNS,
+      'ORDER BY name ASC',
+    );
+    const limitIdx = paramIdx;
+    const offsetIdx = paramIdx + 1;
     const [countRows, dataRows] = await Promise.all([
       this.ctx.dataSource.query(
-        `SELECT COUNT(*)::int AS total
-         FROM adwest.sreni_attendance_metrics
-         WHERE ($1::text IS NULL OR sreni_id = $1)
-           AND ($2::text IS NULL OR name ILIKE $2 OR description ILIKE $2)`,
-        [sreniFilter, searchParam],
+        `SELECT COUNT(*)::int AS total FROM adwest.sreni_attendance_metrics ${whereClause}`,
+        queryParams,
       ),
       this.ctx.dataSource.query(
         `SELECT id, sreni_id, name, description, metric_keys, active, created_by, updated_by, created_at, updated_at
          FROM adwest.sreni_attendance_metrics
-         WHERE ($1::text IS NULL OR sreni_id = $1)
-           AND ($2::text IS NULL OR name ILIKE $2 OR description ILIKE $2)
-         ORDER BY name ASC
-         LIMIT $3 OFFSET $4`,
-        [sreniFilter, searchParam, pageSize, (page - 1) * pageSize],
+         ${whereClause}
+         ${orderBy}
+         LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+        [...queryParams, pageSize, (page - 1) * pageSize],
       ),
     ]);
 

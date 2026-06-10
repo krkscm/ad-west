@@ -3,6 +3,7 @@ import { CryptoService } from '@modules/user-management/services/crypto.service'
 import { DataSource } from 'typeorm';
 import { CreateUserDto, UpdateUserDto } from '../dto/core-business.dto';
 import type { UserRecord } from '../core-business.service';
+import { appendUserColumnFilters } from '../utils/column-filter.util';
 
 export interface UserAdminRuntimeContext {
   users: Map<string, UserRecord>;
@@ -34,7 +35,7 @@ export class UserAdminRuntimeService {
     return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
   }
 
-  async listUsersFromDb(params: { page?: number; pageSize?: number; search?: string }): Promise<{
+  async listUsersFromDb(params: { page?: number; pageSize?: number; search?: string; columnFilters?: Record<string, string>; sortBy?: string; sortDir?: 'asc' | 'desc' }): Promise<{
     items: UserRecord[];
     total: number;
     page: number;
@@ -48,20 +49,38 @@ export class UserAdminRuntimeService {
     const page = Math.max(1, params.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 10));
     const search = (params.search ?? '').trim();
-    const searchParam = search ? `%${search}%` : null;
+    const conditions: string[] = [];
+    const queryParams: unknown[] = [];
+    let paramIdx = 1;
+    if (search) {
+      conditions.push(`(name ILIKE $${paramIdx} OR email ILIKE $${paramIdx} OR phone ILIKE $${paramIdx} OR code ILIKE $${paramIdx})`);
+      queryParams.push(`%${search}%`);
+      paramIdx += 1;
+    }
+    if (params.columnFilters && Object.keys(params.columnFilters).length > 0) {
+      paramIdx = appendUserColumnFilters(conditions, queryParams, paramIdx, params.columnFilters);
+    }
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const { buildSqlOrderBy, USER_SORT_COLUMNS } = await import('../utils/column-sort.util');
+    const orderBy = buildSqlOrderBy(
+      { sortBy: params.sortBy, sortDir: params.sortDir },
+      USER_SORT_COLUMNS,
+      'ORDER BY created_at DESC',
+    );
+    const limitIdx = paramIdx;
+    const offsetIdx = paramIdx + 1;
     const [countRows, dataRows] = await Promise.all([
       this.ctx.dataSource.query(
-        `SELECT COUNT(*)::int AS total FROM adwest.users
-         WHERE ($1::text IS NULL OR name ILIKE $1 OR email ILIKE $1 OR phone ILIKE $1 OR code ILIKE $1)`,
-        [searchParam],
+        `SELECT COUNT(*)::int AS total FROM adwest.users ${whereClause}`,
+        queryParams,
       ),
       this.ctx.dataSource.query(
         `SELECT id, code, name, phone, email, role_id, sthan_id, permission_set_id, admin_management, gender, is_super_admin, must_reset_password, active, created_at, updated_at, created_by, updated_by
          FROM adwest.users
-         WHERE ($1::text IS NULL OR name ILIKE $1 OR email ILIKE $1 OR phone ILIKE $1 OR code ILIKE $1)
-         ORDER BY created_at DESC
-         LIMIT $2 OFFSET $3`,
-        [searchParam, pageSize, (page - 1) * pageSize],
+         ${whereClause}
+         ${orderBy}
+         LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+        [...queryParams, pageSize, (page - 1) * pageSize],
       ),
     ]);
 

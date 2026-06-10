@@ -1,5 +1,11 @@
 import { api } from './api'
 import { normalizeApiBaseUrl } from './apiBaseUrl'
+import { appendSortQuery } from './tableListQuery'
+
+export type ListSortParams = {
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
+}
 
 const CONTACT_UPLOAD_TIMEOUT_MS = 180_000
 
@@ -1109,13 +1115,16 @@ export const backendApi = {
     search?: string
     active?: boolean
     level?: RoleDefinitionApi['level']
-  }) => {
+    filters?: string
+  } & ListSortParams) => {
     const query = new URLSearchParams()
     if (params?.page) query.set('page', String(params.page))
     if (params?.pageSize) query.set('pageSize', String(params.pageSize))
     if (params?.search?.trim()) query.set('search', params.search.trim())
     if (typeof params?.active === 'boolean') query.set('active', String(params.active))
     if (params?.level) query.set('level', params.level)
+    if (params?.filters) query.set('filters', params.filters)
+    appendSortQuery(query, params)
 
     const queryString = query.toString()
     return api.get<PaginatedResponse<RoleDefinitionApi>>(`/role-definitions${queryString ? `?${queryString}` : ''}`)
@@ -1152,12 +1161,14 @@ export const backendApi = {
         parentId: r.parentId, active: r.active, createdAt: r.createdAt, updatedAt: r.updatedAt,
       }))),
 
-  listLocationDefinitionsPaginated: (params?: { page?: number; pageSize?: number; search?: string; level?: string }) => {
+  listLocationDefinitionsPaginated: (params?: { page?: number; pageSize?: number; search?: string; level?: string; filters?: string } & ListSortParams) => {
     const qs = new URLSearchParams()
     qs.set('page', String(params?.page ?? 1))
     qs.set('pageSize', String(params?.pageSize ?? 10))
     if (params?.search?.trim()) qs.set('search', params.search.trim())
     if (params?.level) qs.set('level', params.level.toLowerCase())
+    if (params?.filters) qs.set('filters', params.filters)
+    appendSortQuery(qs, params)
     return api.get<PaginatedResponse<{ id: string; code?: string; name: string; level: string; parentId?: string; active: boolean; createdAt: string; updatedAt: string }>>(`/org/locations?${qs.toString()}`)
       .then((res) => ({
         ...res,
@@ -1187,11 +1198,13 @@ export const backendApi = {
     api.get<{ items: SreniDefinitionApi[] }>('/org/sreni-definitions?page=1&pageSize=9999')
       .then((res) => res.items),
 
-  listSreniDefinitionsPaginated: (params?: { page?: number; pageSize?: number; search?: string }) => {
+  listSreniDefinitionsPaginated: (params?: { page?: number; pageSize?: number; search?: string; filters?: string } & ListSortParams) => {
     const qs = new URLSearchParams()
     qs.set('page', String(params?.page ?? 1))
     qs.set('pageSize', String(params?.pageSize ?? 10))
     if (params?.search?.trim()) qs.set('search', params.search.trim())
+    if (params?.filters) qs.set('filters', params.filters)
+    appendSortQuery(qs, params)
     return api.get<PaginatedResponse<SreniDefinitionApi>>(`/org/sreni-definitions?${qs.toString()}`)
   },
 
@@ -1223,11 +1236,13 @@ export const backendApi = {
   deleteSreniDefinition: (id: string) => api.delete<void>(`/org/sreni-definitions/${id}`),
 
   // Users
-  listUsers: (params?: { page?: number; pageSize?: number; search?: string }) => {
+  listUsers: (params?: { page?: number; pageSize?: number; search?: string; filters?: string } & ListSortParams) => {
     const qs = new URLSearchParams();
     if (params?.page) qs.set('page', String(params.page));
     if (params?.pageSize) qs.set('pageSize', String(params.pageSize));
     if (params?.search) qs.set('search', params.search);
+    if (params?.filters) qs.set('filters', params.filters);
+    appendSortQuery(qs, params);
     const q = qs.toString();
     return api.get<PaginatedUsersApi>(`/org/users${q ? `?${q}` : ''}`);
   },
@@ -1245,12 +1260,14 @@ export const backendApi = {
     api.get<{ items: PermissionApi[] }>('/org/permissions?page=1&pageSize=9999')
       .then((res) => res.items),
 
-  listPermissionsPaginated: (params?: { page?: number; pageSize?: number; search?: string; locationId?: string }) => {
+  listPermissionsPaginated: (params?: { page?: number; pageSize?: number; search?: string; locationId?: string; filters?: string } & ListSortParams) => {
     const qs = new URLSearchParams()
     qs.set('page', String(params?.page ?? 1))
     qs.set('pageSize', String(params?.pageSize ?? 10))
     if (params?.search?.trim()) qs.set('search', params.search.trim())
     if (params?.locationId) qs.set('locationId', params.locationId)
+    if (params?.filters) qs.set('filters', params.filters)
+    appendSortQuery(qs, params)
     return api.get<PaginatedResponse<PermissionApi>>(`/org/permissions?${qs.toString()}`)
   },
 
@@ -1265,11 +1282,13 @@ export const backendApi = {
     api.get<{ items: PermissionSetApi[] }>('/org/permission-sets?page=1&pageSize=9999')
       .then((res) => res.items),
 
-  listPermissionSetsPaginated: (params?: { page?: number; pageSize?: number; search?: string }) => {
+  listPermissionSetsPaginated: (params?: { page?: number; pageSize?: number; search?: string; filters?: string } & ListSortParams) => {
     const qs = new URLSearchParams()
     qs.set('page', String(params?.page ?? 1))
     qs.set('pageSize', String(params?.pageSize ?? 10))
     if (params?.search?.trim()) qs.set('search', params.search.trim())
+    if (params?.filters) qs.set('filters', params.filters)
+    appendSortQuery(qs, params)
     return api.get<PaginatedResponse<PermissionSetApi>>(`/org/permission-sets?${qs.toString()}`)
   },
 
@@ -1418,13 +1437,16 @@ export const backendApi = {
     search?: string
     isActive?: boolean
     approvalMode?: ApprovalWorkflowMode
-  }) => {
+    filters?: string
+  } & ListSortParams) => {
     const qs = new URLSearchParams()
     qs.set('page', String(params?.page ?? 1))
     qs.set('pageSize', String(params?.pageSize ?? 10))
     if (params?.search?.trim()) qs.set('search', params.search.trim())
     if (typeof params?.isActive === 'boolean') qs.set('isActive', String(params.isActive))
     if (params?.approvalMode) qs.set('approvalMode', params.approvalMode)
+    if (params?.filters) qs.set('filters', params.filters)
+    appendSortQuery(qs, params)
     return api.get<PaginatedResponse<ApprovalWorkflowDefinitionApi>>(`/settings/approval-workflows?${qs.toString()}`)
   },
 
@@ -1553,13 +1575,16 @@ export const backendApi = {
     status?: 'pending' | 'completed' | 'all'
     sreniId?: string
     search?: string
-  }) => {
+    filters?: string
+  } & ListSortParams) => {
     const qs = new URLSearchParams()
     qs.set('page', String(params?.page ?? 1))
     qs.set('pageSize', String(params?.pageSize ?? 10))
     qs.set('status', params?.status ?? 'pending')
     if (params?.sreniId) qs.set('sreniId', params.sreniId)
     if (params?.search?.trim()) qs.set('search', params.search.trim())
+    if (params?.filters) qs.set('filters', params.filters)
+    appendSortQuery(qs, params)
     return api.get<{
       items: JoinUsSubmissionApi[]
       total: number
@@ -1587,12 +1612,14 @@ export const backendApi = {
   listAllContacts: (
     page = 1,
     pageSize = 10,
-    filters?: { sreniId?: string; sthanId?: string; search?: string },
+    filters?: { sreniId?: string; sthanId?: string; search?: string; filters?: string } & ListSortParams,
   ) => {
     const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
     if (filters?.sreniId) qs.set('sreniId', filters.sreniId)
     if (filters?.sthanId) qs.set('sthanId', filters.sthanId)
     if (filters?.search?.trim()) qs.set('search', filters.search.trim())
+    if (filters?.filters) qs.set('filters', filters.filters)
+    appendSortQuery(qs, filters)
     return api.get<PaginatedResponse<SreniContactRowApi>>(`/org/contacts?${qs}`)
   },
 
@@ -1601,11 +1628,14 @@ export const backendApi = {
     sreniId: string,
     page = 1,
     pageSize = 10,
-    gadaOptions?: { filter?: GadaContactListFilter; gadanayakUserId?: string },
+    gadaOptions?: { filter?: GadaContactListFilter; gadanayakUserId?: string; search?: string; filters?: string } & ListSortParams,
   ) => {
     const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
     if (gadaOptions?.filter) qs.set('gadaFilter', gadaOptions.filter)
     if (gadaOptions?.gadanayakUserId) qs.set('gadanayakUserId', gadaOptions.gadanayakUserId)
+    if (gadaOptions?.search?.trim()) qs.set('search', gadaOptions.search.trim())
+    if (gadaOptions?.filters) qs.set('filters', gadaOptions.filters)
+    appendSortQuery(qs, gadaOptions)
     return api.get<SreniContactsListApi>(
       `/org/sreni-definitions/${encodeURIComponent(sreniId)}/contacts?${qs}`,
     )
@@ -1890,12 +1920,14 @@ export const backendApi = {
     ),
 
   // Attendance metrics
-  listAttendanceMetricsPaginated: (params?: { page?: number; pageSize?: number; search?: string; sreniId?: string }) => {
+  listAttendanceMetricsPaginated: (params?: { page?: number; pageSize?: number; search?: string; sreniId?: string; filters?: string } & ListSortParams) => {
     const qs = new URLSearchParams()
     if (params?.page) qs.set('page', String(params.page))
     if (params?.pageSize) qs.set('pageSize', String(params.pageSize))
     if (params?.search) qs.set('search', params.search)
     if (params?.sreniId) qs.set('sreniId', params.sreniId)
+    if (params?.filters) qs.set('filters', params.filters)
+    appendSortQuery(qs, params)
     const q = qs.toString()
     return api.get<PaginatedResponse<AttendanceMetricApi>>(`/org/attendance-metrics${q ? `?${q}` : ''}`)
   },
@@ -2167,10 +2199,15 @@ export const backendApi = {
     api.delete<void>(`/org/locations/${encodeURIComponent(locationId)}/expenses/${encodeURIComponent(expenseId)}`),
 
   // ─── Sthan — Contacts ────────────────────────────────────────────────────
-  listSthanContacts: (locationId: string, page = 1, pageSize = 10) =>
-    api.get<{ items: SthanContactRowApi[]; total: number; totalPages: number }>(
-      `/org/locations/${encodeURIComponent(locationId)}/contacts?page=${page}&pageSize=${pageSize}`,
-    ),
+  listSthanContacts: (locationId: string, page = 1, pageSize = 10, options?: { search?: string; filters?: string } & ListSortParams) => {
+    const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+    if (options?.search?.trim()) qs.set('search', options.search.trim())
+    if (options?.filters) qs.set('filters', options.filters)
+    appendSortQuery(qs, options)
+    return api.get<{ items: SthanContactRowApi[]; total: number; totalPages: number }>(
+      `/org/locations/${encodeURIComponent(locationId)}/contacts?${qs}`,
+    )
+  },
   clearSthanContacts: (locationId: string) =>
     api.delete<{ deleted: number }>(`/org/locations/${encodeURIComponent(locationId)}/contacts`),
 
