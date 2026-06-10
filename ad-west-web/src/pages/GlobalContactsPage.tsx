@@ -193,7 +193,7 @@ const AssignTagsModal: React.FC<AssignTagsModalProps> = ({
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '4px' }}>
           <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSaving}>Cancel</button>
           <button type="button" className="btn btn-primary" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? 'Saving…' : 'Save'}
+            {isSaving ? 'Updating…' : 'Update'}
           </button>
         </div>
       </div>
@@ -255,7 +255,7 @@ export const GlobalContactsPage: React.FC = () => {
   const [editTarget, setEditTarget] = useState<SreniContactRowApi | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(10);
 
   // Columns available to the layout modal (excludes 'name' which is always pinned)
   const colDefs = useMemo(

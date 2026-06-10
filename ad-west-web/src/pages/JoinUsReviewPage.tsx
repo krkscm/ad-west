@@ -7,8 +7,6 @@ import { useAdminDefinitions } from '../context/admin-definitions-context';
 import { useEnumOptions } from '../hooks/useEnumOptions';
 import { backendApi, JoinUsSubmissionApi, SreniDivisionApi } from '../utils/backendApi';
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50];
-
 const toUiError = (error: unknown, fallback: string): string => {
   if (!(error instanceof Error)) return fallback;
   const match = error.message.match(/^API error \(\d+\):\s*(.*)$/i);
@@ -36,7 +34,7 @@ export const JoinUsReviewPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [pendingCount, setPendingCount] = useState(0);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(10);
   const [status, setStatus] = useState<'pending' | 'completed' | 'all'>('pending');
   const [sreniFilter, setSreniFilter] = useState('');
   const [search, setSearch] = useState('');
@@ -235,7 +233,6 @@ export const JoinUsReviewPage: React.FC = () => {
             totalPages={totalPages}
             totalItems={total}
             pageSize={pageSize}
-            pageSizeOptions={PAGE_SIZE_OPTIONS}
             onPageChange={setPage}
             onPageSizeChange={(ps) => { setPageSize(ps); setPage(1); }}
           />

@@ -36,6 +36,7 @@ import { PageHeader } from '../components/common/PageHeader';
 import { SwitchToggle } from '../components/common/SwitchToggle';
 import { DateField } from '../components/common/DateFields';
 import { TableLayoutModal } from '../components/common/TableLayoutModal';
+import { PAGE_SIZE_OPTIONS, PaginationBar } from '../components/common/PaginationBar';
 import { ColumnItem, buildColumnItems, useTableLayout } from '../hooks/useTableLayout';
 
 interface Props {
@@ -93,8 +94,6 @@ const DATASET_OPTIONS: Array<{ key: DatasetKey; label: string }> = [
   { key: 'events', label: 'Events' },
   { key: 'attendance', label: 'Attendance' },
 ];
-
-const PAGE_SIZE_OPTIONS = [10, 12, 25, 50];
 
 const savedLayoutPanelStyle: React.CSSProperties = {
   display: 'grid',
@@ -261,7 +260,7 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
   const [sortKey, setSortKey] = useState('recorded_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(12);
+  const [pageSize, setPageSize] = useState(10);
 
   const [pivotRowDim, setPivotRowDim] = useState('domain');
   const [pivotColDim, setPivotColDim] = useState('period_bucket');
@@ -1072,7 +1071,9 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
                     onClick={() => void handleSaveLayout('details')}
                     disabled={savingLayoutType === 'details'}
                   >
-                    {savingLayoutType === 'details' ? 'Saving...' : 'Save Layout'}
+                    {savingLayoutType === 'details'
+                      ? (selectedDetailsLayoutId ? 'Updating…' : 'Creating…')
+                      : (selectedDetailsLayoutId ? 'Update Layout' : 'Create Layout')}
                   </button>
                   <button
                     type="button"
@@ -1125,12 +1126,6 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
                     <option value="asc">Ascending</option>
                   </select>
                 </label>
-                <label style={{ display: 'grid', gap: '4px' }}>
-                  <span className="form-label" style={{ margin: 0 }}>Rows Per Page</span>
-                  <select className="form-input" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
-                    {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
-                  </select>
-                </label>
               </div>
 
               <div className="table-container" style={{ overflowX: 'auto' }}>
@@ -1161,13 +1156,14 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
                 </table>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{ color: 'var(--text-secondary-dark)', fontSize: '0.82rem' }}>Page {safePage} of {totalPages}</span>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button type="button" className="btn btn-secondary btn-sm" disabled={safePage <= 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>Previous</button>
-                  <button type="button" className="btn btn-secondary btn-sm" disabled={safePage >= totalPages} onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}>Next</button>
-                </div>
-              </div>
+              <PaginationBar
+                page={safePage}
+                totalPages={totalPages}
+                totalItems={sortedRecords.length}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={(ps) => { setPageSize(ps); setPage(1); }}
+              />
             </div>
           )}
 
@@ -1223,7 +1219,9 @@ export const SreniAnalyticsStudioPage: React.FC<Props> = ({ sreniId, sreniName }
                     onClick={() => void handleSaveLayout('pivot')}
                     disabled={savingLayoutType === 'pivot'}
                   >
-                    {savingLayoutType === 'pivot' ? 'Saving...' : 'Save Layout'}
+                    {savingLayoutType === 'pivot'
+                      ? (selectedPivotLayoutId ? 'Updating…' : 'Creating…')
+                      : (selectedPivotLayoutId ? 'Update Layout' : 'Create Layout')}
                   </button>
                   <button
                     type="button"

@@ -24,7 +24,7 @@ export const PermissionDefinitionsPage: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -201,7 +201,7 @@ export const PermissionDefinitionsPage: React.FC = () => {
             </div>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button type="button" className="btn btn-secondary btn-md" onClick={resetForm}>Cancel</button>
-              <button type="submit" className="btn btn-primary btn-md" disabled={isSaving}>{isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create'}</button>
+              <button type="submit" className="btn btn-primary btn-md" disabled={isSaving}>{isSaving ? (editingId ? 'Updating…' : 'Creating…') : editingId ? 'Update' : 'Create'}</button>
             </div>
           </form>
         </div>
@@ -219,19 +219,13 @@ export const PermissionDefinitionsPage: React.FC = () => {
         {(search || locationFilter) && (
           <button className="btn btn-secondary btn-sm" onClick={() => { setSearch(''); handleLocationFilter(''); }}>Clear Filters</button>
         )}
-        <div className="list-toolbar__meta">
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>Rows:</span>
-          {[10, 20, 50].map((ps) => (
-            <button key={ps} type="button" className={`page-size-pill${pageSize === ps ? ' is-active' : ''}`} onClick={() => { setPageSize(ps); setPage(1); }}>
-              {ps}
-            </button>
-          ))}
-          {!isLoading && (
+        {!isLoading && (
+          <div className="list-toolbar__meta">
             <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>
               {total} permission{total !== 1 ? 's' : ''}
             </span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {isLoading ? (
@@ -330,6 +324,7 @@ export const PermissionDefinitionsPage: React.FC = () => {
           totalItems={total}
           pageSize={pageSize}
           onPageChange={setPage}
+          onPageSizeChange={(ps) => { setPageSize(ps); setPage(1); }}
         />
       </div>
       )}

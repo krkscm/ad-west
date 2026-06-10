@@ -7,11 +7,22 @@ import { FormActions } from '../../components/common/FormActions';
 import { EmptyState } from '../../components/common/EmptyState';
 import { PaginationBar } from '../../components/common/PaginationBar';
 import { useAdminDefinitions } from '../../context/admin-definitions-context';
-import { backendApi, LocationDefinitionApi, PermissionApi, PermissionSetApi } from '../../utils/backendApi';
+import { backendApi, LocationDefinitionApi, PermissionApi, PermissionSetApi, SreniDefinitionApi } from '../../utils/backendApi';
+
+const formatPermissionLabel = (
+  p: PermissionApi | undefined,
+  pid: string,
+  locationById: Map<string, LocationDefinitionApi>,
+  sreniById: Map<string, SreniDefinitionApi>,
+): string => {
+  if (!p) return `${pid.slice(0, 8)}…`;
+  const loc = locationById.get(p.locationId);
+  const sreni = sreniById.get(p.sreniId);
+  if (loc && sreni) return `${loc.name} — ${sreni.name} Samyogak`;
+  return p.name || p.code;
+};
 import { SwitchToggle } from '../../components/common/SwitchToggle';
 import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
-
-const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
 const toUiError = (error: unknown, fallback: string): string => {
   if (!(error instanceof Error)) return fallback;
@@ -23,14 +34,14 @@ const toUiError = (error: unknown, fallback: string): string => {
 export const PermissionSetsPage: React.FC = () => {
   const { addToast } = useToast();
   const confirm = useConfirm();
-  const { locationDefinitions } = useAdminDefinitions();
+  const { locationDefinitions, sreniDefinitions } = useAdminDefinitions();
   const permissionsLoaded = useRef(false);
 
   const [sets, setSets] = useState<PermissionSetApi[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -69,9 +80,7 @@ export const PermissionSetsPage: React.FC = () => {
 
   useEffect(() => { setLocations(locationDefinitions); }, [locationDefinitions]);
 
-  useEffect(() => {
-    if (formOpen) ensurePermissionsLoaded();
-  }, [formOpen]);
+  useEffect(() => { ensurePermissionsLoaded(); }, []);
 
   useEffect(() => { loadSets(page, pageSize, search); }, [page, pageSize]);
 
@@ -99,6 +108,12 @@ export const PermissionSetsPage: React.FC = () => {
     return m;
   }, [locations]);
 
+  const sreniById = useMemo(() => {
+    const m = new Map<string, SreniDefinitionApi>();
+    sreniDefinitions.forEach((s) => m.set(s.id, s));
+    return m;
+  }, [sreniDefinitions]);
+
   const filteredPerms = useMemo(() => {
     const q = permSearch.trim().toLowerCase();
     const active = allPermissions.filter((p) => p.active);
@@ -110,7 +125,7 @@ export const PermissionSetsPage: React.FC = () => {
     const map = new Map<string, PermissionApi[]>();
     filteredPerms.forEach((p) => {
       const loc = locationById.get(p.locationId);
-      const key = loc ? `${loc.name} (${loc.level})` : p.locationId;
+      const key = loc ? `${loc.name} (${loc.level})` : 'Other';
       map.set(key, [...(map.get(key) ?? []), p]);
     });
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
@@ -235,7 +250,7 @@ export const PermissionSetsPage: React.FC = () => {
                     const p = permById.get(pid);
                     return (
                       <span key={pid} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600, background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)' }}>
-                        {p ? p.code : pid}
+                        {formatPermissionLabel(p, pid, locationById, sreniById)}
                         <button type="button" onClick={() => togglePerm(pid)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#818cf8', fontSize: '0.85rem', padding: 0, lineHeight: 1 }}>✕</button>
                       </span>
                     );
@@ -261,9 +276,8 @@ export const PermissionSetsPage: React.FC = () => {
                             onChange={() => togglePerm(p.id)}
                             ariaLabel={`Toggle permission ${p.name}`}
                           />
-                          <code style={{ fontSize: '0.76rem', fontWeight: 700, background: 'var(--chip-bg-soft)', padding: '2px 7px', borderRadius: '4px', letterSpacing: '0.03em', flexShrink: 0 }}>{p.code}</code>
-                          <span style={{ fontSize: '0.87rem', fontWeight: 600, flex: 1 }}>{p.name}</span>
-                          {p.description && <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.description}</span>}
+                          <span style={{ fontSize: '0.87rem', fontWeight: 600, flex: 1 }}>{formatPermissionLabel(p, p.id, locationById, sreniById)}</span>
+                          {p.description && <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.description}>{p.description}</span>}
                         </div>
                       );
                     })}
@@ -274,7 +288,7 @@ export const PermissionSetsPage: React.FC = () => {
 
             <FormActions>
               <button type="button" className="btn btn-secondary" onClick={resetForm}>Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create'}</button>
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? (editingId ? 'Updating…' : 'Creating…') : editingId ? 'Update' : 'Create'}</button>
             </FormActions>
           </form>
         </FormSection>
@@ -286,13 +300,7 @@ export const PermissionSetsPage: React.FC = () => {
           <input className="form-input" placeholder="Search sets by name or description…" value={search} onChange={(e) => handleSearchChange(e.target.value)} />
         </div>
         <div className="list-toolbar__meta">
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>Rows:</span>
-          {PAGE_SIZE_OPTIONS.map((ps) => (
-            <button key={ps} type="button" className={`page-size-pill${pageSize === ps ? ' is-active' : ''}`} onClick={() => handlePageSizeChange(ps)}>
-              {ps}
-            </button>
-          ))}
-          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)', marginLeft: '4px' }}>
+          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>
             {isLoading ? 'Loading…' : `${total} set${total !== 1 ? 's' : ''}`}
           </span>
         </div>
@@ -332,7 +340,7 @@ export const PermissionSetsPage: React.FC = () => {
                         const p = permById.get(pid);
                         return (
                           <span key={pid} style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700, background: 'var(--chip-bg-soft)', letterSpacing: '0.03em' }}>
-                            {p?.code ?? pid.slice(0, 8)}
+                            {formatPermissionLabel(p, pid, locationById, sreniById)}
                           </span>
                         );
                       })}
@@ -368,6 +376,7 @@ export const PermissionSetsPage: React.FC = () => {
             totalItems={total}
             pageSize={pageSize}
             onPageChange={setPage}
+            onPageSizeChange={handlePageSizeChange}
           />
         </div>
       )}

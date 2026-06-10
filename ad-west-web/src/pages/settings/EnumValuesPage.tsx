@@ -18,9 +18,6 @@ interface FormState {
 
 const BLANK_FORM: FormState = { value: '', label: '', sortOrder: '0', active: true, parentValue: '' }
 
-const TYPE_PAGE_SIZE = 12
-const VALUE_PAGE_SIZE = 15
-
 const toUiError = (e: unknown, fallback: string): string => {
   if (!(e instanceof Error)) return fallback
   const m = e.message.match(/^API error \(\d+\):\s*(.*)$/i)
@@ -44,6 +41,8 @@ export const EnumValuesPage: React.FC = () => {
   const [form, setForm] = useState<FormState>(BLANK_FORM)
   const [typePage, setTypePage] = useState(1)
   const [valuePage, setValuePage] = useState(1)
+  const [typePageSize, setTypePageSize] = useState(10)
+  const [valuePageSize, setValuePageSize] = useState(10)
   const [typeSearch, setTypeSearch] = useState('')
 
   const load = useCallback(async () => {
@@ -77,11 +76,11 @@ export const EnumValuesPage: React.FC = () => {
     )
   }, [types, typeSearch])
 
-  const typeTotalPages = Math.max(1, Math.ceil(filteredTypes.length / TYPE_PAGE_SIZE))
+  const typeTotalPages = Math.max(1, Math.ceil(filteredTypes.length / typePageSize))
   const pagedTypes = useMemo(() => {
-    const start = (typePage - 1) * TYPE_PAGE_SIZE
-    return filteredTypes.slice(start, start + TYPE_PAGE_SIZE)
-  }, [filteredTypes, typePage])
+    const start = (typePage - 1) * typePageSize
+    return filteredTypes.slice(start, start + typePageSize)
+  }, [filteredTypes, typePage, typePageSize])
 
   useEffect(() => {
     if (typePage > typeTotalPages) setTypePage(typeTotalPages)
@@ -102,11 +101,11 @@ export const EnumValuesPage: React.FC = () => {
     visibleValues.slice().sort((a, b) => a.sortOrder - b.sortOrder),
   [visibleValues])
 
-  const valueTotalPages = Math.max(1, Math.ceil(sortedVisibleValues.length / VALUE_PAGE_SIZE))
+  const valueTotalPages = Math.max(1, Math.ceil(sortedVisibleValues.length / valuePageSize))
   const pagedVisibleValues = useMemo(() => {
-    const start = (valuePage - 1) * VALUE_PAGE_SIZE
-    return sortedVisibleValues.slice(start, start + VALUE_PAGE_SIZE)
-  }, [sortedVisibleValues, valuePage])
+    const start = (valuePage - 1) * valuePageSize
+    return sortedVisibleValues.slice(start, start + valuePageSize)
+  }, [sortedVisibleValues, valuePage, valuePageSize])
 
   useEffect(() => {
     if (valuePage > valueTotalPages) setValuePage(valueTotalPages)
@@ -284,8 +283,9 @@ export const EnumValuesPage: React.FC = () => {
               page={typePage}
               totalPages={typeTotalPages}
               totalItems={filteredTypes.length}
-              pageSize={TYPE_PAGE_SIZE}
+              pageSize={typePageSize}
               onPageChange={setTypePage}
+              onPageSizeChange={(ps) => { setTypePageSize(ps); setTypePage(1); }}
             />
           </div>
 
@@ -390,7 +390,7 @@ export const EnumValuesPage: React.FC = () => {
                     disabled={isSaving}
                     style={{ padding: '8px 20px', fontSize: '0.85rem' }}
                   >
-                    {isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create'}
+                    {isSaving ? (editingId ? 'Updating…' : 'Creating…') : editingId ? 'Update' : 'Create'}
                   </button>
                   <button
                     className="btn btn-secondary"
@@ -473,8 +473,9 @@ export const EnumValuesPage: React.FC = () => {
                 page={valuePage}
                 totalPages={valueTotalPages}
                 totalItems={sortedVisibleValues.length}
-                pageSize={VALUE_PAGE_SIZE}
+                pageSize={valuePageSize}
                 onPageChange={setValuePage}
+                onPageSizeChange={(ps) => { setValuePageSize(ps); setValuePage(1); }}
               />
             )}
           </div>

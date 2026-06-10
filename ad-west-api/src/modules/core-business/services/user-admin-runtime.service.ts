@@ -24,7 +24,7 @@ export class UserAdminRuntimeService {
     totalPages: number;
   } {
     const page = Math.max(1, params.page ?? 1);
-    const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
+    const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 10));
     const q = (params.search ?? '').trim().toLowerCase();
     const all = Array.from(this.ctx.users.values())
       .filter((u) => !q || u.name.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q) || u.phone?.includes(q) || u.code.toLowerCase().includes(q))
@@ -46,7 +46,7 @@ export class UserAdminRuntimeService {
     }
 
     const page = Math.max(1, params.page ?? 1);
-    const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
+    const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 10));
     const search = (params.search ?? '').trim();
     const searchParam = search ? `%${search}%` : null;
     const [countRows, dataRows] = await Promise.all([

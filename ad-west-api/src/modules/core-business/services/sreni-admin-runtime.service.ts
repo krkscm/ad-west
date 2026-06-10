@@ -349,7 +349,7 @@ export class SreniAdminRuntimeService {
   async listSreniContacts(
     sreniId: string,
     page = 1,
-    pageSize = 50,
+    pageSize = 10,
     scope?: ContactAccessScope,
     gadaOptions?: GadaListQueryOptions,
   ): Promise<{
@@ -841,7 +841,7 @@ export class SreniAdminRuntimeService {
 
   async listAllContacts(
     page = 1,
-    pageSize = 50,
+    pageSize = 10,
     filters?: { sreniId?: string; sthanId?: string; search?: string },
     scope?: ContactAccessScope,
   ): Promise<{ items: (SreniContactRecord & { sreniName: string })[]; total: number; page: number; pageSize: number; totalPages: number }> {

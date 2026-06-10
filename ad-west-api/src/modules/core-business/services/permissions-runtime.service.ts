@@ -23,7 +23,7 @@ export class PermissionsRuntimeService {
     items: PermissionRecord[]; total: number; page: number; pageSize: number; totalPages: number;
   }> {
     const page = Math.max(1, params.page ?? 1);
-    const pageSize = Math.min(1000, Math.max(1, params.pageSize ?? 20));
+    const pageSize = Math.min(1000, Math.max(1, params.pageSize ?? 10));
     if (this.ctx.runtimeMode !== 'db' || !this.ctx.dataSource) {
       const q = (params.search ?? '').trim().toLowerCase();
       let all = Array.from(this.ctx.permissions.values());
@@ -172,7 +172,7 @@ export class PermissionsRuntimeService {
     items: PermissionSetRecord[]; total: number; page: number; pageSize: number; totalPages: number;
   }> {
     const page = Math.max(1, params.page ?? 1);
-    const pageSize = Math.min(1000, Math.max(1, params.pageSize ?? 20));
+    const pageSize = Math.min(1000, Math.max(1, params.pageSize ?? 10));
     if (this.ctx.runtimeMode !== 'db' || !this.ctx.dataSource) {
       const q = (params.search ?? '').trim().toLowerCase();
       let all = Array.from(this.ctx.permissionSets.values());

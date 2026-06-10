@@ -1709,7 +1709,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   async listSreniContacts(
     sreniId: string,
     page = 1,
-    pageSize = 50,
+    pageSize = 10,
     actor?: AuthPrincipal,
     gadaOptions?: GadaListQueryOptions,
   ): Promise<{
@@ -1896,7 +1896,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
 
   async listAllContacts(
     page = 1,
-    pageSize = 50,
+    pageSize = 10,
     filters?: { sreniId?: string; sthanId?: string; search?: string },
     actor?: AuthPrincipal,
   ): Promise<{ items: (SreniContactRecord & { sreniName: string })[]; total: number; page: number; pageSize: number; totalPages: number }> {
@@ -2259,7 +2259,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getSthanRuntime().deleteSthanExpense(locationId, expenseId);
   }
 
-  async listSthanContacts(locationId: string, page = 1, pageSize = 50): Promise<{ items: SthanContactRecord[]; total: number; totalPages: number }> {
+  async listSthanContacts(locationId: string, page = 1, pageSize = 10): Promise<{ items: SthanContactRecord[]; total: number; totalPages: number }> {
     return this.getSthanRuntime().listSthanContacts(locationId, page, pageSize);
   }
 

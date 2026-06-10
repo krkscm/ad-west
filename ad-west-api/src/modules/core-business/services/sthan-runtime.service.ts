@@ -172,7 +172,7 @@ export class SthanRuntimeService {
 
   // ── Contacts (sthan rows in sreni_contacts filtered by location_id) ──────────
 
-  async listSthanContacts(locationId: string, page = 1, pageSize = 50): Promise<{ items: SthanContactRecord[]; total: number; totalPages: number }> {
+  async listSthanContacts(locationId: string, page = 1, pageSize = 10): Promise<{ items: SthanContactRecord[]; total: number; totalPages: number }> {
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
       const offset = (page - 1) * pageSize;
       const [countRows, dataRows] = await Promise.all([

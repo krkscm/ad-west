@@ -9,8 +9,6 @@ import { PaginationBar } from '../../components/common/PaginationBar';
 import { backendApi, EnumValueApi, SreniDefinitionApi } from '../../utils/backendApi';
 import { TableRowActionsMenu } from '../../components/common/TableRowActionsMenu';
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50];
-
 const toUiError = (error: unknown, fallback: string): string => {
   if (!(error instanceof Error)) return fallback;
   const match = error.message.match(/^API error \(\d+\):\s*(.*)$/i);
@@ -30,7 +28,7 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -399,7 +397,7 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
             </div>
             <FormActions>
               <button type="button" className="btn btn-secondary" onClick={resetForm}>Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create'}</button>
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>{isSaving ? (editingId ? 'Updating…' : 'Creating…') : editingId ? 'Update' : 'Create'}</button>
             </FormActions>
           </form>
         </FormSection>
@@ -411,13 +409,7 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
           <input className="form-input" placeholder="Search by name, code or description…" value={search} onChange={(e) => handleSearchChange(e.target.value)} />
         </div>
         <div className="list-toolbar__meta">
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>Rows:</span>
-          {PAGE_SIZE_OPTIONS.map((ps) => (
-            <button key={ps} type="button" className={`page-size-pill${pageSize === ps ? ' is-active' : ''}`} onClick={() => handlePageSizeChange(ps)}>
-              {ps}
-            </button>
-          ))}
-          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)', marginLeft: '4px' }}>
+          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>
             {isLoading ? 'Loading…' : `${total} sreni${total !== 1 ? 's' : ''}`}
           </span>
         </div>
@@ -535,6 +527,7 @@ export const SreniDefinitionPage: React.FC<SreniDefinitionPageProps> = ({ onSren
             totalItems={total}
             pageSize={pageSize}
             onPageChange={setPage}
+            onPageSizeChange={handlePageSizeChange}
           />
         </div>
       )}

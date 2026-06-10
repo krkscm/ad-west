@@ -67,11 +67,11 @@ export class JoinUsReviewService {
     pendingCount: number;
   }> {
     if (!this.dataSource) {
-      return { items: [], total: 0, page: 1, pageSize: 20, totalPages: 1, pendingCount: 0 };
+      return { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1, pendingCount: 0 };
     }
 
     const page = Math.max(1, params.page ?? 1);
-    const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
+    const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 10));
     const status = params.status ?? 'pending';
     const { whereSql, params: whereParams, paramIdx } = this.buildListWhere(scope, status, params.sreniId, params.search);
 

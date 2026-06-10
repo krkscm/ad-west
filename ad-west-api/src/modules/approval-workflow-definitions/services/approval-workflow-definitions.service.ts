@@ -100,7 +100,7 @@ export class ApprovalWorkflowDefinitionsService {
 
   async list(query: ListApprovalWorkflowsQueryDto): Promise<PaginatedApprovalWorkflowsResponse> {
     const page = query.page ?? 1;
-    const pageSize = query.pageSize ?? 20;
+    const pageSize = query.pageSize ?? 10;
     const search = query.search?.trim().toLowerCase();
 
     let rows = await this.store.list();

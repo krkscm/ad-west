@@ -154,7 +154,7 @@ export class OrgRuntimeService {
     items: LocationRecord[]; total: number; page: number; pageSize: number; totalPages: number;
   }> {
     const page = Math.max(1, params.page ?? 1);
-    const pageSize = Math.min(1000, Math.max(1, params.pageSize ?? 20));
+    const pageSize = Math.min(1000, Math.max(1, params.pageSize ?? 10));
     if (this.ctx.runtimeMode !== 'db' || !this.ctx.dataSource) {
       const q = (params.search ?? '').trim().toLowerCase();
       let all = Array.from(this.ctx.locations.values());
@@ -460,7 +460,7 @@ export class OrgRuntimeService {
     items: SrenyRecord[]; total: number; page: number; pageSize: number; totalPages: number;
   }> {
     const page = Math.max(1, params.page ?? 1);
-    const pageSize = Math.min(1000, Math.max(1, params.pageSize ?? 20));
+    const pageSize = Math.min(1000, Math.max(1, params.pageSize ?? 10));
     if (this.ctx.runtimeMode !== 'db' || !this.ctx.dataSource) {
       const q = (params.search ?? '').trim().toLowerCase();
       let all = Array.from(this.ctx.srenies.values()).filter((s) => !s.zoneId);

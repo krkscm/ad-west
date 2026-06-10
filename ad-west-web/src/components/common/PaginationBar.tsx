@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 
+export const DEFAULT_PAGE_SIZE = 10
 export const PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 
 function buildPageNums(page: number, totalPages: number): (number | '…')[] {
@@ -28,12 +29,12 @@ export function PaginationBar({
   totalItems,
   pageSize,
   onPageChange,
-  pageSizeOptions,
+  pageSizeOptions = PAGE_SIZE_OPTIONS,
   onPageSizeChange,
 }: PaginationBarProps) {
   const nums = useMemo(() => buildPageNums(page, totalPages), [page, totalPages])
   const showNav = totalPages > 1
-  const showSizeSelector = Boolean(pageSizeOptions?.length && onPageSizeChange)
+  const showSizeSelector = Boolean(onPageSizeChange && pageSizeOptions.length > 0)
 
   if (totalItems === 0) return null
   if (!showNav && !showSizeSelector) return null
@@ -50,7 +51,7 @@ export function PaginationBar({
         {showSizeSelector && (
           <div className="pagination-bar__size">
             <span className="pagination-bar__size-label">Rows:</span>
-            {pageSizeOptions!.map((ps) => (
+            {pageSizeOptions.map((ps) => (
               <button
                 key={ps}
                 type="button"

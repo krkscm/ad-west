@@ -108,7 +108,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, contact, divisions, s
             disabled={isSaving}
             onClick={() => onSave(divisionId || null, sthanId || null)}
           >
-            {isSaving ? 'Saving…' : 'Save'}
+            {isSaving ? 'Updating…' : 'Update'}
           </button>
         </div>
       </div>
@@ -522,7 +522,7 @@ const AssignGadaModal: React.FC<AssignGadaModalProps> = ({
             disabled={isSaving || !gadanayakUserId || !contactSthanId}
             onClick={() => onSave(gadanayakUserId)}
           >
-            {isSaving ? 'Saving…' : 'Save'}
+            {isSaving ? 'Updating…' : 'Update'}
           </button>
         </div>
       </div>
@@ -1018,7 +1018,7 @@ const SevaContributionsModal: React.FC<SevaContributionsModalProps> = ({ isOpen,
               </button>
             )}
             <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : editingId ? 'Update activity' : 'Save activity'}
+              {saving ? (editingId ? 'Updating…' : 'Creating…') : editingId ? 'Update activity' : 'Create activity'}
             </button>
           </div>
         </div>
@@ -1125,7 +1125,7 @@ export const SreniContactListPage: React.FC<Props> = ({ sreniId, sreniName }) =>
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(10);
   const [isLoading, setIsLoading] = useState(false);
   const [sourceFile, setSourceFile] = useState<string | null>(null);
   const [divisions, setDivisions] = useState<SreniDivisionApi[]>([]);

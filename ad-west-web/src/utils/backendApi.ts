@@ -1155,7 +1155,7 @@ export const backendApi = {
   listLocationDefinitionsPaginated: (params?: { page?: number; pageSize?: number; search?: string; level?: string }) => {
     const qs = new URLSearchParams()
     qs.set('page', String(params?.page ?? 1))
-    qs.set('pageSize', String(params?.pageSize ?? 20))
+    qs.set('pageSize', String(params?.pageSize ?? 10))
     if (params?.search?.trim()) qs.set('search', params.search.trim())
     if (params?.level) qs.set('level', params.level.toLowerCase())
     return api.get<PaginatedResponse<{ id: string; code?: string; name: string; level: string; parentId?: string; active: boolean; createdAt: string; updatedAt: string }>>(`/org/locations?${qs.toString()}`)
@@ -1190,7 +1190,7 @@ export const backendApi = {
   listSreniDefinitionsPaginated: (params?: { page?: number; pageSize?: number; search?: string }) => {
     const qs = new URLSearchParams()
     qs.set('page', String(params?.page ?? 1))
-    qs.set('pageSize', String(params?.pageSize ?? 20))
+    qs.set('pageSize', String(params?.pageSize ?? 10))
     if (params?.search?.trim()) qs.set('search', params.search.trim())
     return api.get<PaginatedResponse<SreniDefinitionApi>>(`/org/sreni-definitions?${qs.toString()}`)
   },
@@ -1248,7 +1248,7 @@ export const backendApi = {
   listPermissionsPaginated: (params?: { page?: number; pageSize?: number; search?: string; locationId?: string }) => {
     const qs = new URLSearchParams()
     qs.set('page', String(params?.page ?? 1))
-    qs.set('pageSize', String(params?.pageSize ?? 20))
+    qs.set('pageSize', String(params?.pageSize ?? 10))
     if (params?.search?.trim()) qs.set('search', params.search.trim())
     if (params?.locationId) qs.set('locationId', params.locationId)
     return api.get<PaginatedResponse<PermissionApi>>(`/org/permissions?${qs.toString()}`)
@@ -1268,7 +1268,7 @@ export const backendApi = {
   listPermissionSetsPaginated: (params?: { page?: number; pageSize?: number; search?: string }) => {
     const qs = new URLSearchParams()
     qs.set('page', String(params?.page ?? 1))
-    qs.set('pageSize', String(params?.pageSize ?? 20))
+    qs.set('pageSize', String(params?.pageSize ?? 10))
     if (params?.search?.trim()) qs.set('search', params.search.trim())
     return api.get<PaginatedResponse<PermissionSetApi>>(`/org/permission-sets?${qs.toString()}`)
   },
@@ -1421,7 +1421,7 @@ export const backendApi = {
   }) => {
     const qs = new URLSearchParams()
     qs.set('page', String(params?.page ?? 1))
-    qs.set('pageSize', String(params?.pageSize ?? 20))
+    qs.set('pageSize', String(params?.pageSize ?? 10))
     if (params?.search?.trim()) qs.set('search', params.search.trim())
     if (typeof params?.isActive === 'boolean') qs.set('isActive', String(params.isActive))
     if (params?.approvalMode) qs.set('approvalMode', params.approvalMode)
@@ -1556,7 +1556,7 @@ export const backendApi = {
   }) => {
     const qs = new URLSearchParams()
     qs.set('page', String(params?.page ?? 1))
-    qs.set('pageSize', String(params?.pageSize ?? 20))
+    qs.set('pageSize', String(params?.pageSize ?? 10))
     qs.set('status', params?.status ?? 'pending')
     if (params?.sreniId) qs.set('sreniId', params.sreniId)
     if (params?.search?.trim()) qs.set('search', params.search.trim())
@@ -1586,7 +1586,7 @@ export const backendApi = {
   // All contacts (across all Srenis)
   listAllContacts: (
     page = 1,
-    pageSize = 50,
+    pageSize = 10,
     filters?: { sreniId?: string; sthanId?: string; search?: string },
   ) => {
     const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
@@ -1600,7 +1600,7 @@ export const backendApi = {
   listSreniContacts: (
     sreniId: string,
     page = 1,
-    pageSize = 50,
+    pageSize = 10,
     gadaOptions?: { filter?: GadaContactListFilter; gadanayakUserId?: string },
   ) => {
     const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
@@ -2167,7 +2167,7 @@ export const backendApi = {
     api.delete<void>(`/org/locations/${encodeURIComponent(locationId)}/expenses/${encodeURIComponent(expenseId)}`),
 
   // ─── Sthan — Contacts ────────────────────────────────────────────────────
-  listSthanContacts: (locationId: string, page = 1, pageSize = 50) =>
+  listSthanContacts: (locationId: string, page = 1, pageSize = 10) =>
     api.get<{ items: SthanContactRowApi[]; total: number; totalPages: number }>(
       `/org/locations/${encodeURIComponent(locationId)}/contacts?page=${page}&pageSize=${pageSize}`,
     ),

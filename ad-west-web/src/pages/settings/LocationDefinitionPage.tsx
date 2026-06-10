@@ -45,7 +45,7 @@ export const LocationDefinitionPage: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
   const [levelFilter, setLevelFilter] = useState<LocationLevel | ''>('');
   const [isSaving, setIsSaving] = useState(false);
@@ -252,7 +252,7 @@ export const LocationDefinitionPage: React.FC = () => {
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button type="button" className="btn btn-secondary btn-md" onClick={resetForm} style={{ flex: 1 }}>Cancel</button>
                 <button type="submit" className="btn btn-primary btn-md" disabled={isSaving} style={{ flex: 2 }}>
-                  {isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create'}
+                  {isSaving ? (editingId ? 'Updating…' : 'Creating…') : editingId ? 'Update' : 'Create'}
                 </button>
               </div>
             </div>
@@ -278,19 +278,13 @@ export const LocationDefinitionPage: React.FC = () => {
             </button>
           ))}
         </div>
-        <div className="list-toolbar__meta">
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>Rows:</span>
-          {[10, 20, 50].map((ps) => (
-            <button key={ps} type="button" className={`page-size-pill${pageSize === ps ? ' is-active' : ''}`} onClick={() => { setPageSize(ps); setPage(1); }}>
-              {ps}
-            </button>
-          ))}
-          {!isLoading && (
+        {!isLoading && (
+          <div className="list-toolbar__meta">
             <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary-dark)' }}>
               {total} location{total !== 1 ? 's' : ''}
             </span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {isLoading ? (
@@ -375,6 +369,7 @@ export const LocationDefinitionPage: React.FC = () => {
           totalItems={total}
           pageSize={pageSize}
           onPageChange={setPage}
+          onPageSizeChange={(ps) => { setPageSize(ps); setPage(1); }}
         />
       </div>
       )}

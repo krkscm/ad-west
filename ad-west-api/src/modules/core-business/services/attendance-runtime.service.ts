@@ -37,7 +37,7 @@ export class AttendanceRuntimeService {
     totalPages: number;
   }> {
     const page = Math.max(1, params.page ?? 1);
-    const pageSize = Math.min(1000, Math.max(1, params.pageSize ?? 20));
+    const pageSize = Math.min(1000, Math.max(1, params.pageSize ?? 10));
 
     if (this.ctx.runtimeMode !== 'db' || !this.ctx.dataSource) {
       const search = (params.search ?? '').trim().toLowerCase();

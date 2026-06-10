@@ -283,7 +283,7 @@ export const RolesDefinitionPage: React.FC = () => {
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary btn-md" disabled={isSaving} style={{ flex: 2 }}>
-                  {isSaving ? 'Saving…' : editingRoleId ? 'Save Changes' : 'Create'}
+                  {isSaving ? (editingRoleId ? 'Updating…' : 'Creating…') : editingRoleId ? 'Update' : 'Create'}
                 </button>
               </div>
             </div>
@@ -307,24 +307,6 @@ export const RolesDefinitionPage: React.FC = () => {
               setPage(1);
             }}
           />
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>Show</span>
-          <select
-            className="form-input"
-            style={{ width: 'auto', padding: '6px 28px 6px 12px', marginBottom: 0, fontSize: '0.8rem', cursor: 'pointer' }}
-            value={String(pageSize)}
-            onChange={(event) => {
-              setPageSize(Number(event.target.value));
-              setPage(1);
-            }}
-          >
-            <option value="5">5</option>
-            <option value="10">10</option>
-            <option value="20">20</option>
-            <option value="50">50</option>
-          </select>
         </div>
 
         <div className="list-toolbar__meta">
@@ -446,6 +428,7 @@ export const RolesDefinitionPage: React.FC = () => {
           totalItems={total}
           pageSize={pageSize}
           onPageChange={setPage}
+          onPageSizeChange={(ps) => { setPageSize(ps); setPage(1); }}
         />
       </div>
       )}

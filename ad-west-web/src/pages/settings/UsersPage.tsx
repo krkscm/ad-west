@@ -20,8 +20,6 @@ const toUiError = (error: unknown, fallback: string): string => {
   return error.message || fallback;
 };
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50];
-
 interface UsersPageProps {
   onAdd: () => void;
   onEdit: (user: UserApi) => void;
@@ -36,7 +34,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onAdd, onEdit, editingUser
   const [users, setUsers] = useState<UserApi[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(0);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -155,19 +153,6 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onAdd, onEdit, editingUser
             onChange={(e) => handleSearchChange(e.target.value)}
           />
         </div>
-        <div className="list-toolbar__meta">
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>Rows:</span>
-          {PAGE_SIZE_OPTIONS.map((ps) => (
-            <button
-              key={ps}
-              type="button"
-              className={`page-size-pill${pageSize === ps ? ' is-active' : ''}`}
-              onClick={() => handlePageSizeChange(ps)}
-            >
-              {ps}
-            </button>
-          ))}
-        </div>
       </div>
 
       {isLoading ? (
@@ -244,6 +229,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ onAdd, onEdit, editingUser
             totalItems={total}
             pageSize={pageSize}
             onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
           />
         </div>
       )}

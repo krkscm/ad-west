@@ -47,7 +47,7 @@ export const ApprovalWorkflowPage: React.FC<ApprovalWorkflowPageProps> = ({
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -158,14 +158,6 @@ export const ApprovalWorkflowPage: React.FC<ApprovalWorkflowPageProps> = ({
             Clear
           </button>
         )}
-        <div className="list-toolbar__meta">
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary-dark)' }}>Rows:</span>
-          {[10, 20, 50].map((ps) => (
-            <button key={ps} type="button" className={`page-size-pill${pageSize === ps ? ' is-active' : ''}`} onClick={() => { setPageSize(ps); setPage(1); }}>
-              {ps}
-            </button>
-          ))}
-        </div>
       </div>
 
       {isLoading ? (
@@ -251,6 +243,7 @@ export const ApprovalWorkflowPage: React.FC<ApprovalWorkflowPageProps> = ({
           totalItems={total}
           pageSize={pageSize}
           onPageChange={setPage}
+          onPageSizeChange={(ps) => { setPageSize(ps); setPage(1); }}
         />
       </div>
       )}

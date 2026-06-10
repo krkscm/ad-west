@@ -132,7 +132,7 @@ export class CoreBusinessController {
   ) {
     return this.service.listLocationsFromDb({
       page: page ? parseInt(page, 10) : 1,
-      pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+      pageSize: pageSize ? parseInt(pageSize, 10) : 10,
       search,
       level,
     });
@@ -165,7 +165,7 @@ export class CoreBusinessController {
   ) {
     return this.service.listSreniDefinitionsFromDb({
       page: page ? parseInt(page, 10) : 1,
-      pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+      pageSize: pageSize ? parseInt(pageSize, 10) : 10,
       search,
     });
   }
@@ -207,7 +207,7 @@ export class CoreBusinessController {
   ) {
     return this.service.listAttendanceMetricsFromDb({
       page: page ? parseInt(page, 10) : 1,
-      pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+      pageSize: pageSize ? parseInt(pageSize, 10) : 10,
       search,
       sreniId,
     });
@@ -250,7 +250,7 @@ export class CoreBusinessController {
   ) {
     return this.service.listPermissionsFromDb({
       page: page ? parseInt(page, 10) : 1,
-      pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+      pageSize: pageSize ? parseInt(pageSize, 10) : 10,
       search,
       locationId,
     });
@@ -285,7 +285,7 @@ export class CoreBusinessController {
   ) {
     return this.service.listPermissionSetsFromDb({
       page: page ? parseInt(page, 10) : 1,
-      pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+      pageSize: pageSize ? parseInt(pageSize, 10) : 10,
       search,
     });
   }
@@ -325,7 +325,7 @@ export class CoreBusinessController {
   ) {
     return this.service.listUsersFromDb({
       page: page ? parseInt(page, 10) : 1,
-      pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+      pageSize: pageSize ? parseInt(pageSize, 10) : 10,
       search,
     });
   }
@@ -772,7 +772,7 @@ export class CoreBusinessController {
     return this.service.listSreniContacts(
       sreniId,
       page ? parseInt(page, 10) : 1,
-      pageSize ? parseInt(pageSize, 10) : 50,
+      pageSize ? parseInt(pageSize, 10) : 10,
       actor,
       {
         filter: gadaFilter,
@@ -943,7 +943,7 @@ export class CoreBusinessController {
     return this.service.listJoinUsSubmissions(
       {
         page: page ? parseInt(page, 10) : 1,
-        pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+        pageSize: pageSize ? parseInt(pageSize, 10) : 10,
         status: status ?? 'pending',
         sreniId: sreniId?.trim() || undefined,
         search: search?.trim() || undefined,
@@ -974,7 +974,7 @@ export class CoreBusinessController {
   ) {
     return this.service.listAllContacts(
       page ? parseInt(page, 10) : 1,
-      pageSize ? parseInt(pageSize, 10) : 50,
+      pageSize ? parseInt(pageSize, 10) : 10,
       {
         sreniId: sreniId?.trim() || undefined,
         sthanId: sthanId?.trim() || undefined,
@@ -1478,7 +1478,7 @@ export class CoreBusinessController {
     return this.service.listSthanContacts(
       locationId,
       page ? parseInt(page, 10) : 1,
-      pageSize ? parseInt(pageSize, 10) : 50,
+      pageSize ? parseInt(pageSize, 10) : 10,
     );
   }
 
