@@ -13,6 +13,13 @@ import { UpdateMenuItemDto } from '../dto/update-menu-item.dto';
 import { CryptoService } from './crypto.service';
 import { UserStore } from '../interfaces/user-store.interface';
 
+/** Not assignable via Admin Management menu grants (super-admin / settings only). */
+const MENU_GRANT_EXCLUDED_KEYS = new Set([
+  'settings-approval-workflows',
+  'settings-approval-workflows-form',
+  'ai-chatbot',
+]);
+
 const DEFAULT_MENUS: Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>[] = [
   { key: 'dashboard',                    label: 'Dashboard',           parentKey: null,       icon: '📊', sortOrder: 10, active: true },
   { key: 'governance',                   label: 'General Services',    parentKey: null,       icon: '🧭', sortOrder: 15, active: true },
@@ -263,10 +270,12 @@ export class MenuManagementService {
     menuKeys: string[],
     principal: AuthPrincipal,
   ): Promise<string[]> {
+    menuKeys = menuKeys.filter((key) => !MENU_GRANT_EXCLUDED_KEYS.has(key));
+
     const admin = await this.userStore.getAdminById(adminUserId);
     if (admin && this.isSuperAdmin(admin)) {
       const allMenus = await this.listMenuItems(true);
-      menuKeys = allMenus.map((menu) => menu.key);
+      menuKeys = allMenus.map((menu) => menu.key).filter((key) => !MENU_GRANT_EXCLUDED_KEYS.has(key));
     }
 
     // Validate all keys exist

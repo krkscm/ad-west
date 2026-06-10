@@ -333,7 +333,7 @@ export function JobApplicationsPage() {
                 />
               </div>
               <button className="btn btn-primary" onClick={() => void handleSave()} disabled={saving}>
-                {saving ? 'Saving…' : 'Save & Record Update'}
+                {saving ? 'Updating…' : 'Update'}
               </button>
             </div>
           </div>

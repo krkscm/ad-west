@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useToast } from '../common/Toast'
 import { backendApi, AdminUserApi, MenuItemApi, RoleDefinitionApi } from '../../utils/backendApi'
+import { isAdminMenuGrantSelectable } from '../../utils/adminMenuGrantExclusions'
 import { SwitchToggle } from '../common/SwitchToggle'
 
 const toUiError = (e: unknown, fallback: string): string => {
@@ -89,7 +90,7 @@ export const AdminUserForm: React.FC<Props> = ({ editingId, onBack, onSaved }) =
           setActive(row.active)
           setRoleDefinitionId(row.roleDefinitionId ?? '')
         }
-        setGrantedKeys(new Set(grants.menuKeys))
+        setGrantedKeys(new Set(grants.menuKeys.filter(isAdminMenuGrantSelectable)))
       }
     } catch (e) {
       addToast(toUiError(e, 'Failed to load data.'), 'error')
@@ -137,7 +138,10 @@ export const AdminUserForm: React.FC<Props> = ({ editingId, onBack, onSaved }) =
       }
 
       if (adminId) {
-        await backendApi.setAdminMenuGrants(adminId, Array.from(grantedKeys))
+        await backendApi.setAdminMenuGrants(
+          adminId,
+          Array.from(grantedKeys).filter(isAdminMenuGrantSelectable),
+        )
       }
 
       if (!editingId) {
@@ -162,8 +166,12 @@ export const AdminUserForm: React.FC<Props> = ({ editingId, onBack, onSaved }) =
     })
   }
 
-  const topMenus = menus.filter(m => !m.parentKey)
-  const childrenOf = (key: string) => menus.filter(m => m.parentKey === key)
+  const selectableMenus = useMemo(
+    () => menus.filter((m) => m.active && isAdminMenuGrantSelectable(m.key)),
+    [menus],
+  )
+  const topMenus = selectableMenus.filter(m => !m.parentKey)
+  const childrenOf = (key: string) => selectableMenus.filter(m => m.parentKey === key)
   const grantedCount = grantedKeys.size
 
   if (isLoading) {
@@ -340,7 +348,7 @@ export const AdminUserForm: React.FC<Props> = ({ editingId, onBack, onSaved }) =
             </div>
 
             <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
-              <button type="button" onClick={() => setGrantedKeys(new Set(menus.map(m => m.key)))}
+              <button type="button" onClick={() => setGrantedKeys(new Set(selectableMenus.map(m => m.key)))}
                 style={{ flex: 1, padding: '7px', borderRadius: '8px', border: '1px solid var(--border-dark)', background: 'transparent', color: 'var(--text-secondary-dark)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>
                 Select All
               </button>
@@ -407,7 +415,7 @@ export const AdminUserForm: React.FC<Props> = ({ editingId, onBack, onSaved }) =
             Cancel
           </button>
           <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ minWidth: '140px' }}>
-            {isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create'}
+            {isSaving ? (editingId ? 'Updating…' : 'Creating…') : editingId ? 'Update' : 'Create'}
           </button>
         </div>
       </form>

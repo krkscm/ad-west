@@ -569,7 +569,7 @@ export const SthanCalendarPage: React.FC<Props> = ({ locationId, locationName })
               onClick={() => void handleSave()}
               disabled={!formTitle.trim()}
             >
-              {editingEvent ? 'Save Changes' : 'Create'}
+              {editingEvent ? 'Update' : 'Create'}
             </button>
           </div>
         </div>

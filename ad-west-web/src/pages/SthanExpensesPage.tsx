@@ -207,7 +207,7 @@ export const SthanExpensesPage: React.FC<Props> = ({ locationId, locationName })
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
             <button type="button" className="btn btn-secondary" onClick={() => { setSelected(null); setReviewNotes(''); }}>Cancel</button>
             <button type="button" className="btn btn-primary" disabled={reviewing} onClick={() => void handleReview(selected)}>
-              {reviewing ? 'Saving…' : 'Save Decision'}
+              {reviewing ? 'Updating…' : 'Update Decision'}
             </button>
           </div>
         </div>

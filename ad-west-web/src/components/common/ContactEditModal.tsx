@@ -220,7 +220,7 @@ export const ContactEditModal: React.FC<ContactEditModalProps> = ({
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border-dark)' }}>
           <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSaving}>Cancel</button>
           <button type="submit" className="btn btn-primary" disabled={isSaving}>
-            {isSaving ? 'Saving…' : 'Save Changes'}
+            {isSaving ? 'Updating…' : 'Update'}
           </button>
         </div>
       </form>

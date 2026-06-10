@@ -686,7 +686,7 @@ export const ApprovalWorkflowFormPage: React.FC<ApprovalWorkflowFormPageProps> =
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
             <button type="button" className="btn btn-secondary btn-md" onClick={onBack}>Cancel</button>
             <button type="submit" className="btn btn-primary btn-md" disabled={isSaving}>
-              {isSaving ? 'Saving...' : editingId ? 'Save Changes' : 'Create'}
+              {isSaving ? (editingId ? 'Updating…' : 'Creating…') : editingId ? 'Update' : 'Create'}
             </button>
           </div>
         </form>
@@ -782,7 +782,7 @@ export const ApprovalWorkflowFormPage: React.FC<ApprovalWorkflowFormPageProps> =
                 )}
                 <button type="submit" className="btn btn-primary" disabled={isSavingStage}
                   style={{ background: modeMeta.color, borderColor: modeMeta.color }}>
-                  {isSavingStage ? 'Saving...' : sfEditingId ? 'Update' : 'Add Node'}
+                  {isSavingStage ? (sfEditingId ? 'Updating…' : 'Creating…') : sfEditingId ? 'Update' : 'Create'}
                 </button>
               </div>
             </form>

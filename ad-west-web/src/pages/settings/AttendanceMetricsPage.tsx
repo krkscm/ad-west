@@ -521,7 +521,7 @@ export const AttendanceMetricsPage: React.FC = () => {
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                   <button type="button" className="btn btn-secondary btn-md" onClick={() => void closeForm()}>Cancel</button>
                   <button type="submit" className="btn btn-primary btn-md" disabled={isSaving}>
-                    {isSaving ? 'Saving...' : editingId ? 'Save Changes' : 'Create'}
+                    {isSaving ? (editingId ? 'Updating…' : 'Creating…') : editingId ? 'Update' : 'Create'}
                   </button>
                 </div>
               </form>

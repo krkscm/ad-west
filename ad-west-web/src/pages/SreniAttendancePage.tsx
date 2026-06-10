@@ -196,7 +196,7 @@ export const SreniAttendancePage: React.FC<Props> = ({ sreniId, sreniName }) => 
                             onClick={() => void saveCapture(row.event.id, metric.id, values)}
                             disabled={savingKey === rowKey}
                           >
-                            {savingKey === rowKey ? 'Saving…' : 'Save'}
+                            {savingKey === rowKey ? 'Updating…' : 'Update'}
                           </button>
                         </div>
 

@@ -189,7 +189,7 @@ export function ReimbursementPage() {
               />
             </div>
             <FormActions>
-              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Create'}</button>
+              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Creating…' : 'Create'}</button>
               <button type="button" className="btn btn-secondary" onClick={() => { setMode('list'); setForm(BLANK) }}>Cancel</button>
             </FormActions>
           </form>
@@ -340,7 +340,7 @@ export function ReimbursementPage() {
                   <label className="form-label">Notes</label>
                   <textarea className="form-input" value={reviewNotes} onChange={(e) => setReviewNotes(e.target.value)} rows={3} style={{ resize: 'vertical' }} />
                 </div>
-                <button className="btn btn-primary" onClick={handleReview} disabled={reviewing}>{reviewing ? 'Saving…' : 'Save Review'}</button>
+                <button className="btn btn-primary" onClick={handleReview} disabled={reviewing}>{reviewing ? 'Updating…' : 'Update Review'}</button>
               </div>
             )}
           </div>

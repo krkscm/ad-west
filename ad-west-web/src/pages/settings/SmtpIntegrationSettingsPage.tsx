@@ -224,7 +224,7 @@ export const SmtpIntegrationSettingsPage: React.FC = () => {
               hint={config?.updatedAt ? `Last updated: ${new Date(config.updatedAt).toLocaleString()}` : 'Not saved yet'}
             >
               <button className="btn btn-primary" type="submit" disabled={isSaving}>
-                {isSaving ? 'Saving…' : 'Save Configuration'}
+                {isSaving ? 'Updating…' : 'Update Configuration'}
               </button>
             </FormActions>
           </FormSection>

@@ -344,7 +344,7 @@ export const TableLayoutModal: React.FC<Props> = ({
                 disabled={saving}
                 onClick={() => void handleUpdate()}
               >
-                {saving ? 'Saving…' : `Update "${editingLayout?.name}"`}
+                {saving ? 'Updating…' : `Update "${editingLayout?.name}"`}
               </button>
             </div>
           )}

@@ -166,7 +166,7 @@ export function JobPostingsPage() {
 
             <FormActions>
               <button type="button" className="btn btn-secondary" onClick={() => setMode('list')}>Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : mode === 'create' ? 'Create' : 'Save Changes'}</button>
+              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? (mode === 'create' ? 'Creating…' : 'Updating…') : mode === 'create' ? 'Create' : 'Update'}</button>
             </FormActions>
           </FormSection>
         </form>

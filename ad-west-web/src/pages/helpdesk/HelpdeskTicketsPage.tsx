@@ -205,7 +205,7 @@ export function HelpdeskTicketsPage() {
                 />
               </div>
               <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-                {saving ? 'Saving…' : 'Save Changes'}
+                {saving ? 'Updating…' : 'Update'}
               </button>
             </div>
           </div>

@@ -185,7 +185,7 @@ export const ReportMetricsPage: React.FC = () => {
             <FormActions>
               <button type="button" className="btn btn-secondary" onClick={closeForm}>Cancel</button>
               <button type="submit" className="btn btn-primary" disabled={isSaving}>
-                {isSaving ? 'Saving…' : editingId ? 'Save Changes' : 'Create'}
+                {isSaving ? (editingId ? 'Updating…' : 'Creating…') : editingId ? 'Update' : 'Create'}
               </button>
             </FormActions>
           </form>

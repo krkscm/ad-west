@@ -140,7 +140,7 @@ const LocationReportMetricsPanel: React.FC = () => {
             <FormActions>
               <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
               <button type="submit" className="btn btn-primary" disabled={saving}>
-                {saving ? 'Saving…' : editingId ? 'Save Changes' : 'Create'}
+                {saving ? (editingId ? 'Updating…' : 'Creating…') : editingId ? 'Update' : 'Create'}
               </button>
             </FormActions>
           </form>
