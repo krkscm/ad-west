@@ -35,6 +35,7 @@ export interface RoleDefinitionApi {
   name: string
   active: boolean
   level: 'ZONE' | 'STHAN' | 'DIVISION'
+  canApproveReimbursements: boolean
   createdBy: string
   createdAt: string
   updatedBy: string
@@ -1135,12 +1136,14 @@ export const backendApi = {
     name: string
     level: RoleDefinitionApi['level']
     active?: boolean
+    canApproveReimbursements?: boolean
   }) => api.post<RoleDefinitionApi>('/role-definitions', payload),
 
   updateRoleDefinition: (id: string, payload: {
     code?: string
     name?: string
     level?: RoleDefinitionApi['level']
+    canApproveReimbursements?: boolean
   }) => api.patch<RoleDefinitionApi>(`/role-definitions/${id}`, payload),
 
   updateRoleDefinitionStatus: (id: string, active: boolean) =>
@@ -2121,6 +2124,8 @@ export const backendApi = {
     return api.get<{ items: ReimbursementApi[] }>(`/member-services/reimbursements${qs}`)
   },
   listMyReimbursements: () => api.get<{ items: ReimbursementApi[] }>('/member-services/reimbursements/my'),
+  getReimbursementAccess: () => api.get<{ canReview: boolean }>('/member-services/reimbursements/access'),
+  listReimbursementReviewQueue: () => api.get<{ items: ReimbursementApi[] }>('/member-services/reimbursements/review-queue'),
   createReimbursement: (payload: { category: ReimbursementCategory; description: string; amount: number; currency?: string; asDraft?: boolean; receiptFile?: File }) => {
     const form = new FormData()
     form.append('category', payload.category)

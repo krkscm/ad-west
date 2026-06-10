@@ -60,6 +60,7 @@ export class RoleDefinitionsService {
         name: (row) => row.name,
         level: (row) => row.level,
         active: (row) => String(row.active),
+        canApproveReimbursements: (row) => String(row.canApproveReimbursements),
       });
     }
 
@@ -68,6 +69,7 @@ export class RoleDefinitionsService {
       name: (row) => row.name,
       level: (row) => row.level,
       active: (row) => row.active,
+      canApproveReimbursements: (row) => row.canApproveReimbursements,
     }, (a, b) => a.name.localeCompare(b.name));
 
     const total = rows.length;
@@ -98,6 +100,7 @@ export class RoleDefinitionsService {
       name: dto.name.trim(),
       active: dto.active ?? true,
       level: dto.level,
+      canApproveReimbursements: dto.canApproveReimbursements ?? false,
       createdBy: principal.userId,
       createdAt: now,
       updatedBy: principal.userId,
@@ -129,6 +132,10 @@ export class RoleDefinitionsService {
 
     if (dto.level !== undefined) {
       role.level = dto.level;
+    }
+
+    if (dto.canApproveReimbursements !== undefined) {
+      role.canApproveReimbursements = dto.canApproveReimbursements;
     }
 
     role.updatedBy = principal.userId;

@@ -89,9 +89,20 @@ export interface ApprovalWorkflowRuntimeItem {
   updatedAt: string;
 }
 
+export interface ApprovalRuntimeTargetSyncContext {
+  item: ApprovalWorkflowRuntimeItem;
+  workflow: ApprovalWorkflowDefinition;
+  principal: AuthPrincipal;
+  decision: 'approved' | 'rejected';
+  note?: string;
+}
+
+export type ApprovalRuntimeTargetSyncHandler = (ctx: ApprovalRuntimeTargetSyncContext) => Promise<void>;
+
 @Injectable()
 export class ApprovalWorkflowDefinitionsService {
   private readonly runtimeItems = new Map<string, ApprovalWorkflowRuntimeItem>();
+  private readonly runtimeTargetSyncHandlers = new Map<string, ApprovalRuntimeTargetSyncHandler>();
 
   constructor(
     @Inject(APPROVAL_WORKFLOW_STORE)
@@ -334,7 +345,35 @@ export class ApprovalWorkflowDefinitionsService {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
-  listMyRuntimeItems(principal: AuthPrincipal, status?: ApprovalWorkflowRuntimeItem['status']): ApprovalWorkflowRuntimeItem[] {
+  registerRuntimeTargetSyncHandler(
+    workflowCode: string,
+    handler: ApprovalRuntimeTargetSyncHandler,
+  ): void {
+    this.runtimeTargetSyncHandlers.set(workflowCode.trim().toUpperCase(), handler);
+  }
+
+  async findWorkflowByCode(code: string): Promise<ApprovalWorkflowDefinition | undefined> {
+    return this.store.findByCode(code);
+  }
+
+  async canActorReviewWorkflowByCode(code: string, principal: AuthPrincipal): Promise<boolean> {
+    if (principal.roles.includes(AdminRole.SUPER_ADMIN)) return true;
+
+    const workflow = await this.store.findByCode(code);
+    if (!workflow?.isActive || !workflow.stages.length) return false;
+
+    for (const stage of workflow.stages) {
+      if (await this.isActorEligibleForStage(stage, principal)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  async listMyRuntimeItems(
+    principal: AuthPrincipal,
+    status?: ApprovalWorkflowRuntimeItem['status'],
+  ): Promise<ApprovalWorkflowRuntimeItem[]> {
     const isSuperAdmin = principal.roles.includes(AdminRole.SUPER_ADMIN);
     const effectiveStatus = status ?? 'pending';
     const rows = Array.from(this.runtimeItems.values()).filter(
@@ -343,15 +382,29 @@ export class ApprovalWorkflowDefinitionsService {
     if (isSuperAdmin) {
       return rows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     }
-    // For non-super-admins, exclude stages they've already voted on
-    return rows
-      .filter((item) =>
-        item.currentStageIds.length > 0 &&
-        item.stageStates.some(
-          (s) => s.status === 'pending' && !s.approvals.includes(principal.userId),
-        ),
-      )
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+
+    const eligible: ApprovalWorkflowRuntimeItem[] = [];
+    for (const item of rows) {
+      if (!item.currentStageIds.length) continue;
+      const workflow = await this.requireWorkflow(item.workflowId);
+      for (const stageId of item.currentStageIds) {
+        const stage = workflow.stages.find((row) => row.id === stageId);
+        if (!stage) continue;
+        const stageState = item.stageStates.find((row) => row.stageId === stageId);
+        if (stageState?.status !== 'pending' || stageState.approvals.includes(principal.userId)) {
+          continue;
+        }
+        try {
+          await this.assertActorCanReviewStage(stage, principal);
+          eligible.push(item);
+          break;
+        } catch {
+          // Current user is not an approver for this stage.
+        }
+      }
+    }
+
+    return eligible.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
   getRuntimeItem(itemId: string): ApprovalWorkflowRuntimeItem {
@@ -465,6 +518,7 @@ export class ApprovalWorkflowDefinitionsService {
       item.currentStageIds = [];
       item.updatedAt = now;
       this.runtimeItems.set(item.id, item);
+      await this.syncRuntimeTargetState(item, workflow, principal, dto.decision, dto.note);
       return item;
     }
 
@@ -479,7 +533,21 @@ export class ApprovalWorkflowDefinitionsService {
     this.refreshStageProgress(item, workflow);
     item.updatedAt = now;
     this.runtimeItems.set(item.id, item);
+    await this.syncRuntimeTargetState(item, workflow, principal, dto.decision, dto.note);
     return item;
+  }
+
+  private async syncRuntimeTargetState(
+    item: ApprovalWorkflowRuntimeItem,
+    workflow: ApprovalWorkflowDefinition,
+    principal: AuthPrincipal,
+    decision: 'approved' | 'rejected',
+    note?: string,
+  ): Promise<void> {
+    if (item.status !== 'approved' && item.status !== 'rejected') return;
+    const handler = this.runtimeTargetSyncHandlers.get(workflow.code.trim().toUpperCase());
+    if (!handler) return;
+    await handler({ item, workflow, principal, decision, note });
   }
 
   async addStage(workflowId: string, dto: CreateApprovalWorkflowStageDto, principal: AuthPrincipal): Promise<ApprovalWorkflowStage> {
@@ -592,15 +660,12 @@ export class ApprovalWorkflowDefinitionsService {
     item.currentStageIds = pendingStages;
   }
 
-  private async assertActorCanReviewStage(stage: ApprovalWorkflowStage, principal: AuthPrincipal): Promise<void> {
+  private async isActorEligibleForStage(
+    stage: ApprovalWorkflowStage,
+    principal: AuthPrincipal,
+  ): Promise<boolean> {
     const roleDefinitionIds = stage.approverRoleDefinitionIds ?? [];
-    if (!roleDefinitionIds.length) {
-      throw new ForbiddenException('Stage does not allow role-based reviewers');
-    }
-
-    if (!this.dataSource) {
-      throw new ForbiddenException('Role-based reviewer validation requires DB persistence mode');
-    }
+    if (!roleDefinitionIds.length || !this.dataSource) return false;
 
     const [adminRows, userRows] = await Promise.all([
       this.dataSource.query(
@@ -619,7 +684,20 @@ export class ApprovalWorkflowDefinitionsService {
     if (adminRoleId) actorRoleIds.add(adminRoleId);
     if (userRoleId) actorRoleIds.add(userRoleId);
 
-    const hasEligibleRole = roleDefinitionIds.some((roleId) => actorRoleIds.has(roleId));
+    return roleDefinitionIds.some((roleId) => actorRoleIds.has(roleId));
+  }
+
+  private async assertActorCanReviewStage(stage: ApprovalWorkflowStage, principal: AuthPrincipal): Promise<void> {
+    const roleDefinitionIds = stage.approverRoleDefinitionIds ?? [];
+    if (!roleDefinitionIds.length) {
+      throw new ForbiddenException('Stage does not allow role-based reviewers');
+    }
+
+    if (!this.dataSource) {
+      throw new ForbiddenException('Role-based reviewer validation requires DB persistence mode');
+    }
+
+    const hasEligibleRole = await this.isActorEligibleForStage(stage, principal);
     if (!hasEligibleRole) {
       throw new ForbiddenException('Current user role is not eligible to review this stage');
     }

@@ -36,6 +36,7 @@ import { ImapService } from './services/imap.service';
 import { MenuManagementService } from './services/menu-management.service';
 import { PostgresRoleDefinitionStoreService } from './services/postgres-role-definition-store.service';
 import { PostgresStoreService } from './services/postgres-store.service';
+import { RoleDefinitionSchemaBootstrapService } from './services/role-definition-schema-bootstrap.service';
 import { RoleDefinitionsService } from './services/role-definitions.service';
 import { TableLayoutService } from './services/table-layout.service';
 
@@ -60,7 +61,7 @@ export class UserManagementModule {
       InMemoryStoreService,
       InMemoryRoleDefinitionStoreService,
       ...(useDbPersistence ? [PostgresStoreService] : []),
-      ...(useDbPersistence ? [PostgresRoleDefinitionStoreService] : []),
+      ...(useDbPersistence ? [PostgresRoleDefinitionStoreService, RoleDefinitionSchemaBootstrapService] : []),
       {
         provide: USER_STORE,
         useFactory: (

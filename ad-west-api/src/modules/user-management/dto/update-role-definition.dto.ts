@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, MaxLength, MinLength, Matches } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString, MaxLength, MinLength, Matches } from 'class-validator';
 import { RoleLevel } from '../enums/role-level.enum';
 
 export class UpdateRoleDefinitionDto {
@@ -18,4 +18,8 @@ export class UpdateRoleDefinitionDto {
   @IsOptional()
   @IsEnum(RoleLevel)
   level?: RoleLevel;
+
+  @IsOptional()
+  @IsBoolean()
+  canApproveReimbursements?: boolean;
 }

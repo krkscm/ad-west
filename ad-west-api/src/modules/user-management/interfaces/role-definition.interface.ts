@@ -6,6 +6,7 @@ export interface RoleDefinition {
   name: string;
   active: boolean;
   level: RoleLevel;
+  canApproveReimbursements: boolean;
   createdBy: string;
   createdAt: string;
   updatedBy: string;

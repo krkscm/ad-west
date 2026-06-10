@@ -34,6 +34,8 @@ const BLANK = { category: 'other' as ReimbursementCategory, description: '', amo
 const MAX_RECEIPT_BYTES = 500 * 1024
 const ALLOWED_RECEIPT_EXT = ['.jpg', '.jpeg', '.png', '.pdf']
 
+const normalizeRoleKey = (value: string) => value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+
 export function ReimbursementPage() {
   const { adminUser } = useAuth()
   const { addToast } = useToast()
@@ -41,11 +43,13 @@ export function ReimbursementPage() {
   const { options: categoryOptions, labelByValue: categoryLabel } = useEnumOptions('expense_category')
   const { options: statusOptions, labelByValue: statusLabel } = useEnumOptions('expense_status')
   const reviewStatusOptions = statusOptions.filter((o) =>
-    ['pending_review', 'approved', 'rejected'].includes(o.value),
+    ['approved', 'rejected'].includes(o.value),
   )
-  const isSuperAdmin = adminUser?.roles?.some((r: any) => r.role === 'SUPER_ADMIN') ?? false
+  const isSuperAdmin = adminUser?.roles?.some((r) => normalizeRoleKey(String(r.role)) === 'SUPERADMIN') ?? false
 
   const [items, setItems] = useState<ReimbursementApi[]>([])
+  const [canReview, setCanReview] = useState(false)
+  const [listView, setListView] = useState<'mine' | 'review'>('mine')
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState<Mode>('list')
   const [filterStatus, setFilterStatus] = useState('')
@@ -108,19 +112,44 @@ export function ReimbursementPage() {
     setFilterStatus('')
   }
 
+  const showReviewPanel = isSuperAdmin || canReview
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = isSuperAdmin
-        ? await backendApi.listReimbursements({ status: filterStatus || undefined })
-        : await backendApi.listMyReimbursements()
+      if (isSuperAdmin) {
+        const res = await backendApi.listReimbursements({ status: filterStatus || undefined })
+        setItems(res.items)
+        return
+      }
+      if (canReview && listView === 'review') {
+        const res = await backendApi.listReimbursementReviewQueue()
+        setItems(res.items)
+        return
+      }
+      const res = await backendApi.listMyReimbursements()
       setItems(res.items)
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to load', 'error')
     } finally {
       setLoading(false)
     }
-  }, [filterStatus, isSuperAdmin, addToast])
+  }, [filterStatus, isSuperAdmin, canReview, listView, addToast])
+
+  useEffect(() => {
+    let cancelled = false
+    void backendApi.getReimbursementAccess()
+      .then((access) => {
+        if (!cancelled) {
+          setCanReview(access.canReview)
+          if (access.canReview && !isSuperAdmin) setListView('review')
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCanReview(false)
+      })
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => { load() }, [load])
 
@@ -261,7 +290,9 @@ export function ReimbursementPage() {
       <PageHeader
         icon="💰"
         title="Reimbursements"
-        subtitle="Raise and track expense reimbursement requests."
+        subtitle={canReview && !isSuperAdmin
+          ? 'Submit your requests and review pending reimbursements assigned to your role.'
+          : 'Raise and track expense reimbursement requests.'}
         stats={[
           { label: 'Total', value: items.length, variant: 'info' },
           { label: 'Pending', value: submittedCount, variant: 'warning' },
@@ -275,15 +306,37 @@ export function ReimbursementPage() {
         }
       />
 
-      {isSuperAdmin && (
+      {(isSuperAdmin || canReview) && (
         <div className="glass-panel" style={{ padding: '14px 18px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)' }}>Status</label>
-          <div style={{ width: '220px', maxWidth: '100%' }}>
-            <select className="form-input" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ marginBottom: 0 }}>
-              <option value="">All Statuses</option>
-              {statusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
+          {canReview && !isSuperAdmin && (
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                className={`btn ${listView === 'review' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setListView('review')}
+              >
+                Pending Review
+              </button>
+              <button
+                type="button"
+                className={`btn ${listView === 'mine' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setListView('mine')}
+              >
+                My Requests
+              </button>
+            </div>
+          )}
+          {isSuperAdmin && (
+            <>
+              <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary-dark)' }}>Status</label>
+              <div style={{ width: '220px', maxWidth: '100%' }}>
+                <select className="form-input" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ marginBottom: 0 }}>
+                  <option value="">All Statuses</option>
+                  {statusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -392,7 +445,7 @@ export function ReimbursementPage() {
                 <strong>Reviewer note:</strong> {selected.reviewerNotes}
               </div>
             )}
-            {isSuperAdmin && ['submitted', 'pending_review'].includes(selected.status) && (
+            {showReviewPanel && ['submitted', 'pending_review'].includes(selected.status) && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div className="form-group">
                   <label className="form-label">Decision</label>

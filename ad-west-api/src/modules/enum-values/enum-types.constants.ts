@@ -158,6 +158,7 @@ export const PLATFORM_ENUM_SEEDS: EnumSeedRow[] = [
   { enumType: ENUM_TYPES.APPROVAL_TARGET_TYPE, value: 'document_submission', label: 'Document submission', sortOrder: 10, active: true, parentValue: null },
   { enumType: ENUM_TYPES.APPROVAL_TARGET_TYPE, value: 'report_submission', label: 'Report submission', sortOrder: 20, active: true, parentValue: null },
   { enumType: ENUM_TYPES.APPROVAL_TARGET_TYPE, value: 'calendar_event', label: 'Calendar event', sortOrder: 30, active: true, parentValue: null },
+  { enumType: ENUM_TYPES.APPROVAL_TARGET_TYPE, value: 'reimbursement_request', label: 'Reimbursement request', sortOrder: 40, active: true, parentValue: null },
   { enumType: ENUM_TYPES.APPROVAL_ITEM_STATUS, value: 'pending', label: 'Pending', sortOrder: 10, active: true, parentValue: null },
   { enumType: ENUM_TYPES.APPROVAL_ITEM_STATUS, value: 'approved', label: 'Approved', sortOrder: 20, active: true, parentValue: null },
   { enumType: ENUM_TYPES.APPROVAL_ITEM_STATUS, value: 'rejected', label: 'Rejected', sortOrder: 30, active: true, parentValue: null },

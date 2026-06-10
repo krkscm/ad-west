@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
@@ -46,6 +47,19 @@ export class ReimbursementController {
   @Get('my')
   async listMine(@CurrentUser() user: AuthPrincipal) {
     return { items: await this.svc.listReimbursements(user.userId) };
+  }
+
+  @Get('access')
+  async access(@CurrentUser() user: AuthPrincipal) {
+    return { canReview: await this.svc.canReviewReimbursements(user) };
+  }
+
+  @Get('review-queue')
+  async reviewQueue(@CurrentUser() user: AuthPrincipal) {
+    if (!(await this.svc.canReviewReimbursements(user))) {
+      throw new ForbiddenException('Your role is not configured as a reimbursement approver');
+    }
+    return { items: await this.svc.listReimbursementsForReview() };
   }
 
   @Get(':id')
@@ -97,11 +111,10 @@ export class ReimbursementController {
     @Body() body: { status: ReimbursementStatus; reviewerNotes?: string },
     @CurrentUser() user: AuthPrincipal,
   ) {
-    const r = await this.svc.updateReimbursementStatus(id, {
+    const r = await this.svc.reviewReimbursement(id, {
       status: body.status,
       reviewerNotes: body.reviewerNotes,
-      reviewedBy: user.userId,
-    });
+    }, user);
     if (!r) throw new NotFoundException('Reimbursement not found');
     return r;
   }

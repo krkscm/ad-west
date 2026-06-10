@@ -1,10 +1,12 @@
-import { BadRequestException, Injectable, Optional } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { mkdir, writeFile } from 'fs/promises';
 import { extname, join } from 'path';
+import { AuthPrincipal } from '@modules/user-management/interfaces/auth-principal.interface';
 import { ReimbursementRequestEntity } from './entities/reimbursement-request.entity';
+import { ReimbursementApprovalConfigService } from './reimbursement-approval-config.service';
 import { SpecialEventEntity } from './entities/special-event.entity';
 import { EventSreniLinkEntity } from './entities/event-sreni-link.entity';
 import { EventFormFieldEntity } from './entities/event-form-field.entity';
@@ -108,6 +110,7 @@ export class MemberServicesService {
     @Optional() @InjectRepository(NotificationEntity)
     private readonly notificationRepo?: Repository<NotificationEntity>,
     @Optional() @InjectDataSource() private readonly dataSource?: DataSource,
+    @Optional() private readonly reimbursementApprovalConfig?: ReimbursementApprovalConfigService,
   ) {
     this.enumConfig = new EnumConfigService(this.useDb() ? 'db' : 'in-memory', this.dataSource);
   }
@@ -201,6 +204,21 @@ export class MemberServicesService {
     return items;
   }
 
+  async listReimbursementsForReview(): Promise<ReimbursementRequest[]> {
+    const items = await this.listReimbursements();
+    return items.filter((row) => row.status === 'pending_review' || row.status === 'submitted');
+  }
+
+  async canReviewReimbursements(principal: AuthPrincipal): Promise<boolean> {
+    if (!this.reimbursementApprovalConfig) return false;
+    return this.reimbursementApprovalConfig.canPrincipalReview(principal);
+  }
+
+  async assertCanReviewReimbursements(principal: AuthPrincipal): Promise<void> {
+    if (await this.canReviewReimbursements(principal)) return;
+    throw new ForbiddenException('Your role is not configured as a reimbursement approver');
+  }
+
   async getReimbursement(id: string): Promise<ReimbursementRequest | undefined> {
     if (this.useDb()) {
       const row = await this.reimbursementRepo!.findOne({ where: { id } });
@@ -209,17 +227,19 @@ export class MemberServicesService {
     return this.memReimbursements.get(id);
   }
 
-  async createReimbursement(data: {
-    submittedBy: string;
-    category: ReimbursementCategory;
-    description: string;
-    amount: number;
-    currency?: string;
-    asDraft?: boolean;
-    receiptFile?: Express.Multer.File;
-  }): Promise<ReimbursementRequest> {
+  async createReimbursement(
+    data: {
+      submittedBy: string;
+      category: ReimbursementCategory;
+      description: string;
+      amount: number;
+      currency?: string;
+      asDraft?: boolean;
+      receiptFile?: Express.Multer.File;
+    },
+  ): Promise<ReimbursementRequest> {
     await this.enumConfig.validate(ENUM_TYPES.EXPENSE_CATEGORY, data.category, 'Category');
-    const status: ReimbursementStatus = data.asDraft ? 'draft' : 'submitted';
+    const status: ReimbursementStatus = data.asDraft ? 'draft' : 'pending_review';
     await this.enumConfig.validate(ENUM_TYPES.EXPENSE_STATUS, status, 'Status');
     const now = new Date();
     const id = randomUUID();
@@ -290,10 +310,37 @@ export class MemberServicesService {
     return updated;
   }
 
-  async submitReimbursement(id: string, submittedBy: string): Promise<ReimbursementRequest | undefined> {
+  async submitReimbursement(
+    id: string,
+    submittedBy: string,
+  ): Promise<ReimbursementRequest | undefined> {
     const r = await this.getReimbursement(id);
     if (!r || r.submittedBy !== submittedBy || r.status !== 'draft') return undefined;
-    return this.updateReimbursementStatus(id, { status: 'submitted' });
+    return this.updateReimbursementStatus(id, { status: 'pending_review' });
+  }
+
+  async reviewReimbursement(
+    id: string,
+    data: { status: ReimbursementStatus; reviewerNotes?: string },
+    principal: AuthPrincipal,
+  ): Promise<ReimbursementRequest | undefined> {
+    if (!['approved', 'rejected'].includes(data.status)) {
+      throw new BadRequestException('Review decision must be approved or rejected');
+    }
+
+    const existing = await this.getReimbursement(id);
+    if (!existing) return undefined;
+    if (!['submitted', 'pending_review'].includes(existing.status)) {
+      throw new BadRequestException('Only pending reimbursement requests can be reviewed');
+    }
+
+    await this.assertCanReviewReimbursements(principal);
+
+    return this.updateReimbursementStatus(id, {
+      status: data.status,
+      reviewerNotes: data.reviewerNotes,
+      reviewedBy: principal.userId,
+    });
   }
 
   async deleteReimbursement(id: string): Promise<boolean> {

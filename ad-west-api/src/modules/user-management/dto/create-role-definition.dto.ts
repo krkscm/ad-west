@@ -19,4 +19,8 @@ export class CreateRoleDefinitionDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  canApproveReimbursements?: boolean;
 }

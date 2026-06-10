@@ -163,7 +163,7 @@ type ActiveTab =
 
 const SETTINGS_ROOT_TAB: ActiveTab = 'settings-admins';
 
-/** Temporarily hide Approval Workflows from Settings navigation. */
+/** Approval Workflows settings UI is disabled for this application for now. */
 const SHOW_APPROVAL_WORKFLOWS_TAB = false;
 
 const getInitialTab = (): ActiveTab =>
@@ -1691,7 +1691,7 @@ export const AdminDashboardPage: React.FC = () => {
                 </button>
               )}
 
-              {SHOW_APPROVAL_WORKFLOWS_TAB && (
+              {SHOW_APPROVAL_WORKFLOWS_TAB && showAdminsTab && (
                 <button
                   onClick={() => setActiveTab('settings-approval-workflows')}
                   className={`sidebar-nav-item${activeTab === 'settings-approval-workflows' ? ' is-active' : ''}`}
@@ -2058,7 +2058,7 @@ export const AdminDashboardPage: React.FC = () => {
           {activeTab === 'governance-join-us-review' && showJoinUsReviewTab && <JoinUsReviewPage />}
           {activeTab === 'governance-contacts' && showContactsTab && <GlobalContactsPage />}
 
-          {SHOW_APPROVAL_WORKFLOWS_TAB && activeTab === 'settings-approval-workflows' && (
+          {SHOW_APPROVAL_WORKFLOWS_TAB && showAdminsTab && activeTab === 'settings-approval-workflows' && (
             <ApprovalWorkflowPage
               onAdd={() => openApprovalWorkflowForm(null)}
               onEdit={(workflow: ApprovalWorkflowDefinitionApi) => openApprovalWorkflowForm(workflow)}
@@ -2066,7 +2066,7 @@ export const AdminDashboardPage: React.FC = () => {
             />
           )}
 
-          {SHOW_APPROVAL_WORKFLOWS_TAB && activeTab === 'settings-approval-workflows-form' && (
+          {SHOW_APPROVAL_WORKFLOWS_TAB && showAdminsTab && activeTab === 'settings-approval-workflows-form' && (
             <ApprovalWorkflowFormPage
               editingWorkflow={approvalWorkflowFormEdit}
               onBack={closeApprovalWorkflowForm}

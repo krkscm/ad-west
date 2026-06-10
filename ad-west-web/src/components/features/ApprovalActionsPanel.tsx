@@ -15,9 +15,19 @@ const statusLabel: Record<string, string> = {
   rejected: 'Rejected',
 }
 
+type ApprovalActionRow = {
+  id: string
+  kind: 'workflow' | 'reimbursement'
+  summary: string
+  status: 'pending' | 'approved' | 'rejected'
+  updatedAt: string
+  workflowItem?: ApprovalWorkflowRuntimeItemApi
+  reimbursementId?: string
+}
+
 export const ApprovalActionsPanel: React.FC = () => {
   const { addToast } = useToast()
-  const [items, setItems] = useState<ApprovalWorkflowRuntimeItemApi[]>([])
+  const [items, setItems] = useState<ApprovalActionRow[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [notes, setNotes] = useState<Record<string, string>>({})
@@ -43,8 +53,8 @@ export const ApprovalActionsPanel: React.FC = () => {
     { key: '__actions__', filterable: false, sortable: false, width: '56px' },
   ], [])
 
-  const accessors = useMemo<Record<string, ClientFilterAccessor<ApprovalWorkflowRuntimeItemApi>>>(() => ({
-    summary: { getValue: (item) => item.summary || item.targetId },
+  const accessors = useMemo<Record<string, ClientFilterAccessor<ApprovalActionRow>>>(() => ({
+    summary: { getValue: (item) => item.summary },
     status: { getValue: (item) => item.status, match: 'exact' },
     updated: { getValue: (item) => new Date(item.updatedAt).toLocaleString() },
   }), [])
@@ -66,7 +76,36 @@ export const ApprovalActionsPanel: React.FC = () => {
   const load = async () => {
     setLoading(true)
     try {
-      const rows = await backendApi.listMyApprovalActions()
+      const [workflowItems, access] = await Promise.all([
+        backendApi.listMyApprovalActions('pending').catch(() => []),
+        backendApi.getReimbursementAccess().catch(() => ({ canReview: false })),
+      ])
+
+      const rows: ApprovalActionRow[] = workflowItems.map((item) => ({
+        id: item.id,
+        kind: 'workflow',
+        summary: item.summary || item.targetId,
+        status: item.status,
+        updatedAt: item.updatedAt,
+        workflowItem: item,
+      }))
+
+      if (access.canReview) {
+        const queue = await backendApi.listReimbursementReviewQueue()
+        for (const reimbursement of queue.items) {
+          const amount = `${reimbursement.currency} ${Number(reimbursement.amount).toFixed(2)}`
+          rows.push({
+            id: `reimbursement-${reimbursement.id}`,
+            kind: 'reimbursement',
+            summary: `Reimbursement: ${reimbursement.description} (${amount})`,
+            status: 'pending',
+            updatedAt: reimbursement.updatedAt,
+            reimbursementId: reimbursement.id,
+          })
+        }
+      }
+
+      rows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       setItems(rows)
     } catch (error) {
       setItems([])
@@ -86,21 +125,28 @@ export const ApprovalActionsPanel: React.FC = () => {
   )
 
   const handleReview = async (
-    item: ApprovalWorkflowRuntimeItemApi,
+    item: ApprovalActionRow,
     decision: 'approved' | 'rejected',
   ) => {
-    const stageId = item.currentStageIds[0]
-    if (!stageId) {
-      addToast('No active stage found for this item.', 'error')
-      return
-    }
     setBusyId(item.id)
     try {
-      await backendApi.reviewApprovalWorkflowRuntimeItem(item.id, {
-        stageId,
-        decision,
-        note: notes[item.id]?.trim() || undefined,
-      })
+      if (item.kind === 'reimbursement' && item.reimbursementId) {
+        await backendApi.reviewReimbursement(item.reimbursementId, {
+          status: decision,
+          reviewerNotes: notes[item.id]?.trim() || undefined,
+        })
+      } else if (item.workflowItem) {
+        const stageId = item.workflowItem.currentStageIds[0]
+        if (!stageId) {
+          addToast('No active stage found for this item.', 'error')
+          return
+        }
+        await backendApi.reviewApprovalWorkflowRuntimeItem(item.workflowItem.id, {
+          stageId,
+          decision,
+          note: notes[item.id]?.trim() || undefined,
+        })
+      }
       addToast(`Decision recorded: ${decision}`, 'success')
       await load()
     } catch (error) {
@@ -115,7 +161,7 @@ export const ApprovalActionsPanel: React.FC = () => {
       <div style={{ marginBottom: '24px' }}>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '4px' }}>📝 My Approvals</h2>
         <p style={{ color: 'var(--text-secondary-dark)', fontSize: '0.875rem' }}>
-          Review approval items assigned to you and submit your decision.
+          Review pending reimbursements and other items assigned to your role.
         </p>
         <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <span className="badge badge-warning">Pending: {pendingCount}</span>
@@ -160,7 +206,7 @@ export const ApprovalActionsPanel: React.FC = () => {
                 const isPending = item.status === 'pending'
                 return (
                   <tr key={item.id}>
-                    <td style={{ fontWeight: 600 }}>{item.summary || item.targetId}</td>
+                    <td style={{ fontWeight: 600 }}>{item.summary}</td>
                     <td>{statusLabel[item.status] ?? item.status}</td>
                     <td>{new Date(item.updatedAt).toLocaleString()}</td>
                     <td>
@@ -182,7 +228,7 @@ export const ApprovalActionsPanel: React.FC = () => {
                     <td style={{ textAlign: 'right', verticalAlign: 'middle' }}>
                       {isPending ? (
                         <TableRowActionsMenu
-                          ariaLabel={`Actions for ${item.summary || item.targetId}`}
+                          ariaLabel={`Actions for ${item.summary}`}
                           actions={[
                             { label: 'Approve', onClick: () => void handleReview(item, 'approved'), disabled: busy },
                             { label: 'Reject', tone: 'danger', onClick: () => void handleReview(item, 'rejected'), disabled: busy },

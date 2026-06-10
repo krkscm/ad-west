@@ -18,6 +18,9 @@ export class RoleDefinitionEntity {
   @Column({ type: 'varchar', length: 16 })
   level!: RoleLevel;
 
+  @Column({ name: 'can_approve_reimbursements', type: 'boolean', default: false })
+  canApproveReimbursements!: boolean;
+
   @Column({ name: 'created_by', type: 'varchar', length: 64 })
   createdBy!: string;
 

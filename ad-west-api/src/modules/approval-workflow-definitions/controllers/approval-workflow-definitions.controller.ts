@@ -102,7 +102,7 @@ export class ApprovalWorkflowDefinitionsController {
   listMyRuntimeItems(
     @CurrentUser() principal: AuthPrincipal,
     @Query('status') status?: 'pending' | 'approved' | 'rejected',
-  ): ApprovalWorkflowRuntimeItem[] {
+  ): Promise<ApprovalWorkflowRuntimeItem[]> {
     return this.service.listMyRuntimeItems(principal, status);
   }
 

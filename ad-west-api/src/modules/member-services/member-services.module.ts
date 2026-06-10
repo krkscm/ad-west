@@ -8,6 +8,7 @@ import { EventSreniLinkEntity } from './entities/event-sreni-link.entity';
 import { EventFormFieldEntity } from './entities/event-form-field.entity';
 import { EventRegistrationEntity } from './entities/event-registration.entity';
 import { NotificationEntity } from './entities/notification.entity';
+import { ReimbursementApprovalConfigService } from './reimbursement-approval-config.service';
 import { MemberServicesService } from './member-services.service';
 import {
   NotificationsAdminController,
@@ -37,7 +38,7 @@ export class MemberServicesModule {
         NotificationsAdminController,
         PublicEventsController,
       ],
-      providers: [CryptoService, GatewayAdminAuthGuard, MemberServicesService],
+      providers: [CryptoService, GatewayAdminAuthGuard, ReimbursementApprovalConfigService, MemberServicesService],
     };
   }
 }

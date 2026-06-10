@@ -11,6 +11,7 @@ import { TableNoResultsRow } from '../../components/common/TableNoResultsRow';
 import { useTableColumnFilters } from '../../hooks/useTableColumnFilters';
 import { useTableSort } from '../../hooks/useTableSort';
 import { isListFilterActive } from '../../utils/tableListUtils';
+import { SwitchToggle } from '../../components/common/SwitchToggle';
 import { backendApi, RoleDefinitionApi, type ListSortParams } from '../../utils/backendApi';
 
 type RoleLevel = RoleDefinitionApi['level'];
@@ -67,6 +68,7 @@ export const RolesDefinitionPage: React.FC = () => {
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [level, setLevel] = useState<RoleLevel>('ZONE');
+  const [canApproveReimbursements, setCanApproveReimbursements] = useState(false);
 
   const sortedRoles = useMemo(
     () => [...roles].sort((a, b) => a.code.localeCompare(b.code)),
@@ -78,6 +80,7 @@ export const RolesDefinitionPage: React.FC = () => {
     setCode('');
     setName('');
     setLevel('ZONE');
+    setCanApproveReimbursements(false);
     setFormOpen(false);
   };
 
@@ -125,6 +128,14 @@ export const RolesDefinitionPage: React.FC = () => {
       ],
     },
     {
+      key: 'canApproveReimbursements',
+      label: 'Reimb. Approver',
+      filterable: true,
+      filterType: 'select',
+      placeholder: 'All',
+      options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }],
+    },
+    {
       key: 'active',
       label: 'Status',
       filterable: true,
@@ -153,6 +164,7 @@ export const RolesDefinitionPage: React.FC = () => {
           code: cleanCode,
           name: cleanName,
           level,
+          canApproveReimbursements,
         });
         addToast('Role updated successfully.', 'success');
       } else {
@@ -161,6 +173,7 @@ export const RolesDefinitionPage: React.FC = () => {
           name: cleanName,
           level,
           active: true,
+          canApproveReimbursements,
         });
         addToast('Role created successfully.', 'success');
       }
@@ -179,6 +192,7 @@ export const RolesDefinitionPage: React.FC = () => {
     setCode(role.code);
     setName(role.name);
     setLevel(role.level);
+    setCanApproveReimbursements(role.canApproveReimbursements ?? false);
     setFormOpen(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -233,7 +247,7 @@ export const RolesDefinitionPage: React.FC = () => {
       <PageHeader
         icon="🎭"
         title="Roles Definition"
-        subtitle="Configure and maintain standard roles and administrative level assignments."
+        subtitle="Configure roles, levels, and reimbursement approval authority per role."
         actions={
           <button
             type="button"
@@ -330,6 +344,15 @@ export const RolesDefinitionPage: React.FC = () => {
                 </select>
               </div>
 
+              <div className="form-group" style={{ marginBottom: 0, gridColumn: '1 / -1' }}>
+                <SwitchToggle
+                  checked={canApproveReimbursements}
+                  onChange={setCanApproveReimbursements}
+                  labelOn="Can approve reimbursements — users with this role may review pending requests"
+                  labelOff="Cannot approve reimbursements"
+                />
+              </div>
+
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button type="button" className="btn btn-secondary btn-md" onClick={resetForm} style={{ flex: 1 }}>
                   Cancel
@@ -404,7 +427,7 @@ export const RolesDefinitionPage: React.FC = () => {
           </thead>
           <tbody>
             {sortedRoles.length === 0 ? (
-              <TableNoResultsRow colSpan={5} title="No roles match your filters" onClearFilters={clearAllFilters} />
+              <TableNoResultsRow colSpan={6} title="No roles match your filters" onClearFilters={clearAllFilters} />
             ) : sortedRoles.map((role) => (
                 <tr
                   key={role.id}
@@ -433,6 +456,22 @@ export const RolesDefinitionPage: React.FC = () => {
                   {/* Level */}
                   <td style={{ padding: '14px 20px' }}>
                     <LevelBadge level={role.level} />
+                  </td>
+
+                  {/* Reimbursement approver */}
+                  <td style={{ padding: '14px 20px' }}>
+                    <span
+                      className={role.canApproveReimbursements ? 'badge badge-success' : 'badge'}
+                      style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        padding: '3px 8px',
+                        background: role.canApproveReimbursements ? undefined : 'var(--chip-bg-soft)',
+                        color: role.canApproveReimbursements ? undefined : 'var(--text-secondary-dark)',
+                      }}
+                    >
+                      {role.canApproveReimbursements ? 'Yes' : 'No'}
+                    </span>
                   </td>
 
                   {/* Status */}
