@@ -70,9 +70,9 @@ const buildSreniCalendarExportData = (
     title: event.title,
     startTime: event.startTime,
     endTime: event.endTime,
-    scope: event.scope,
+    scope: event.scope ?? (event.kind === 'special_event' ? 'special' : ''),
     sthans: event.scope === 'sthan'
-      ? event.sthanIds.map((id) => options.sthanById.get(id)?.name ?? id).join('; ')
+      ? (event.sthanIds ?? []).map((id) => options.sthanById.get(id)?.name ?? id).join('; ')
       : '',
     notes: event.notes ?? '',
     createdBy: event.createdBy,

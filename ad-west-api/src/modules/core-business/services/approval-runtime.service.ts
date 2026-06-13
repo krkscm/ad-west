@@ -26,6 +26,8 @@ export interface ApprovalRuntimeContext {
   findApprovalItem(itemId: string): ApprovalItemRecord;
   scheduleApprovalItemStatePersistence(itemId: string): void;
   scheduleApprovalWorkflowStatePersistence(workflowId: string): void;
+  resolveActorIdentityIds(principal: AuthPrincipal): string[];
+  onApprovalItemFinalized?: (item: ApprovalItemRecord) => void;
 }
 
 export class ApprovalRuntimeService {
@@ -125,6 +127,7 @@ export class ApprovalRuntimeService {
 
   listMyApprovalActions(principal: AuthPrincipal, status?: string): ApprovalItemRecord[] {
     this.applyApprovalEscalations();
+    const actorIds = new Set(this.ctx.resolveActorIdentityIds(principal));
 
     const rows = Array.from(this.ctx.approvalItems.values()).filter((item) => {
       if (status && item.status !== status) {
@@ -133,10 +136,11 @@ export class ApprovalRuntimeService {
 
       if (item.status === 'pending') {
         const workflow = this.ctx.findApprovalWorkflow(item.workflowId);
-        return this.getPendingApproverIds(item, workflow).includes(principal.userId);
+        return this.getPendingApproverIds(item, workflow).some((id) => actorIds.has(id));
       }
 
-      return item.status === 'need_more_information' && item.submittedBy === principal.userId;
+      return item.status === 'need_more_information'
+        && (actorIds.has(item.submittedBy) || item.submittedBy === principal.userId);
     });
 
     return rows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -165,7 +169,8 @@ export class ApprovalRuntimeService {
     }
 
     const approverIds = this.getPendingApproverIds(item, workflow);
-    if (!approverIds.includes(principal.userId)) {
+    const actorIds = new Set(this.ctx.resolveActorIdentityIds(principal));
+    if (!approverIds.some((id) => actorIds.has(id))) {
       throw new UnauthorizedException('You are not assigned to review this approval item');
     }
 
@@ -258,6 +263,9 @@ export class ApprovalRuntimeService {
     item.updatedAt = item.reviewedAt;
     this.ctx.approvalItems.set(item.id, item);
     this.ctx.scheduleApprovalItemStatePersistence(item.id);
+    if (item.status === 'approved' || item.status === 'rejected') {
+      this.ctx.onApprovalItemFinalized?.(item);
+    }
     return item;
   }
 
@@ -266,7 +274,8 @@ export class ApprovalRuntimeService {
     if (item.status !== 'need_more_information') {
       throw new BadRequestException('Only items needing more information can be resubmitted');
     }
-    if (item.submittedBy !== principal.userId) {
+    const actorIds = new Set(this.ctx.resolveActorIdentityIds(principal));
+    if (!actorIds.has(item.submittedBy) && item.submittedBy !== principal.userId) {
       throw new UnauthorizedException('Only the original requester can resubmit this item');
     }
 
@@ -320,6 +329,9 @@ export class ApprovalRuntimeService {
     this.ctx.approvalWorkflows.set(workflow.id, workflow);
     this.ctx.scheduleApprovalWorkflowStatePersistence(workflow.id);
 
+    const requester = this.resolveRequesterUser(principal);
+    const submittedBy = requester?.id ?? principal.userId;
+
     const item: ApprovalItemRecord = {
       id: this.ctx.newId('api'),
       workflowId: workflow.id,
@@ -328,7 +340,7 @@ export class ApprovalRuntimeService {
       summary: payload.summary,
       status: 'pending',
       currentStepIndex: 0,
-      submittedBy: principal.userId,
+      submittedBy,
       escalationCount: 0,
       auditTrail: [
         {

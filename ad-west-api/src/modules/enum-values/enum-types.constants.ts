@@ -27,6 +27,9 @@ export const ENUM_TYPES = {
   DOCUMENT_ACCESS_LEVEL: 'document_access_level',
   // Calendar
   CALENDAR_EVENT_SCOPE: 'calendar_event_scope',
+  CALENDAR_APPROVAL_STATUS: 'calendar_approval_status',
+  CALENDAR_PRIORITY_TIER: 'calendar_priority_tier',
+  CALENDAR_FEED_KIND: 'calendar_feed_kind',
   // Programs & attendance
   PROGRAM_STATUS: 'program_status',
   REGISTRATION_STATUS: 'registration_status',
@@ -143,6 +146,17 @@ export const PLATFORM_ENUM_SEEDS: EnumSeedRow[] = [
   // Calendar
   { enumType: ENUM_TYPES.CALENDAR_EVENT_SCOPE, value: 'zone', label: 'Zone', sortOrder: 10, active: true, parentValue: null },
   { enumType: ENUM_TYPES.CALENDAR_EVENT_SCOPE, value: 'sthan', label: 'Sthan', sortOrder: 20, active: true, parentValue: null },
+  { enumType: ENUM_TYPES.CALENDAR_APPROVAL_STATUS, value: 'pending', label: 'Pending', sortOrder: 10, active: true, parentValue: null },
+  { enumType: ENUM_TYPES.CALENDAR_APPROVAL_STATUS, value: 'approved', label: 'Approved', sortOrder: 20, active: true, parentValue: null },
+  { enumType: ENUM_TYPES.CALENDAR_APPROVAL_STATUS, value: 'rejected', label: 'Rejected', sortOrder: 30, active: true, parentValue: null },
+  { enumType: ENUM_TYPES.CALENDAR_PRIORITY_TIER, value: 'special_event', label: 'Special Event', sortOrder: 10, active: true, parentValue: null },
+  { enumType: ENUM_TYPES.CALENDAR_PRIORITY_TIER, value: 'zone', label: 'Zone', sortOrder: 20, active: true, parentValue: null },
+  { enumType: ENUM_TYPES.CALENDAR_PRIORITY_TIER, value: 'sthan', label: 'Sthan', sortOrder: 30, active: true, parentValue: null },
+  { enumType: ENUM_TYPES.CALENDAR_PRIORITY_TIER, value: 'pending', label: 'Pending Approval', sortOrder: 40, active: true, parentValue: null },
+  { enumType: ENUM_TYPES.CALENDAR_PRIORITY_TIER, value: 'local', label: 'Local (Sthan)', sortOrder: 50, active: true, parentValue: null },
+  { enumType: ENUM_TYPES.CALENDAR_FEED_KIND, value: 'special_event', label: 'Special Event', sortOrder: 10, active: true, parentValue: null },
+  { enumType: ENUM_TYPES.CALENDAR_FEED_KIND, value: 'sreni_event', label: 'Sreni Event', sortOrder: 20, active: true, parentValue: null },
+  { enumType: ENUM_TYPES.CALENDAR_FEED_KIND, value: 'sthan_local', label: 'Sthan Local Event', sortOrder: 30, active: true, parentValue: null },
   // Programs
   { enumType: ENUM_TYPES.PROGRAM_STATUS, value: 'draft', label: 'Draft', sortOrder: 10, active: true, parentValue: null },
   { enumType: ENUM_TYPES.PROGRAM_STATUS, value: 'published', label: 'Published', sortOrder: 20, active: true, parentValue: null },

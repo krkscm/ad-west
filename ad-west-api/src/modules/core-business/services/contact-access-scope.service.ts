@@ -32,6 +32,11 @@ export class ContactAccessScopeService {
     private readonly permissions?: Map<string, PermissionRecord>,
   ) {}
 
+  async resolveSettingsUserId(principal: AuthPrincipal): Promise<string | undefined> {
+    const user = await this.resolveOrganizationalUser(principal);
+    return user?.id;
+  }
+
   async resolveScope(principal: AuthPrincipal): Promise<ContactAccessScope> {
     const user = await this.resolveOrganizationalUser(principal);
     if (!user) {

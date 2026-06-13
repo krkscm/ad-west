@@ -12,6 +12,8 @@ import {
 } from '../dto/core-business.dto';
 import { applyContactListSqlFilters, type ContactListQueryOptions } from '../utils/column-filter.util';
 import type {
+  CalendarApprovalStatus,
+  CalendarPriorityTier,
   SthanCalendarEventRecord,
   SthanContactRecord,
   SthanExpenseCategory,
@@ -19,8 +21,15 @@ import type {
   SthanExpenseStatus,
   SthanReportRecord,
 } from '../core-business.types';
+import {
+  CALENDAR_APPROVAL_STATUS,
+  CALENDAR_PRIORITY_TIER,
+} from '../constants/calendar-domain.constants';
 import { MemberContactPersistenceService } from './member-contact-persistence.service';
+import type { CalendarViewerContext } from './calendar-access.service';
 import type { SreniAdminRuntimeContext } from './sreni-admin-runtime.service';
+
+const SPECIAL_EVENT_COLOR = '#b45309';
 export interface SthanRuntimeContext {
   runtimeMode: 'in-memory' | 'db';
   dataSource?: DataSource;
@@ -310,6 +319,7 @@ export class SthanRuntimeService {
   }
 
   private mapCalendarRow(r: SthanCalendarDbRow): SthanCalendarEventRecord {
+    const approvalStatus = (r.approval_status ?? CALENDAR_APPROVAL_STATUS.APPROVED) as CalendarApprovalStatus;
     return {
       id: r.id,
       locationId: r.location_id,
@@ -319,15 +329,23 @@ export class SthanRuntimeService {
       endTime: typeof r.end_time === 'string' ? r.end_time.slice(0, 5) : String(r.end_time).slice(0, 5),
       color: r.color,
       notes: r.notes ?? undefined,
+      approvalStatus,
       createdBy: r.created_by,
       createdAt: this.ctx.toIsoTimestamp(r.created_at),
       updatedBy: r.updated_by,
       updatedAt: this.ctx.toIsoTimestamp(r.updated_at),
       source: 'local',
+      priorityTier: approvalStatus === CALENDAR_APPROVAL_STATUS.PENDING
+        ? CALENDAR_PRIORITY_TIER.PENDING
+        : CALENDAR_PRIORITY_TIER.LOCAL,
     };
   }
 
   private mapSreniCalendarRow(r: SreniCalendarDbRow, locationId: string): SthanCalendarEventRecord {
+    const approvalStatus = (r.approval_status ?? CALENDAR_APPROVAL_STATUS.APPROVED) as CalendarApprovalStatus;
+    const priorityTier: CalendarPriorityTier = r.scope === 'zone'
+      ? CALENDAR_PRIORITY_TIER.ZONE
+      : CALENDAR_PRIORITY_TIER.STHAN;
     return {
       id: r.id,
       locationId,
@@ -337,6 +355,7 @@ export class SthanRuntimeService {
       endTime: typeof r.end_time === 'string' ? r.end_time.slice(0, 5) : String(r.end_time).slice(0, 5),
       color: r.color,
       notes: r.notes ?? undefined,
+      approvalStatus,
       createdBy: r.created_by,
       createdAt: this.ctx.toIsoTimestamp(r.created_at),
       updatedBy: r.updated_by,
@@ -345,26 +364,110 @@ export class SthanRuntimeService {
       sreniId: r.sreni_id,
       scope: r.scope as 'zone' | 'sthan',
       readOnly: true,
+      priorityTier,
     };
+  }
+
+  private mapSpecialEventRow(
+    row: {
+      id: string;
+      title: string;
+      date_time: string | Date;
+      end_date_time: string | Date | null;
+      venue: string | null;
+      description: string | null;
+      created_by: string | null;
+      created_at: string | Date;
+      updated_at: string | Date;
+    },
+    locationId: string,
+  ): SthanCalendarEventRecord {
+    const start = new Date(row.date_time);
+    const end = row.end_date_time ? new Date(row.end_date_time) : new Date(start.getTime() + 60 * 60 * 1000);
+    const actor = row.created_by ?? 'system';
+    return {
+      id: `special-${row.id}`,
+      locationId,
+      title: row.title,
+      date: start.toISOString().slice(0, 10),
+      startTime: start.toISOString().slice(11, 16),
+      endTime: end.toISOString().slice(11, 16),
+      color: SPECIAL_EVENT_COLOR,
+      notes: [row.venue, row.description].filter(Boolean).join(' — ') || undefined,
+      approvalStatus: CALENDAR_APPROVAL_STATUS.APPROVED,
+      createdBy: actor,
+      createdAt: this.ctx.toIsoTimestamp(row.created_at),
+      updatedBy: actor,
+      updatedAt: this.ctx.toIsoTimestamp(row.updated_at),
+      source: 'special_event',
+      readOnly: true,
+      priorityTier: CALENDAR_PRIORITY_TIER.SPECIAL_EVENT,
+    };
+  }
+
+  private canViewLocalSthanEvent(
+    event: SthanCalendarEventRecord,
+    viewer: CalendarViewerContext,
+    principal: AuthPrincipal,
+  ): boolean {
+    if (event.source !== 'local' || event.approvalStatus !== CALENDAR_APPROVAL_STATUS.PENDING) {
+      return true;
+    }
+    if (viewer.isZoneViewer) {
+      return true;
+    }
+    const actor = (principal.email ?? principal.userId).trim().toLowerCase();
+    return event.createdBy.trim().toLowerCase() === actor;
+  }
+
+  private async listSpecialEventsForSthan(locationId: string): Promise<SthanCalendarEventRecord[]> {
+    if (!(this.ctx.runtimeMode === 'db' && this.ctx.dataSource)) return [];
+    try {
+      const rows = await this.ctx.dataSource.query(
+        `SELECT DISTINCT e.id::text, e.title, e.date_time, e.end_date_time, e.venue, e.description,
+                e.created_by, e.created_at, e.updated_at
+         FROM adwest.special_events e
+         INNER JOIN adwest.event_sreni_links l ON l.event_id = e.id
+         INNER JOIN adwest.sreni_contacts c ON c.sreni_id = l.sreni_id AND c.sthan_location_id = $1::uuid
+         ORDER BY e.date_time ASC`,
+        [locationId],
+      ) as Array<{
+        id: string;
+        title: string;
+        date_time: string | Date;
+        end_date_time: string | Date | null;
+        venue: string | null;
+        description: string | null;
+        created_by: string | null;
+        created_at: string | Date;
+        updated_at: string | Date;
+      }>;
+      return rows.map((row) => this.mapSpecialEventRow(row, locationId));
+    } catch {
+      return [];
+    }
   }
 
   private async listLinkedSreniCalendarEvents(locationId: string): Promise<SthanCalendarEventRecord[]> {
     if (!(this.ctx.runtimeMode === 'db' && this.ctx.dataSource)) return [];
     try {
       const rows = await this.ctx.dataSource.query(
-        `SELECT id::text, sreni_id, title, event_date, start_time, end_time, color, notes, scope,
+        `SELECT id::text, sreni_id, title, event_date, start_time, end_time, color, notes, scope, approval_status,
                 created_by, updated_by, created_at, updated_at
          FROM adwest.sreni_calendar_events e
-         WHERE scope = 'zone'
-            OR (
-              scope = 'sthan'
-              AND (
-                jsonb_array_length(sthan_ids) = 0
-                OR sthan_ids @> jsonb_build_array($1::text)
-              )
-            )
+         WHERE approval_status = $2
+           AND (
+             scope = 'zone'
+             OR (
+               scope = 'sthan'
+               AND (
+                 jsonb_array_length(sthan_ids) = 0
+                 OR sthan_ids @> jsonb_build_array($1::text)
+               )
+             )
+           )
          ORDER BY event_date ASC, start_time ASC, title ASC`,
-        [locationId],
+        [locationId, CALENDAR_APPROVAL_STATUS.APPROVED],
       ) as SreniCalendarDbRow[];
       return rows.map((r) => this.mapSreniCalendarRow(r, locationId));
     } catch {
@@ -373,30 +476,48 @@ export class SthanRuntimeService {
   }
 
   private sortCalendarEvents(events: SthanCalendarEventRecord[]): SthanCalendarEventRecord[] {
+    const rank: Record<CalendarPriorityTier, number> = {
+      [CALENDAR_PRIORITY_TIER.SPECIAL_EVENT]: 0,
+      [CALENDAR_PRIORITY_TIER.ZONE]: 1,
+      [CALENDAR_PRIORITY_TIER.STHAN]: 2,
+      [CALENDAR_PRIORITY_TIER.PENDING]: 3,
+      [CALENDAR_PRIORITY_TIER.LOCAL]: 4,
+    };
+
     return events.slice().sort((a, b) => {
+      const tierDiff = rank[(a.priorityTier ?? CALENDAR_PRIORITY_TIER.LOCAL)]
+        - rank[(b.priorityTier ?? CALENDAR_PRIORITY_TIER.LOCAL)];
+      if (tierDiff !== 0) return tierDiff;
       if (a.date !== b.date) return a.date.localeCompare(b.date);
       if (a.startTime !== b.startTime) return a.startTime.localeCompare(b.startTime);
       return a.title.localeCompare(b.title);
     });
   }
 
-  async listSthanCalendarEvents(locationId: string): Promise<SthanCalendarEventRecord[]> {
+  async listSthanCalendarEvents(
+    locationId: string,
+    viewer: CalendarViewerContext,
+    principal: AuthPrincipal,
+  ): Promise<SthanCalendarEventRecord[]> {
     if (this.ctx.runtimeMode === 'db' && this.ctx.dataSource) {
       try {
         await this.assertSthanLocation(locationId);
-        const [localRows, linkedRows] = await Promise.all([
+        const [localRows, linkedRows, specialRows] = await Promise.all([
           this.ctx.dataSource.query(
             `SELECT id::text, location_id::text, title, event_date, start_time, end_time, color, notes,
-                    created_by, updated_by, created_at, updated_at
+                    approval_status, created_by, updated_by, created_at, updated_at
              FROM adwest.sthan_calendar_events
              WHERE location_id = $1::uuid
              ORDER BY event_date ASC, start_time ASC, title ASC`,
             [locationId],
           ) as Promise<SthanCalendarDbRow[]>,
           this.listLinkedSreniCalendarEvents(locationId),
+          this.listSpecialEventsForSthan(locationId),
         ]);
-        const local = localRows.map((r) => this.mapCalendarRow(r));
-        return this.sortCalendarEvents([...local, ...linkedRows]);
+        const local = localRows
+          .map((r) => this.mapCalendarRow(r))
+          .filter((event) => this.canViewLocalSthanEvent(event, viewer, principal));
+        return this.sortCalendarEvents([...specialRows, ...linkedRows, ...local]);
       } catch (error) {
         if (error instanceof NotFoundException || error instanceof BadRequestException) throw error;
         return [];
@@ -409,15 +530,16 @@ export class SthanRuntimeService {
     locationId: string,
     dto: CreateSthanCalendarEventDto,
     principal: AuthPrincipal,
+    _viewer: CalendarViewerContext,
   ): Promise<SthanCalendarEventRecord> {
     await this.assertSthanLocation(locationId);
     const actor = principal.email ?? principal.userId;
     const rows = await this.ctx.dataSource!.query(
       `INSERT INTO adwest.sthan_calendar_events
-         (location_id, title, event_date, start_time, end_time, color, notes, created_by, updated_by)
-       VALUES ($1::uuid, $2, $3::date, $4::time, $5::time, $6, $7, $8, $8)
+         (location_id, title, event_date, start_time, end_time, color, notes, approval_status, created_by, updated_by)
+       VALUES ($1::uuid, $2, $3::date, $4::time, $5::time, $6, $7, $8, $9, $9)
        RETURNING id::text, location_id::text, title, event_date, start_time, end_time, color, notes,
-                 created_by, updated_by, created_at, updated_at`,
+                 approval_status, created_by, updated_by, created_at, updated_at`,
       [
         locationId,
         dto.title.trim(),
@@ -426,6 +548,7 @@ export class SthanRuntimeService {
         dto.endTime,
         dto.color ?? '#6366f1',
         dto.notes?.trim() || null,
+        CALENDAR_APPROVAL_STATUS.PENDING,
         actor,
       ],
     ) as SthanCalendarDbRow[];
@@ -446,6 +569,7 @@ export class SthanRuntimeService {
     eventId: string,
     dto: UpdateSthanCalendarEventDto,
     principal: AuthPrincipal,
+    viewer: CalendarViewerContext,
   ): Promise<SthanCalendarEventRecord> {
     await this.assertSthanLocation(locationId);
     const actor = principal.email ?? principal.userId;
@@ -457,11 +581,12 @@ export class SthanRuntimeService {
            end_time = COALESCE($6::time, end_time),
            color = COALESCE($7, color),
            notes = CASE WHEN $8::boolean THEN $9 ELSE notes END,
+           approval_status = $11,
            updated_by = $10,
            updated_at = now()
        WHERE id = $1::uuid AND location_id = $2::uuid
        RETURNING id::text, location_id::text, title, event_date, start_time, end_time, color, notes,
-                 created_by, updated_by, created_at, updated_at`,
+                 approval_status, created_by, updated_by, created_at, updated_at`,
       [
         eventId,
         locationId,
@@ -473,12 +598,16 @@ export class SthanRuntimeService {
         dto.notes !== undefined,
         dto.notes?.trim() || null,
         actor,
+        CALENDAR_APPROVAL_STATUS.PENDING,
       ],
     ) as SthanCalendarDbRow[];
     if (!rows[0]) {
       throw new NotFoundException('Calendar event not found');
     }
     const event = this.mapCalendarRow(rows[0]);
+    if (!this.canViewLocalSthanEvent(event, viewer, principal)) {
+      throw new NotFoundException('Calendar event not found');
+    }
     this.ctx.createReportingApprovalRequest?.(
       {
         targetId: event.id,
@@ -494,8 +623,24 @@ export class SthanRuntimeService {
     locationId: string,
     eventId: string,
     principal: AuthPrincipal,
+    viewer: CalendarViewerContext,
   ): Promise<{ success: boolean; deletedBy: string }> {
     await this.assertSthanLocation(locationId);
+    const existing = await this.ctx.dataSource!.query(
+      `SELECT id::text, location_id::text, title, event_date, start_time, end_time, color, notes,
+              approval_status, created_by, updated_by, created_at, updated_at
+       FROM adwest.sthan_calendar_events
+       WHERE id = $1::uuid AND location_id = $2::uuid
+       LIMIT 1`,
+      [eventId, locationId],
+    ) as SthanCalendarDbRow[];
+    if (!existing[0]) {
+      throw new NotFoundException('Calendar event not found');
+    }
+    const event = this.mapCalendarRow(existing[0]);
+    if (!this.canViewLocalSthanEvent(event, viewer, principal)) {
+      throw new NotFoundException('Calendar event not found');
+    }
     const result = await this.ctx.dataSource!.query(
       `DELETE FROM adwest.sthan_calendar_events WHERE id = $1::uuid AND location_id = $2::uuid RETURNING id`,
       [eventId, locationId],
@@ -534,6 +679,7 @@ interface SthanCalendarDbRow {
   end_time: string;
   color: string;
   notes: string | null;
+  approval_status?: string | null;
   created_by: string;
   updated_by: string;
   created_at: string | Date;
@@ -550,6 +696,7 @@ interface SreniCalendarDbRow {
   color: string;
   notes: string | null;
   scope: string;
+  approval_status?: string | null;
   created_by: string;
   updated_by: string;
   created_at: string | Date;

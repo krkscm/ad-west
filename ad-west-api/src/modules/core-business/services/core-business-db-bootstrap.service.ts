@@ -29,6 +29,12 @@ export class CoreBusinessDbBootstrapService {
       await this.dataSource.query(
         `ALTER TABLE adwest.approval_items ADD COLUMN IF NOT EXISTS target_type VARCHAR(64)`,
       );
+      await this.dataSource.query(
+        `ALTER TABLE adwest.sreni_calendar_events ADD COLUMN IF NOT EXISTS approval_status varchar(20) NOT NULL DEFAULT 'approved'`,
+      );
+      await this.dataSource.query(
+        `ALTER TABLE adwest.sthan_calendar_events ADD COLUMN IF NOT EXISTS approval_status varchar(20) NOT NULL DEFAULT 'approved'`,
+      );
       await this.dataSource.query(`
         DO $$
         BEGIN

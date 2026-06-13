@@ -1,3 +1,9 @@
+import type {
+  CalendarApprovalStatus,
+  CalendarFeedKind,
+  CalendarPriorityTier,
+} from './constants/calendar-domain.constants';
+
 export type ProgramStatus = 'draft' | 'published' | 'archived';
 
 export interface ZoneRecord {
@@ -581,6 +587,12 @@ export interface ContactSreniTagRecord {
   updatedAt: string;
 }
 
+export type {
+  CalendarApprovalStatus,
+  CalendarFeedKind,
+  CalendarPriorityTier,
+} from './constants/calendar-domain.constants';
+
 export interface CalendarEventRecord {
   id: string;
   sreniId: string;
@@ -592,10 +604,42 @@ export interface CalendarEventRecord {
   notes?: string;
   scope: 'zone' | 'sthan';
   sthanIds: string[];
+  approvalStatus: CalendarApprovalStatus;
   createdBy: string;
   createdAt: string;
   updatedBy: string;
   updatedAt: string;
+}
+
+export interface CalendarFeedItemRecord {
+  id: string;
+  kind: CalendarFeedKind;
+  priorityTier: CalendarPriorityTier;
+  approvalStatus?: CalendarApprovalStatus;
+  title: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  color: string;
+  notes?: string;
+  sreniId?: string;
+  locationId?: string;
+  scope?: 'zone' | 'sthan';
+  sthanIds?: string[];
+  readOnly?: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedBy: string;
+  updatedAt: string;
+}
+
+export interface CalendarConflictWarning {
+  code: string;
+  message: string;
+  relatedSreniId?: string;
+  relatedSreniName?: string;
+  relatedEventId?: string;
+  relatedEventTitle?: string;
 }
 
 export interface AttendanceMetricRecord {
@@ -717,13 +761,15 @@ export interface SthanCalendarEventRecord {
   endTime: string;
   color: string;
   notes?: string;
+  approvalStatus: CalendarApprovalStatus;
   createdBy: string;
   createdAt: string;
   updatedBy: string;
   updatedAt: string;
   /** local = created on this Sthan calendar; sreni = synced from a Sreni calendar */
-  source: 'local' | 'sreni';
+  source: 'local' | 'sreni' | 'special_event';
   sreniId?: string;
   scope?: 'zone' | 'sthan';
   readOnly?: boolean;
+  priorityTier?: CalendarPriorityTier;
 }

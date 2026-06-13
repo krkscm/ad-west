@@ -38,16 +38,15 @@ const EVENT_COLORS = [
 const today = new Date();
 const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
 
-const loadManualSthanAccess = (adminId?: string): string[] => {
-  if (!adminId) return [];
-  try {
-    const stored = localStorage.getItem(`adwest-calendar-sthan-access-${adminId}`);
-    if (!stored) return [];
-    const parsed = JSON.parse(stored) as string[];
-    return Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string' && v.length > 0) : [];
-  } catch {
-    return [];
-  }
+const isEditableEvent = (ev: CalendarEventApi) => ev.kind !== 'special_event' && !ev.readOnly;
+
+const isSpecialEvent = (ev: CalendarEventApi) =>
+  ev.kind === 'special_event' || ev.priorityTier === 'special_event';
+
+const eventDisplayTitle = (ev: CalendarEventApi) => {
+  if (ev.approvalStatus === 'pending') return `${ev.title} (Pending)`;
+  if (isSpecialEvent(ev)) return `${ev.title} (Special Event)`;
+  return ev.title;
 };
 
 export const SreniCalendarPage: React.FC<Props> = ({ sreniId, sreniName }) => {
@@ -63,30 +62,22 @@ export const SreniCalendarPage: React.FC<Props> = ({ sreniId, sreniName }) => {
   const [month, setMonth] = useState(today.getMonth());
   const [events, setEvents] = useState<CalendarEventApi[]>([]);
   const [sthanLocations, setSthanLocations] = useState<LocationDefinitionApi[]>([]);
-  const [accessibleSthanIds, setAccessibleSthanIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [view, setView] = useState<'month' | 'agenda'>('month');
 
   const loadEvents = useCallback(async () => {
     setIsLoading(true);
     try {
-      const sthans = activeSthanLocations;
-      const manualSthanIds = loadManualSthanAccess(adminUser?.sub);
-      const allowedSthanIds = hasZoneRights ? sthans.map((loc) => loc.id) : manualSthanIds;
-
-      setSthanLocations(sthans);
-      setAccessibleSthanIds(allowedSthanIds);
-
-      const rows = await backendApi.listSreniCalendarEvents(sreniId, allowedSthanIds);
+      setSthanLocations(activeSthanLocations);
+      const rows = await backendApi.listSreniCalendarEvents(sreniId);
       setEvents(rows);
     } catch {
       setEvents([]);
       setSthanLocations([]);
-      setAccessibleSthanIds([]);
     } finally {
       setIsLoading(false);
     }
-  }, [adminUser?.sub, hasZoneRights, sreniId, activeSthanLocations]);
+  }, [sreniId, activeSthanLocations]);
 
   useEffect(() => {
     void loadEvents();
@@ -118,6 +109,7 @@ export const SreniCalendarPage: React.FC<Props> = ({ sreniId, sreniName }) => {
 
   const openEdit = (e: React.MouseEvent, ev: CalendarEventApi) => {
     e.stopPropagation();
+    if (!isEditableEvent(ev)) return;
     setEditingEvent(ev);
     setSelectedDate(ev.date);
     setFormTitle(ev.title);
@@ -125,7 +117,7 @@ export const SreniCalendarPage: React.FC<Props> = ({ sreniId, sreniName }) => {
     setFormEnd(ev.endTime);
     setFormColor(ev.color);
     setFormNotes(ev.notes ?? '');
-    setFormScope(ev.scope);
+    setFormScope(ev.scope ?? 'sthan');
     setFormSthanIds(ev.sthanIds ?? []);
     setModalOpen(true);
   };
@@ -145,6 +137,16 @@ export const SreniCalendarPage: React.FC<Props> = ({ sreniId, sreniName }) => {
     };
 
     try {
+      if (!editingEvent) {
+        const warnings = await backendApi.checkSreniCalendarConflicts(sreniId, payload);
+        if (warnings.length > 0) {
+          const proceed = window.confirm(
+            `Potential scheduling conflicts were detected:\n\n${warnings.map((w) => w.message).join('\n')}\n\nCreate this event anyway?`,
+          );
+          if (!proceed) return;
+        }
+      }
+
       if (editingEvent) {
         await backendApi.updateSreniCalendarEvent(sreniId, editingEvent.id, payload);
         addToast('Event updated and routed for approval.', 'success');
@@ -366,9 +368,9 @@ export const SreniCalendarPage: React.FC<Props> = ({ sreniId, sreniName }) => {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         {dayEvents.slice(0, 3).map(ev => (
                           <div
-                            key={ev.id}
+                            key={`${ev.kind ?? 'sreni'}-${ev.id}`}
                             onClick={e => openEdit(e, ev)}
-                            title={`${ev.startTime}–${ev.endTime}: ${ev.title}`}
+                            title={`${ev.startTime}–${ev.endTime}: ${eventDisplayTitle(ev)}`}
                             style={{
                               fontSize: '0.71rem',
                               fontWeight: 600,
@@ -377,13 +379,15 @@ export const SreniCalendarPage: React.FC<Props> = ({ sreniId, sreniName }) => {
                               background: ev.color + '20',
                               color: ev.color,
                               borderLeft: `3px solid ${ev.color}`,
+                              opacity: ev.approvalStatus === 'pending' ? 0.75 : 1,
+                              fontStyle: ev.approvalStatus === 'pending' ? 'italic' : 'normal',
                               overflow: 'hidden',
                               whiteSpace: 'nowrap',
                               textOverflow: 'ellipsis',
-                              cursor: 'pointer',
+                              cursor: isEditableEvent(ev) ? 'pointer' : 'default',
                             }}
                           >
-                            {ev.startTime} {ev.title}
+                            {ev.startTime} {eventDisplayTitle(ev)}
                           </div>
                         ))}
                         {dayEvents.length > 3 && (
@@ -428,7 +432,7 @@ export const SreniCalendarPage: React.FC<Props> = ({ sreniId, sreniName }) => {
                 >
                   <div style={{ width: '4px', height: '40px', borderRadius: '2px', background: ev.color, flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{ev.title}</div>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{eventDisplayTitle(ev)}</div>
                     <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary-dark)', marginTop: '2px' }}>
                       {label} · {ev.startTime}–{ev.endTime}
                     </div>
@@ -437,9 +441,9 @@ export const SreniCalendarPage: React.FC<Props> = ({ sreniId, sreniName }) => {
                         {ev.notes}
                       </div>
                     )}
-                    {ev.scope === 'sthan' && ev.sthanIds.length > 0 && (
+                    {ev.scope === 'sthan' && (ev.sthanIds?.length ?? 0) > 0 && (
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary-dark)', marginTop: '4px' }}>
-                        {ev.sthanIds.map((id) => sthanById.get(id)?.name ?? id).join(', ')}
+                        {(ev.sthanIds ?? []).map((id) => sthanById.get(id)?.name ?? id).join(', ')}
                       </div>
                     )}
                   </div>
@@ -522,11 +526,9 @@ export const SreniCalendarPage: React.FC<Props> = ({ sreniId, sreniName }) => {
                 }}
                 style={{ minHeight: '96px' }}
               >
-                {sthanLocations
-                  .filter((loc) => hasZoneRights || accessibleSthanIds.includes(loc.id))
-                  .map((loc) => (
-                    <option key={loc.id} value={loc.id}>{loc.name}</option>
-                  ))}
+                {sthanLocations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>{loc.name}</option>
+                ))}
               </select>
             </div>
           )}

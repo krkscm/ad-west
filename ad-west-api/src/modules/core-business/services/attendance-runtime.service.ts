@@ -6,6 +6,7 @@ import {
   UpdateAttendanceMetricDto,
   UpsertEventAttendanceCaptureDto,
 } from '../dto/core-business.dto';
+import type { CalendarViewerContext } from './calendar-access.service';
 import type {
   CalendarEventRecord,
   AttendanceMetricRecord,
@@ -19,10 +20,9 @@ export interface AttendanceRuntimeContext {
   runtimeMode: 'in-memory' | 'db';
   dataSource?: DataSource;
   newId(prefix: string): string;
-  hasZoneRights(principal: AuthPrincipal): boolean;
   canViewCreatorData(principal: AuthPrincipal, creatorUserId: string): boolean;
   toIsoTimestamp(value: string | Date): string;
-  listSreniCalendarEvents(sreniId: string, principal: AuthPrincipal, accessibleSthanIds: string[]): CalendarEventRecord[];
+  listSreniCalendarEvents(sreniId: string, viewer: CalendarViewerContext, principal: AuthPrincipal): CalendarEventRecord[];
   isTargetApproved(targetType: 'report_submission' | 'calendar_event', targetId: string): boolean;
 }
 
@@ -282,9 +282,9 @@ export class AttendanceRuntimeService {
   listSreniAttendanceListing(
     sreniId: string,
     principal: AuthPrincipal,
-    accessibleSthanIds: string[] = [],
+    viewer: CalendarViewerContext,
   ): Array<{ event: CalendarEventRecord; metrics: Array<{ metric: AttendanceMetricRecord; capture?: EventAttendanceCaptureRecord }> }> {
-    const visibleEvents = this.ctx.listSreniCalendarEvents(sreniId, principal, accessibleSthanIds)
+    const visibleEvents = this.ctx.listSreniCalendarEvents(sreniId, viewer, principal)
       .filter((event) => this.ctx.isTargetApproved('calendar_event', event.id));
     const eventsById = new Map(visibleEvents.map((event) => [event.id, event] as const));
 
@@ -334,14 +334,15 @@ export class AttendanceRuntimeService {
     eventId: string,
     dto: UpsertEventAttendanceCaptureDto,
     principal: AuthPrincipal,
+    viewer: CalendarViewerContext,
   ): Promise<EventAttendanceCaptureRecord> {
     const event = this.ctx.calendarEvents.get(eventId);
     if (!event || event.sreniId !== sreniId) throw new NotFoundException('Calendar event not found');
     if (!this.ctx.isTargetApproved('calendar_event', event.id)) {
       throw new BadRequestException('Attendance capture is allowed only after the event approval is completed');
     }
-    if (event.scope === 'zone' && !this.ctx.hasZoneRights(principal)) {
-      throw new BadRequestException('Zone scoped events require zone rights');
+    if (event.scope === 'zone' && !viewer.isZoneViewer) {
+      throw new BadRequestException('Zone scoped events require zone-level access');
     }
 
     const metric = this.ctx.attendanceMetrics.get(dto.metricId);

@@ -12,6 +12,7 @@ import {
 import { AuthPrincipal } from '@modules/user-management/interfaces/auth-principal.interface';
 import { CryptoService } from '@modules/user-management/services/crypto.service';
 import { CORE_BUSINESS_STORE } from './constants';
+import { CALENDAR_APPROVAL_STATUS } from './constants/calendar-domain.constants';
 import {
   BulkAttendanceUploadDto,
   CreateDocumentDto,
@@ -81,6 +82,7 @@ import {
 } from './dto/core-business.dto';
 import { ApprovalRuntimeService } from './services/approval-runtime.service';
 import { AttendanceRuntimeService, type AttendanceRuntimeContext } from './services/attendance-runtime.service';
+import { CalendarAccessService } from './services/calendar-access.service';
 import { CalendarEventsRuntimeService, type CalendarEventsRuntimeContext } from './services/calendar-events-runtime.service';
 import { ContactAccessScope, ContactAccessScopeService } from './services/contact-access-scope.service';
 import { SevaSamithiContactService } from './services/seva-samithi-contact.service';
@@ -130,7 +132,9 @@ import type {
   ApprovalWorkflowRecord,
   AttendanceMetricRecord,
   AttendanceRecord,
+  CalendarConflictWarning,
   CalendarEventRecord,
+  CalendarFeedItemRecord,
   ContactSreniTagRecord,
   MemberContactCommitDecision,
   MemberContactCommitResult,
@@ -270,6 +274,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   private calendarEventsRuntimeService: CalendarEventsRuntimeService | null = null;
   private coreBusinessAccessUtilsService: CoreBusinessAccessUtilsService | null = null;
   private contactAccessScopeService: ContactAccessScopeService | null = null;
+  private calendarAccessService: CalendarAccessService | null = null;
   private coreBusinessDbBootstrapService: CoreBusinessDbBootstrapService | null = null;
   private coreBusinessDbHydrationService: CoreBusinessDbHydrationService | null = null;
   private coreBusinessDomainUtilsService: CoreBusinessDomainUtilsService | null = null;
@@ -1046,6 +1051,12 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   }
 
   private isTargetApproved(targetType: 'report_submission' | 'calendar_event', targetId: string): boolean {
+    if (targetType === 'calendar_event') {
+      const event = this.calendarEvents.get(targetId);
+      if (event) {
+        return event.approvalStatus === CALENDAR_APPROVAL_STATUS.APPROVED;
+      }
+    }
     return this.getApprovalRuntime().isTargetApproved(targetType, targetId);
   }
 
@@ -1061,6 +1072,38 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
         findApprovalItem: (itemId) => this.getCoreBusinessDomainUtilsService().findApprovalItem(itemId),
         scheduleApprovalItemStatePersistence: (itemId) => this.scheduleApprovalItemStatePersistence(itemId),
         scheduleApprovalWorkflowStatePersistence: (workflowId) => this.scheduleApprovalWorkflowStatePersistence(workflowId),
+        resolveActorIdentityIds: (principal) => {
+          const ids = new Set<string>([principal.userId]);
+          if (principal.email) {
+            ids.add(principal.email.trim().toLowerCase());
+            const byEmail = Array.from(this.users.values()).find(
+              (user) => user.active && user.email?.trim().toLowerCase() === principal.email?.trim().toLowerCase(),
+            );
+            if (byEmail) ids.add(byEmail.id);
+          }
+          const direct = this.users.get(principal.userId);
+          if (direct?.active) ids.add(direct.id);
+          return [...ids];
+        },
+        onApprovalItemFinalized: (item) => {
+          if (item.targetType !== 'calendar_event') return;
+          const status = item.status === CALENDAR_APPROVAL_STATUS.APPROVED
+            ? CALENDAR_APPROVAL_STATUS.APPROVED
+            : item.status === CALENDAR_APPROVAL_STATUS.REJECTED
+              ? CALENDAR_APPROVAL_STATUS.REJECTED
+              : null;
+          if (!status) return;
+          if (this.calendarEvents.has(item.targetId)) {
+            this.getCalendarEventsRuntime().setSreniEventApprovalStatus(item.targetId, status);
+            return;
+          }
+          if (this.runtimeMode === 'db' && this.dataSource) {
+            void this.dataSource.query(
+              `UPDATE adwest.sthan_calendar_events SET approval_status=$2, updated_at=now() WHERE id::text=$1`,
+              [item.targetId, status],
+            );
+          }
+        },
       });
     }
     return this.approvalRuntimeService;
@@ -1248,19 +1291,33 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   async listSreniCalendarEvents(
     sreniId: string,
     principal: AuthPrincipal,
-    accessibleSthanIds: string[] = [],
-  ): Promise<CalendarEventRecord[]> {
+  ): Promise<CalendarFeedItemRecord[]> {
     await this.ensureSrenyProgramRuntime(sreniId);
-    return this.getCalendarEventsRuntime().listSreniCalendarEvents(sreniId, principal, accessibleSthanIds);
+    const viewer = await this.getCalendarAccessService().resolveViewer(principal);
+    this.getCalendarAccessService().assertCanAccessSreni(viewer, sreniId);
+    return this.getCalendarEventsRuntime().listSreniCalendarFeedAsync(sreniId, viewer, principal);
+  }
+
+  async checkSreniCalendarConflicts(
+    sreniId: string,
+    dto: CreateCalendarEventDto,
+    principal: AuthPrincipal,
+  ): Promise<CalendarConflictWarning[]> {
+    await this.ensureSrenyProgramRuntime(sreniId);
+    const viewer = await this.getCalendarAccessService().resolveViewer(principal);
+    this.getCalendarAccessService().assertCanAccessSreni(viewer, sreniId);
+    return this.getCalendarEventsRuntime().checkCreateConflicts(sreniId, dto, viewer);
   }
 
   async createSreniCalendarEvent(
     sreniId: string,
     dto: CreateCalendarEventDto,
     principal: AuthPrincipal,
-  ): Promise<CalendarEventRecord> {
+  ): Promise<CalendarFeedItemRecord> {
     await this.ensureSrenyProgramRuntime(sreniId);
-    return this.getCalendarEventsRuntime().createSreniCalendarEvent(sreniId, dto, principal);
+    const viewer = await this.getCalendarAccessService().resolveViewer(principal);
+    this.getCalendarAccessService().assertCanAccessSreni(viewer, sreniId);
+    return this.getCalendarEventsRuntime().createSreniCalendarEvent(sreniId, dto, viewer, principal);
   }
 
   async updateSreniCalendarEvent(
@@ -1268,9 +1325,11 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     eventId: string,
     dto: UpdateCalendarEventDto,
     principal: AuthPrincipal,
-  ): Promise<CalendarEventRecord> {
+  ): Promise<CalendarFeedItemRecord> {
     await this.ensureSrenyProgramRuntime(sreniId);
-    return this.getCalendarEventsRuntime().updateSreniCalendarEvent(sreniId, eventId, dto, principal);
+    const viewer = await this.getCalendarAccessService().resolveViewer(principal);
+    this.getCalendarAccessService().assertCanAccessSreni(viewer, sreniId);
+    return this.getCalendarEventsRuntime().updateSreniCalendarEvent(sreniId, eventId, dto, viewer, principal);
   }
 
   async deleteSreniCalendarEvent(
@@ -1279,7 +1338,9 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     principal: AuthPrincipal,
   ): Promise<{ success: boolean; deletedBy: string }> {
     await this.ensureSrenyProgramRuntime(sreniId);
-    return this.getCalendarEventsRuntime().deleteSreniCalendarEvent(sreniId, eventId, principal);
+    const viewer = await this.getCalendarAccessService().resolveViewer(principal);
+    this.getCalendarAccessService().assertCanAccessSreni(viewer, sreniId);
+    return this.getCalendarEventsRuntime().deleteSreniCalendarEvent(sreniId, eventId, viewer, principal);
   }
 
   private getCalendarEventsRuntime(): CalendarEventsRuntimeService {
@@ -1295,7 +1356,7 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
       dataSource: this.dataSource ?? undefined,
       calendarEvents: this.calendarEvents,
       sreniExists: (sreniId) => this.srenies.has(sreniId),
-      hasZoneRights: (principal) => this.getCoreBusinessAccessUtilsService().hasZoneRights(principal),
+      sreniName: (sreniId) => this.srenies.get(sreniId)?.name ?? sreniId,
       newId: (prefix) => this.newId(prefix),
       createReportingApprovalRequest: (payload, principal) => this.createReportingApprovalRequest(payload, principal),
       logWarning: (message) => this.logger.warn(message),
@@ -1327,10 +1388,11 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
   async listSreniAttendanceListing(
     sreniId: string,
     principal: AuthPrincipal,
-    accessibleSthanIds: string[] = [],
   ): Promise<Array<{ event: CalendarEventRecord; metrics: Array<{ metric: AttendanceMetricRecord; capture?: EventAttendanceCaptureRecord }> }>> {
     await this.ensureSrenyProgramRuntime(sreniId);
-    return this.getAttendanceRuntime().listSreniAttendanceListing(sreniId, principal, accessibleSthanIds);
+    const viewer = await this.getCalendarAccessService().resolveViewer(principal);
+    this.getCalendarAccessService().assertCanAccessSreni(viewer, sreniId);
+    return this.getAttendanceRuntime().listSreniAttendanceListing(sreniId, principal, viewer);
   }
 
   async listAnalyticsStudioLayouts(
@@ -1432,7 +1494,9 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     principal: AuthPrincipal,
   ): Promise<EventAttendanceCaptureRecord> {
     await this.ensureSrenyProgramRuntime(sreniId);
-    return this.getAttendanceRuntime().upsertEventAttendanceCapture(sreniId, eventId, dto, principal);
+    const viewer = await this.getCalendarAccessService().resolveViewer(principal);
+    this.getCalendarAccessService().assertCanAccessSreni(viewer, sreniId);
+    return this.getAttendanceRuntime().upsertEventAttendanceCapture(sreniId, eventId, dto, principal, viewer);
   }
 
   private getAttendanceRuntime(): AttendanceRuntimeService {
@@ -1450,12 +1514,11 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
       runtimeMode: this.runtimeMode,
       dataSource: this.dataSource ?? undefined,
       newId: (prefix) => this.newId(prefix),
-      hasZoneRights: (principal) => this.getCoreBusinessAccessUtilsService().hasZoneRights(principal),
       canViewCreatorData: (principal, creatorUserId) =>
         this.getCoreBusinessAccessUtilsService().canViewCreatorData(principal, creatorUserId, this.users),
       toIsoTimestamp: (value) => this.getCoreBusinessDomainUtilsService().toIsoTimestamp(value),
-      listSreniCalendarEvents: (sreniId, principal, accessibleSthanIds) =>
-        this.getCalendarEventsRuntime().listSreniCalendarEvents(sreniId, principal, accessibleSthanIds),
+      listSreniCalendarEvents: (sreniId, viewer, principal) =>
+        this.getCalendarEventsRuntime().listSreniCalendarEvents(sreniId, viewer, principal),
       isTargetApproved: (targetType, targetId) => this.isTargetApproved(targetType, targetId),
     };
   }
@@ -1472,6 +1535,16 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
       this.coreBusinessAccessUtilsService = new CoreBusinessAccessUtilsService();
     }
     return this.coreBusinessAccessUtilsService;
+  }
+
+  private getCalendarAccessService(): CalendarAccessService {
+    if (!this.calendarAccessService) {
+      this.calendarAccessService = new CalendarAccessService(
+        this.getContactAccessScopeService(),
+        this.dataSource,
+      );
+    }
+    return this.calendarAccessService;
   }
 
   private getContactAccessScopeService(): ContactAccessScopeService {
@@ -2282,8 +2355,13 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     return this.getSthanRuntime().updateSthanContact(locationId, contactId, data);
   }
 
-  async listSthanCalendarEvents(locationId: string): Promise<SthanCalendarEventRecord[]> {
-    return this.getSthanRuntime().listSthanCalendarEvents(locationId);
+  async listSthanCalendarEvents(
+    locationId: string,
+    principal: AuthPrincipal,
+  ): Promise<SthanCalendarEventRecord[]> {
+    const viewer = await this.getCalendarAccessService().resolveViewer(principal);
+    await this.getCalendarAccessService().assertCanAccessSthan(viewer, locationId);
+    return this.getSthanRuntime().listSthanCalendarEvents(locationId, viewer, principal);
   }
 
   async createSthanCalendarEvent(
@@ -2291,7 +2369,9 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     dto: CreateSthanCalendarEventDto,
     principal: AuthPrincipal,
   ): Promise<SthanCalendarEventRecord> {
-    return this.getSthanRuntime().createSthanCalendarEvent(locationId, dto, principal);
+    const viewer = await this.getCalendarAccessService().resolveViewer(principal);
+    await this.getCalendarAccessService().assertCanAccessSthan(viewer, locationId);
+    return this.getSthanRuntime().createSthanCalendarEvent(locationId, dto, principal, viewer);
   }
 
   async updateSthanCalendarEvent(
@@ -2300,7 +2380,9 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     dto: UpdateSthanCalendarEventDto,
     principal: AuthPrincipal,
   ): Promise<SthanCalendarEventRecord> {
-    return this.getSthanRuntime().updateSthanCalendarEvent(locationId, eventId, dto, principal);
+    const viewer = await this.getCalendarAccessService().resolveViewer(principal);
+    await this.getCalendarAccessService().assertCanAccessSthan(viewer, locationId);
+    return this.getSthanRuntime().updateSthanCalendarEvent(locationId, eventId, dto, principal, viewer);
   }
 
   async deleteSthanCalendarEvent(
@@ -2308,6 +2390,8 @@ export class CoreBusinessService implements OnModuleInit, OnModuleDestroy {
     eventId: string,
     principal: AuthPrincipal,
   ): Promise<{ success: boolean; deletedBy: string }> {
-    return this.getSthanRuntime().deleteSthanCalendarEvent(locationId, eventId, principal);
+    const viewer = await this.getCalendarAccessService().resolveViewer(principal);
+    await this.getCalendarAccessService().assertCanAccessSthan(viewer, locationId);
+    return this.getSthanRuntime().deleteSthanCalendarEvent(locationId, eventId, principal, viewer);
   }
 }

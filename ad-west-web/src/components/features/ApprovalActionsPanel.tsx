@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ApprovalWorkflowRuntimeItemApi, backendApi } from '../../utils/backendApi'
+import { ApprovalItemApi, backendApi } from '../../utils/backendApi'
 import { useToast } from '../common/Toast'
 import { TableRowActionsMenu } from '../common/TableRowActionsMenu'
 import { TableColumnFilterRow, type TableColumnFilterDef } from '../common/TableColumnFilterRow'
@@ -17,11 +17,11 @@ const statusLabel: Record<string, string> = {
 
 type ApprovalActionRow = {
   id: string
-  kind: 'workflow' | 'reimbursement'
+  kind: 'calendar' | 'report' | 'reimbursement'
   summary: string
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'need_more_information'
   updatedAt: string
-  workflowItem?: ApprovalWorkflowRuntimeItemApi
+  approvalItem?: ApprovalItemApi
   reimbursementId?: string
 }
 
@@ -76,18 +76,18 @@ export const ApprovalActionsPanel: React.FC = () => {
   const load = async () => {
     setLoading(true)
     try {
-      const [workflowItems, access] = await Promise.all([
+      const [approvalItems, access] = await Promise.all([
         backendApi.listMyApprovalActions('pending').catch(() => []),
         backendApi.getReimbursementAccess().catch(() => ({ canReview: false })),
       ])
 
-      const rows: ApprovalActionRow[] = workflowItems.map((item) => ({
+      const rows: ApprovalActionRow[] = approvalItems.map((item) => ({
         id: item.id,
-        kind: 'workflow',
+        kind: item.targetType === 'calendar_event' ? 'calendar' : 'report',
         summary: item.summary || item.targetId,
         status: item.status,
         updatedAt: item.updatedAt,
-        workflowItem: item,
+        approvalItem: item,
       }))
 
       if (access.canReview) {
@@ -135,14 +135,8 @@ export const ApprovalActionsPanel: React.FC = () => {
           status: decision,
           reviewerNotes: notes[item.id]?.trim() || undefined,
         })
-      } else if (item.workflowItem) {
-        const stageId = item.workflowItem.currentStageIds[0]
-        if (!stageId) {
-          addToast('No active stage found for this item.', 'error')
-          return
-        }
-        await backendApi.reviewApprovalWorkflowRuntimeItem(item.workflowItem.id, {
-          stageId,
+      } else if (item.approvalItem) {
+        await backendApi.reviewApprovalItem(item.approvalItem.id, {
           decision,
           note: notes[item.id]?.trim() || undefined,
         })

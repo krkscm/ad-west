@@ -161,7 +161,7 @@ export class CoreBusinessDbHydrationService {
         'SELECT id, sreni_id, row_index, data, zone_location_id, sthan_location_id, division_location_id, division_id, sthan_id, contact_kind, parent_contact_id, sr_no, source_file, uploaded_by, created_at, updated_at FROM adwest.sreni_contacts ORDER BY sreni_id ASC, row_index ASC',
       ).catch(() => [] as unknown[]),
       this.ctx.dataSource.query(
-        'SELECT id, sreni_id, title, event_date, start_time, end_time, color, notes, scope, sthan_ids, created_by, updated_by, created_at, updated_at FROM adwest.sreni_calendar_events ORDER BY event_date ASC, start_time ASC',
+        'SELECT id, sreni_id, title, event_date, start_time, end_time, color, notes, scope, sthan_ids, approval_status, created_by, updated_by, created_at, updated_at FROM adwest.sreni_calendar_events ORDER BY event_date ASC, start_time ASC',
       ).catch(() => [] as unknown[]),
       this.ctx.dataSource.query(
         'SELECT id, sreni_id, name, description, metric_keys, active, created_by, updated_by, created_at, updated_at FROM adwest.sreni_attendance_metrics ORDER BY sreni_id ASC, name ASC',
@@ -713,7 +713,7 @@ export class CoreBusinessDbHydrationService {
     for (const row of calendarEventRows as Array<{
       id: string; sreni_id: string; title: string; event_date: string | Date;
       start_time: string; end_time: string; color: string; notes: string | null;
-      scope: 'zone' | 'sthan'; sthan_ids: string[] | null;
+      scope: 'zone' | 'sthan'; sthan_ids: string[] | null; approval_status?: string | null;
       created_by: string; updated_by: string;
       created_at: string | Date; updated_at: string | Date;
     }>) {
@@ -728,6 +728,7 @@ export class CoreBusinessDbHydrationService {
         notes: row.notes ?? undefined,
         scope: row.scope,
         sthanIds: Array.isArray(row.sthan_ids) ? row.sthan_ids : [],
+        approvalStatus: (row.approval_status ?? 'approved') as 'pending' | 'approved' | 'rejected',
         createdBy: row.created_by,
         updatedBy: row.updated_by,
         createdAt: this.ctx.toIsoTimestamp(row.created_at),
@@ -811,7 +812,7 @@ export class CoreBusinessDbHydrationService {
   async hydrateSrenyProgramRuntimeData(sreniId: string): Promise<void> {
     const [calendarEventRows, attendanceMetricRows, eventAttendanceCaptureRows] = await Promise.all([
       this.ctx.dataSource.query(
-        `SELECT id, sreni_id, title, event_date, start_time, end_time, color, notes, scope, sthan_ids, created_by, updated_by, created_at, updated_at
+        `SELECT id, sreni_id, title, event_date, start_time, end_time, color, notes, scope, sthan_ids, approval_status, created_by, updated_by, created_at, updated_at
          FROM adwest.sreni_calendar_events WHERE sreni_id=$1 ORDER BY event_date ASC, start_time ASC`,
         [sreniId],
       ).catch(() => [] as unknown[]),
@@ -830,7 +831,7 @@ export class CoreBusinessDbHydrationService {
     for (const row of calendarEventRows as Array<{
       id: string; sreni_id: string; title: string; event_date: string | Date;
       start_time: string; end_time: string; color: string; notes: string | null;
-      scope: 'zone' | 'sthan'; sthan_ids: string[] | null;
+      scope: 'zone' | 'sthan'; sthan_ids: string[] | null; approval_status?: string | null;
       created_by: string; updated_by: string;
       created_at: string | Date; updated_at: string | Date;
     }>) {
@@ -845,6 +846,7 @@ export class CoreBusinessDbHydrationService {
         notes: row.notes ?? undefined,
         scope: row.scope,
         sthanIds: Array.isArray(row.sthan_ids) ? row.sthan_ids : [],
+        approvalStatus: (row.approval_status ?? 'approved') as 'pending' | 'approved' | 'rejected',
         createdBy: row.created_by,
         updatedBy: row.updated_by,
         createdAt: this.ctx.toIsoTimestamp(row.created_at),

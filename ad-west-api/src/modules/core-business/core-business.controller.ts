@@ -694,13 +694,18 @@ export class CoreBusinessController {
   listSreniCalendarEvents(
     @Param('sreniId') sreniId: string,
     @CurrentUser() actor: AuthPrincipal,
-    @Query('accessibleSthanIds') accessibleSthanIds?: string,
   ) {
-    const sthanIds = (accessibleSthanIds ?? '')
-      .split(',')
-      .map((id) => id.trim())
-      .filter(Boolean);
-    return this.service.listSreniCalendarEvents(sreniId, actor, sthanIds);
+    return this.service.listSreniCalendarEvents(sreniId, actor);
+  }
+
+  @Post('programs/sreni-definitions/:sreniId/calendar-events/conflicts')
+  @UseGuards(CoreAdminAuthGuard)
+  checkSreniCalendarConflicts(
+    @Param('sreniId') sreniId: string,
+    @Body() dto: CreateCalendarEventDto,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.checkSreniCalendarConflicts(sreniId, dto, actor);
   }
 
   @Post('programs/sreni-definitions/:sreniId/calendar-events')
@@ -739,13 +744,8 @@ export class CoreBusinessController {
   listSreniAttendanceListing(
     @Param('sreniId') sreniId: string,
     @CurrentUser() actor: AuthPrincipal,
-    @Query('accessibleSthanIds') accessibleSthanIds?: string,
   ) {
-    const sthanIds = (accessibleSthanIds ?? '')
-      .split(',')
-      .map((id) => id.trim())
-      .filter(Boolean);
-    return this.service.listSreniAttendanceListing(sreniId, actor, sthanIds);
+    return this.service.listSreniAttendanceListing(sreniId, actor);
   }
 
   @Get('programs/sreni-definitions/:sreniId/analytics-layouts')
@@ -1580,8 +1580,11 @@ export class CoreBusinessController {
 
   @Get('org/locations/:locationId/calendar-events')
   @UseGuards(CoreAdminAuthGuard)
-  listSthanCalendarEvents(@Param('locationId') locationId: string) {
-    return this.service.listSthanCalendarEvents(locationId);
+  listSthanCalendarEvents(
+    @Param('locationId') locationId: string,
+    @CurrentUser() actor: AuthPrincipal,
+  ) {
+    return this.service.listSthanCalendarEvents(locationId, actor);
   }
 
   @Post('org/locations/:locationId/calendar-events')

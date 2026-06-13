@@ -389,19 +389,32 @@ export interface MemberContactCommitResultApi {
 
 export interface CalendarEventApi {
   id: string
-  sreniId: string
+  kind?: 'special_event' | 'sreni_event' | 'sthan_local'
+  priorityTier?: 'special_event' | 'zone' | 'sthan' | 'pending' | 'local'
+  approvalStatus?: 'pending' | 'approved' | 'rejected'
+  sreniId?: string
   title: string
   date: string
   startTime: string
   endTime: string
   color: string
   notes?: string
-  scope: 'zone' | 'sthan'
-  sthanIds: string[]
+  scope?: 'zone' | 'sthan'
+  sthanIds?: string[]
+  readOnly?: boolean
   createdBy: string
   createdAt: string
   updatedBy: string
   updatedAt: string
+}
+
+export interface CalendarConflictWarningApi {
+  code: string
+  message: string
+  relatedSreniId?: string
+  relatedSreniName?: string
+  relatedEventId?: string
+  relatedEventTitle?: string
 }
 
 export interface AttendanceMetricApi {
@@ -978,11 +991,13 @@ export interface SthanCalendarEventApi {
   endTime: string
   color: string
   notes?: string
+  approvalStatus?: 'pending' | 'approved' | 'rejected'
+  priorityTier?: 'special_event' | 'zone' | 'sthan' | 'pending' | 'local'
   createdBy: string
   createdAt: string
   updatedBy: string
   updatedAt: string
-  source?: 'local' | 'sreni'
+  source?: 'local' | 'sreni' | 'special_event'
   sreniId?: string
   scope?: 'zone' | 'sthan'
   readOnly?: boolean
@@ -1389,7 +1404,7 @@ export const backendApi = {
     api.get<ApprovalItemApi[]>(`/approvals/items${status ? `?status=${encodeURIComponent(status)}` : ''}`),
 
   listMyApprovalActions: (status?: string) =>
-    api.get<ApprovalWorkflowRuntimeItemApi[]>(`/settings/approval-workflows/runtime/my-items${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+    api.get<ApprovalItemApi[]>(`/approvals/my-actions${status ? `?status=${encodeURIComponent(status)}` : ''}`),
 
   listMyApprovalNotifications: (_itemId?: string) =>
     api.get<ApprovalNotificationApi[]>('/settings/approval-workflows/runtime/my-notifications'),
@@ -1884,16 +1899,24 @@ export const backendApi = {
     ),
 
   // Sreni Calendar Events
-  listSreniCalendarEvents: (sreniId: string, accessibleSthanIds?: string[]) => {
-    const qs = new URLSearchParams()
-    if (accessibleSthanIds && accessibleSthanIds.length > 0) {
-      qs.set('accessibleSthanIds', accessibleSthanIds.join(','))
-    }
-    const q = qs.toString()
-    return api.get<CalendarEventApi[]>(
-      `/programs/sreni-definitions/${encodeURIComponent(sreniId)}/calendar-events${q ? `?${q}` : ''}`,
-    )
-  },
+  listSreniCalendarEvents: (sreniId: string) =>
+    api.get<CalendarEventApi[]>(
+      `/programs/sreni-definitions/${encodeURIComponent(sreniId)}/calendar-events`,
+    ),
+
+  checkSreniCalendarConflicts: (sreniId: string, payload: {
+    title: string
+    date: string
+    startTime: string
+    endTime: string
+    color?: string
+    notes?: string
+    scope: 'zone' | 'sthan'
+    sthanIds?: string[]
+  }) => api.post<CalendarConflictWarningApi[]>(
+    `/programs/sreni-definitions/${encodeURIComponent(sreniId)}/calendar-events/conflicts`,
+    payload,
+  ),
 
   createSreniCalendarEvent: (sreniId: string, payload: {
     title: string
@@ -1953,16 +1976,10 @@ export const backendApi = {
   deleteAttendanceMetric: (metricId: string) =>
     api.delete<{ success: boolean; deletedId: string }>(`/org/attendance-metrics/${encodeURIComponent(metricId)}`),
 
-  listSreniAttendanceListing: (sreniId: string, accessibleSthanIds?: string[]) => {
-    const qs = new URLSearchParams()
-    if (accessibleSthanIds && accessibleSthanIds.length > 0) {
-      qs.set('accessibleSthanIds', accessibleSthanIds.join(','))
-    }
-    const q = qs.toString()
-    return api.get<SreniAttendanceListingItemApi[]>(
-      `/programs/sreni-definitions/${encodeURIComponent(sreniId)}/attendance-listing${q ? `?${q}` : ''}`,
-    )
-  },
+  listSreniAttendanceListing: (sreniId: string) =>
+    api.get<SreniAttendanceListingItemApi[]>(
+      `/programs/sreni-definitions/${encodeURIComponent(sreniId)}/attendance-listing`,
+    ),
 
   listAnalyticsStudioLayouts: (sreniId: string, layoutType?: 'details' | 'pivot') => {
     const qs = new URLSearchParams()

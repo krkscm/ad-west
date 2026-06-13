@@ -36,11 +36,22 @@ const EVENT_COLORS = [
 const today = new Date();
 const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
 
-const isSyncedEvent = (ev: SthanCalendarEventApi) => ev.source === 'sreni' || ev.readOnly;
+const isSyncedEvent = (ev: SthanCalendarEventApi) =>
+  ev.source === 'sreni' || ev.source === 'special_event' || ev.readOnly;
+
+const isSpecialEvent = (ev: SthanCalendarEventApi) =>
+  ev.source === 'special_event' || ev.priorityTier === 'special_event';
+
+const eventDisplayTitle = (ev: SthanCalendarEventApi) => {
+  if (ev.approvalStatus === 'pending') return `${ev.title} (Pending)`;
+  if (isSpecialEvent(ev)) return `${ev.title} (Special Event)`;
+  return ev.title;
+};
 
 const eventKey = (ev: SthanCalendarEventApi) => `${ev.source ?? 'local'}-${ev.id}`;
 
 const scopeLabel = (ev: SthanCalendarEventApi) => {
+  if (ev.source === 'special_event') return 'Special Event';
   if (ev.scope === 'zone') return 'Zone';
   if (ev.scope === 'sthan') return 'Sreni · Sthan';
   return 'Sreni';
@@ -343,7 +354,7 @@ export const SthanCalendarPage: React.FC<Props> = ({ locationId, locationName })
                           <div
                             key={eventKey(ev)}
                             onClick={e => openEdit(e, ev)}
-                            title={`${ev.startTime}–${ev.endTime}: ${ev.title}${synced ? ` (${scopeLabel(ev)} · read-only)` : ''}`}
+                            title={`${ev.startTime}–${ev.endTime}: ${eventDisplayTitle(ev)}${synced ? ` (${scopeLabel(ev)} · read-only)` : ''}`}
                             style={{
                               fontSize: '0.71rem',
                               fontWeight: 600,
@@ -358,7 +369,7 @@ export const SthanCalendarPage: React.FC<Props> = ({ locationId, locationName })
                               cursor: 'pointer',
                             }}
                           >
-                            {synced ? '↗ ' : ''}{ev.startTime} {ev.title}
+                            {synced ? '↗ ' : ''}{ev.startTime} {eventDisplayTitle(ev)}
                           </div>
                           );
                         })}
@@ -405,7 +416,7 @@ export const SthanCalendarPage: React.FC<Props> = ({ locationId, locationName })
                   <div style={{ width: '4px', height: '40px', borderRadius: '2px', background: ev.color, flexShrink: 0, opacity: synced ? 0.75 : 1 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span>{ev.title}</span>
+                      <span>{eventDisplayTitle(ev)}</span>
                       {synced && (
                         <span style={{
                           fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '999px',
